@@ -97,7 +97,10 @@ pipeML is fully implemented and adapted as part of [CellTFusion](https://github.
 ## Citing pipeML
 
 If you use pipeML in a scientific publication, we would appreciate citation to the :
-
 ```
 XXXXX
 ```
+
+## Acknowledgements
+
+This repository was created by [Marcelo Hurtado](https://github.com/mhurtado13) in the [Network Biology for Immuno-oncology (NetB(IO)²)](https://www.crct-inserm.fr/en/netbio2_en/) group at the Cancer Research Center of Toulouse in supervision of [Vera Pancaldi](https://github.com/VeraPancaldi).
