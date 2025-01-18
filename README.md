@@ -30,7 +30,7 @@ Make sure to run `renv::deactivate()` when finishing running multideconv, to avo
 
 For more information about how `renv` works, visit https://rstudio.github.io/renv/articles/renv.html.
 
-## Pipeline
+## Description
 
 pipeML is a robust pipeline done in R to train and test machine learning models for classification tasks. It is develop for a fast and easy use, its complexity allows a robust implementation during each step of the pipeline (Figure 1). 
 
