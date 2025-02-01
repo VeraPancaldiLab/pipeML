@@ -1,5 +1,55 @@
 
+
 ##Machine learning pipeline functions adapted for CellTFusion (https://github.com/VeraPancaldiLab/CellTFusion)
+
+libraries_set <- function(){
+  suppressMessages(library("BiocManager"))
+  suppressMessages(library("devtools"))
+  suppressMessages(library("pak"))
+  suppressMessages(library("remotes"))
+  suppressMessages(library("decoupleR"))
+  suppressMessages(library("OmnipathR"))
+  suppressMessages(library("tidyr"))
+  suppressMessages(library("dplyr"))
+  suppressMessages(library("matrixStats"))
+  suppressMessages(library("org.Hs.eg.db"))
+  suppressMessages(library("ReactomePA"))
+  suppressMessages(library("WGCNA"))
+  suppressMessages(library("reshape2"))
+  suppressMessages(library("purrr"))
+  suppressMessages(library("tidygraph"))
+  suppressMessages(library("stringr"))
+  suppressMessages(library("tibble"))
+  suppressMessages(library("gplots"))
+  suppressMessages(library("ggplot2"))
+  suppressMessages(library("AnnotationDbi"))
+  suppressMessages(library("RColorBrewer"))
+  suppressMessages(library("pheatmap"))
+  suppressMessages(library("ggfortify"))
+  suppressMessages(library("Hmisc"))
+  suppressMessages(library("ggpubr"))
+  suppressMessages(library("ComplexHeatmap"))
+  suppressMessages(library("ggstatsplot"))
+  suppressMessages(library("dendextend"))
+  suppressMessages(library("stats"))
+  suppressMessages(library("Boruta"))
+  suppressMessages(library("caret"))
+  suppressMessages(library("pROC"))
+  suppressMessages(library("MLeval"))
+  suppressMessages(library("survival"))
+  suppressMessages(library("survminer"))
+  suppressMessages(library("rms"))
+  suppressMessages(library("igraph"))
+  suppressMessages(library("uuid"))
+  suppressMessages(library("parallel"))
+  suppressMessages(library("factoextra"))
+  suppressMessages(library("doParallel"))
+  suppressMessages(library("foreach"))
+}
+
+libraries_set()
+
+dir.create(file.path(getwd(), "Results"))
 
 ##Basic function to compute boruta algorithm
 compute.boruta <- function(data, seed, fix = TRUE) {
@@ -846,7 +896,7 @@ compute.k_fold_CV = function(model, k_folds, n_rep, stacking = F, metric = "Accu
   #Remove models with same predictions across samples (not able to make distinction)
   model_predictions <- lapply(model_predictions, function(df) {
     df = df %>%
-      select(where(~ n_distinct(.) > 1))
+      dplyr::select(dplyr::where(~ n_distinct(.) > 1))
     
     if(ncol(df) == 0){
       df = NULL
@@ -949,35 +999,112 @@ compute.ML = function(raw.counts, normalized = F, deconv, tf.universe, paths.uni
   raw.counts_train = raw.counts[,index]
   counts.normalized_train = norm.counts[,index]
   deconv_train = deconv[index,]
-  
-  tfs_train = compute.TFs.activity(counts.normalized_train, universe = tf.universe)
-  #deconv_train = compute.deconvolution(raw.counts_train, normalized = normalized, methods = deconv_methods, doParallel = doParallel, workers = workers, credentials.mail = "marcelo.hurtado@inserm.fr", credentials.token = "734212f6ad77fc4eea2bdb502792f294", return = return)
-  
+  tfs_train = compute.TFs.activity(counts.normalized_train)
+
   # Test cohort
   traitData_test = clinical[-index, ]
   raw.counts_test = raw.counts[,-index]
   counts.normalized_test = norm.counts[,-index]
   deconv_test = deconv[-index,]
-  tfs_test = compute.TFs.activity(counts.normalized_test, universe = tf.universe)
-  #deconv_test = compute.deconvolution(raw.counts_test, normalized = normalized, methods = deconv_methods, doParallel = doParallel, workers = workers, credentials.mail = "marcelo.hurtado@inserm.fr", credentials.token = "734212f6ad77fc4eea2bdb502792f294", return = return)
+  tfs_test = compute.TFs.activity(counts.normalized_test)
   
-  ###############################################################################################################################################################################
-  
-  # CellTFusion
+  network = compute.WTCNA(tfs_train, corr_mod = 0.7, clustering.method = "ward.D2", return = return)
+  dt = compute.deconvolution.analysis(deconv_train, corr = 0.7, seed = 123, return = return, file_name = file_name)
   set.seed(seed)
-  network = compute.WTCNA(tfs_train, corr_mod = 0.7, clustering.method = "ward.D2", return = return) 
+  
   pathways = compute.pathway.activity(counts.normalized_train, paths = paths.universe)
-  dt = compute.deconvolution.analysis(deconv_train, corr = 0.7, seed = 123, return = return, file_name = file_name) #Here we try to put the same seed just in case we have the same high_corr features, to ensure the same are choose for easier comparison between ML models (this choosing is random anyway so it doesn't affect)
-  corr_modules = compute.modules.relationship(network[[1]], dt[[1]], return = T, plot = return)
-  cell_dendrograms = identify.cell.groups(corr_modules, height = 20, return = return)
-  cell.groups = cell.groups.computation(dt[[1]], cell.dendrograms = cell_dendrograms, corr_modules[[1]], network, return = return) #Identify cell groups with specific cut 
-  
-  ###############################################################################################################################################################################
-  
-  ####################################################Training
 
+  # Network and subgrouping analysis in training cohort
+  hallmarks_of_immune_response <- c("CYT", "Roh_IS", "chemokines", "Davoli_IS", "IFNy", "Ayers_expIS", "RIR", "TLS")
+  immunescores = easier::compute_scores_immune_response(counts.normalized_train, hallmarks_of_immune_response)
+
+  immunescores = immunescores %>%
+    dplyr::mutate(RIR = immunescores$resF_down) %>%
+    dplyr::select(-resF_up, -resF, -resF_down)
+
+  immunescores$chemokines = immunescores$chemokines*-1
+  network[[1]] = cbind(network[[1]], immunescores, pathways)
+
+  
+  ##### Split between positive class and negative class
+  
+  ###Positive class
+  traitData_positive = traitData_train %>%
+    mutate(trait = traitData_train[,trait]) %>%
+    filter(trait == trait.positive)
+  counts.normalized.positive = counts.normalized_train[,rownames(traitData_positive)]
+  deconv.positive = deconv_train[rownames(traitData_positive),]
+  tfs.positive = compute.TFs.activity(counts.normalized.positive, universe = tf.universe)
+  dt.positive = dt
+  network.positive = network
+  dt.positive[[1]] = replicate_deconvolution_subgroups(dt, deconv.positive)
+  network.positive[[1]] = create_tfs_modules(tfs.positive, network)
+  pathways.positive = compute.pathway.activity(counts.normalized.positive, paths = paths.universe)
+
+  immunescores_positive = easier::compute_scores_immune_response(counts.normalized.positive, hallmarks_of_immune_response)
+
+  immunescores_positive = immunescores_positive %>%
+    dplyr::mutate(RIR = immunescores_positive$resF_down) %>%
+    dplyr::select(-resF_up, -resF, -resF_down)
+
+  immunescores_positive$chemokines = immunescores_positive$chemokines*-1
+  network.positive[[1]] = cbind(network.positive[[1]], immunescores_positive, pathways.positive)
+
+  corr_modules_positive = compute.modules.relationship(network.positive[[1]], dt.positive[[1]], return = T, plot = return, pval = 0.1)
+
+  ###Negative class
+  traitData_negative = traitData_train %>%
+    mutate(trait = traitData_train[,trait]) %>%
+    filter(trait != trait.positive)
+  counts.normalized.negative = counts.normalized_train[,rownames(traitData_negative)]
+  deconv.negative = deconv_train[rownames(traitData_negative),]
+  tfs.negative = compute.TFs.activity(counts.normalized.negative, universe = tf.universe)
+  dt.negative = dt
+  network.negative = network
+  dt.negative[[1]] = replicate_deconvolution_subgroups(dt, deconv.negative)
+  network.negative[[1]] = create_tfs_modules(tfs.negative, network)
+  pathways.negative = compute.pathway.activity(counts.normalized.negative, paths = paths.universe)
+
+  immunescores_negative = easier::compute_scores_immune_response(counts.normalized.negative, hallmarks_of_immune_response)
+
+  immunescores_negative = immunescores_negative %>%
+    dplyr::mutate(RIR = immunescores_negative$resF_down) %>%
+    dplyr::select(-resF_up, -resF, -resF_down)
+
+  immunescores_negative$chemokines = immunescores_negative$chemokines*-1
+  network.negative[[1]] = cbind(network.negative[[1]], immunescores_negative, pathways.negative)
+
+  corr_modules_negative = compute.modules.relationship(network.negative[[1]], dt.negative[[1]], return = T, plot = return, pval = 0.1)
+
+  # ####################################################Training
+  # 
+  corr_modules = differential_corr_analysis(corr_modules_positive[[1]], corr_modules_negative[[1]], nrow(traitData_positive), nrow(traitData_negative), pval = 0.05)
+  
+  #### Positive 
+  corr_modules_positive[[2]] = corr_modules[[2]]
+  corr_modules_negative[[2]] = corr_modules[[2]]
+  
+  cell_dendrograms = identify.cell.groups(corr_modules_positive, height = 20, return = return)
+  cell.groups.positive = cell.groups.computation(dt.positive[[1]], cell_dendrograms, network.positive, return)
+  
+  cell_dendrograms = identify.cell.groups(corr_modules_negative, height = 20, return = return)
+  cell.groups.negative = cell.groups.computation(dt.negative[[1]], cell_dendrograms, network.negative, return)
+  
+  ### Join cell groups composition from both classes
+  names(cell.groups.positive[[2]]) = paste0(names(cell.groups.positive[[2]]), "_responders")
+  names(cell.groups.negative[[2]]) = paste0(names(cell.groups.negative[[2]]), "_non.responders")
+  cell.groups.composition = c(cell.groups.positive[[2]], cell.groups.negative[[2]])
+  
+  ### Join cell groups loadings
+  cell.groups.loadings = c(cell.groups.positive[[3]], cell.groups.negative[[3]])
+  
+  ### List cell groups values and composition 
+  cell_groups = list(cell.groups.positive, cell.groups.composition, cell.groups.loadings)
+  
+  cell.groups.train = compute_cell_groups_signatures(dt, network, cell_groups, names(cell_groups[[2]]), counts.normalized_train, deconv_train, tfs_train) #Cell groups projection
+  
   #Set training set
-  train_data = cell.groups[[1]] %>%
+  train_data = cell.groups.train %>%
     data.frame() %>%
     mutate(Trait = traitData_train[,trait],
            target = as.factor(ifelse(Trait == trait.positive, 'yes', 'no'))) %>%
@@ -990,12 +1117,13 @@ compute.ML = function(raw.counts, normalized = F, deconv, tf.universe, paths.uni
   
   ####################################################Predicting
   if(length(training)!=0){
-    cell_groups = cell.groups #Save cell groups scores per partition
     network = network #Save TF network per partition
     features = training[["Features"]] #Save selected features per partition (only useful if Boruta = T - needs to be improve it)
     deconvolution_subgroups = dt[["Deconvolution groups - Linear-based correlation"]] #Save cell subgroups  
     ####################### Testing set
-    testing_set = compute_cell_groups_signatures(dt, network, cell.groups, features, deconv_test, tfs_test) #Cell groups projection
+    #testing_set = compute_cell_groups_signatures(dt, network, cell_groups, names(cell_groups[[2]]), counts.normalized_test, deconv_test, tfs_test) #Cell groups projection
+    testing_set = compute.test.set(dt, cell_groups, names(cell_groups[[2]]), deconv_test) #Compute features in testing set
+    
     #Extract target variable
     target = traitData_test %>%
       mutate(target = ifelse(traitData_test[,trait] == trait.positive, "yes", "no")) %>%
@@ -1024,22 +1152,153 @@ compute.ML = function(raw.counts, normalized = F, deconv, tf.universe, paths.uni
       get_curves(metrics, "specificity", "sensitivity", "recall", "precision", "model", auc_roc_score, auc_prc_score, file_name)
     }
     
-    rm(pathways, tfs.modules.clusters, dt, corr_modules, cell_dendrograms, cell.groups,
-       traitData_train, counts.normalized_train, tfs_train, deconv_train,
-       traitData_test, counts.normalized_test, deconv_test, tfs_test, 
-       clinical, norm.counts) #Remove variables
+    # rm(pathways, tfs.modules.clusters, dt, corr_modules, cell_dendrograms, cell.groups,
+    #    traitData_train, counts.normalized_train, tfs_train, deconv_train,
+    #    traitData_test, counts.normalized_test, deconv_test, tfs_test, 
+    #    clinical, norm.counts) #Remove variables
     
     gc() #Clean garbage
     
     return(list(Model = model, Features = features, Variable_importance = var_importance, Cell_groups = cell_groups, Deconvolution_subgroups = deconvolution_subgroups, TF_network = network, Prediction_metrics = metrics, AUC = list(AUROC = auc_roc_score, AUPRC = auc_prc_score), Prediction = predictions))
   }else{  #No features are selected as predictive
     
-    rm(pathways, tfs.modules.clusters, dt, corr_modules, cell_dendrograms, cell.groups,
-       traitData_train, counts.normalized_train, tfs_train, deconv_train,
-       traitData_test, counts.normalized_test, deconv_test, tfs_test, 
-       clinical, norm.counts) #Remove variables
-    
+    # rm(pathways, tfs.modules.clusters, dt, corr_modules, cell_dendrograms, cell.groups,
+    #    traitData_train, counts.normalized_train, tfs_train, deconv_train,
+    #    traitData_test, counts.normalized_test, deconv_test, tfs_test, 
+    #    clinical, norm.counts) #Remove variables
+    # 
     gc() #Clean garbage
+    
+    message("No features selected as predictive after Boruta runs. No model returned.")
+    
+    return(NULL)
+  }
+  
+}
+
+compute.training.ML = function(raw.counts, normalized = F, deconv, tf.universe, clinical, trait, trait.positive, metric = "Accuracy", stack, feature.selection = F, doParallel = F, workers = NULL, seed, file_name = NULL, return = F){
+  
+  set.seed(seed)   
+
+  # Normalize counts
+  if(normalized == T){
+    norm.counts = data.frame(ADImpute::NormalizeTPM(raw.counts, log = T)) 
+  }else{
+    norm.counts = raw.counts
+  }
+  
+  tfs = compute.TFs.activity(norm.counts, universe = tf.universe)
+  hallmarks_of_immune_response <- c("CYT", "Roh_IS", "chemokines", "Davoli_IS", "IFNy", "Ayers_expIS", "RIR", "TLS")
+  immunescores = easier::compute_scores_immune_response(norm.counts, hallmarks_of_immune_response)
+  immunescores = immunescores %>%
+    dplyr::mutate(RIR = immunescores$resF_down) %>%
+    dplyr::select(-resF_up, -resF, -resF_down)
+  immunescores$chemokines = immunescores$chemokines*-1
+  network = compute.WTCNA(tfs, corr_mod = 0.7, clustering.method = "ward.D2", return = return)
+  network[[1]] = cbind(network[[1]], immunescores)
+  dt = compute.deconvolution.analysis(deconv, corr = 0.7, seed = 123, return = return, file_name = file_name)
+  set.seed(seed)
+  
+  ##### Split between positive class and negative class
+  
+  ###Positive class
+  traitData_positive = clinical %>%
+    mutate(trait = clinical[,trait]) %>%
+    filter(trait == trait.positive)
+  counts.normalized.positive = norm.counts[,rownames(traitData_positive)]
+  deconv.positive = deconv[rownames(traitData_positive),]
+  tfs.positive = compute.TFs.activity(counts.normalized.positive, universe = tf.universe)
+  dt.positive = dt
+  network.positive = network
+  dt.positive[[1]] = replicate_deconvolution_subgroups(dt, deconv.positive)
+  network.positive[[1]] = create_tfs_modules(tfs.positive, network)
+  immunescores_positive = easier::compute_scores_immune_response(counts.normalized.positive, hallmarks_of_immune_response)
+  immunescores_positive = immunescores_positive %>%
+    dplyr::mutate(RIR = immunescores_positive$resF_down) %>%
+    dplyr::select(-resF_up, -resF, -resF_down)
+  immunescores_positive$chemokines = immunescores_positive$chemokines*-1
+  network.positive[[1]] = cbind(network.positive[[1]], immunescores_positive)
+  
+  corr_modules = compute.modules.relationship(network.positive[[1]], dt.positive[[1]], return = T, plot = return, pval = 0.05)
+  cell_dendrograms = identify.cell.groups(corr_modules, height = 20, return = return)
+  cell.groups.positive = cell.groups.computation(dt.positive[[1]], cell_dendrograms, network.positive, return)
+  
+  ###Negative class
+  traitData_negative = clinical %>%
+    mutate(trait = clinical[,trait]) %>%
+    filter(trait != trait.positive)
+  counts.normalized.negative = norm.counts[,rownames(traitData_negative)]
+  deconv.negative = deconv[rownames(traitData_negative),]
+  tfs.negative = compute.TFs.activity(counts.normalized.negative, universe = tf.universe)
+  dt.negative = dt
+  network.negative = network
+  dt.negative[[1]] = replicate_deconvolution_subgroups(dt, deconv.negative)
+  network.negative[[1]] = create_tfs_modules(tfs.negative, network)
+  immunescores_negative = easier::compute_scores_immune_response(counts.normalized.negative, hallmarks_of_immune_response)
+  immunescores_negative = immunescores_negative %>%
+    dplyr::mutate(RIR = immunescores_negative$resF_down) %>%
+    dplyr::select(-resF_up, -resF, -resF_down)
+  immunescores_negative$chemokines = immunescores_negative$chemokines*-1
+  network.negative[[1]] = cbind(network.negative[[1]], immunescores_negative)
+  
+  corr_modules = compute.modules.relationship(network.negative[[1]], dt.negative[[1]], return = T, plot = return, pval = 0.05)
+  cell_dendrograms = identify.cell.groups(corr_modules, height = 20, return = return)
+  cell.groups.negative = cell.groups.computation(dt.negative[[1]], cell_dendrograms, network.negative, return)
+   
+  ###Cell groups projection
+  cell.groups.positive.projection = compute_cell_groups_signatures(dt.positive, network.positive, cell.groups.positive, colnames(cell.groups.positive[[1]]), counts.normalized.negative, deconv.negative, tfs.negative)
+  cell.groups.negative.projection = compute_cell_groups_signatures(dt.negative, network.negative, cell.groups.negative, colnames(cell.groups.negative[[1]]), counts.normalized.positive, deconv.positive, tfs.positive)
+  
+  cell.groups.pos = rbind(cell.groups.positive[[1]], cell.groups.positive.projection)
+  cell.groups.neg = rbind(cell.groups.negative[[1]], cell.groups.negative.projection)
+  
+  colnames(cell.groups.pos) = paste0(colnames(cell.groups.pos), "_responders")
+  colnames(cell.groups.neg) = paste0(colnames(cell.groups.neg), "_non.responders")
+  cell.groups = cbind(cell.groups.pos, cell.groups.neg)
+  
+  names(cell.groups.positive[[2]]) = paste0(names(cell.groups.positive[[2]]), "_responders")
+  names(cell.groups.negative[[2]]) = paste0(names(cell.groups.negative[[2]]), "_non.responders")
+  
+  cell.groups.composition = c(cell.groups.positive[[2]], cell.groups.negative[[2]])
+  cell_groups = list(cell.groups, cell.groups.composition)
+  # 
+  # ####################################################Training
+  # 
+  ###Simulate cell groups from positive and negative in training set
+  cell.groups.train = compute_cell_groups_signatures(dt, network, cell_groups, names(cell_groups[[2]]), norm.counts, deconv, tfs) #Cell groups projection
+  
+  data = list(cell.groups.train, cell_groups[[2]])
+  
+  data = remove.cell.groups.corr(data, threshold = 0.9) 
+  
+  #Set training set
+  train_data = data[[1]] %>%
+    data.frame() %>%
+    mutate(Trait = clinical[,trait],
+           target = as.factor(ifelse(Trait == trait.positive, 'yes', 'no'))) %>%
+    dplyr::select(-Trait)
+  
+  train_data$target <- factor(train_data$target, levels = c("no", "yes"))  # Order, just in case to ensure positive class is not well defined
+  
+  #Cross-validation training (5 k-folds and 100 repetitions)
+  training = compute.k_fold_CV(train_data, k_folds = 5, n_rep = 100, metric = metric, stacking = stack, boruta = feature.selection, boruta_iterations = 100, fix_boruta = F, boruta_threshold = 0.8, file_name = file_name, return= return)
+  
+  ####################################################Predicting
+  if(length(training)!=0){
+    network = network #Save TF network per partition
+    features = training[["Features"]] #Save selected features per partition (only useful if Boruta = T - needs to be improve it)
+    deconvolution_subgroups = dt #Save cell subgroups  
+
+    if(stack){
+      model = training[["Meta_learner"]]
+      var_importance = calculate_feature_importance_stacking(training[["Variable_importance"]], training[["Base_models"]], model)
+    }else{
+      model = training[["Model"]] #Save best ML model based on the Accuracy/AUC from CV per partition
+      var_importance = varImp(model, scale = F) #Retrieve variable importance
+    }
+    
+    return(list(Model = training, Features = features, Variable_importance = var_importance, Cell_groups = data, Deconvolution_subgroups = deconvolution_subgroups, TF_network = network))
+  }else{  #No features are selected as predictive
     
     message("No features selected as predictive after Boruta runs. No model returned.")
     
@@ -1059,6 +1318,8 @@ compute.deconvolution.ML = function(deconv, clinical, trait, trait.positive, par
   traitData_train = clinical[index, ]
   deconv_train = deconv[index,]
   dt = compute.deconvolution.analysis(deconv_train, corr = 0.7, seed = 123, return = return, file_name = file_name) 
+  
+  set.seed(seed)  
   
   # Test cohort
   traitData_test = clinical[-index, ]
@@ -1087,7 +1348,7 @@ compute.deconvolution.ML = function(deconv, clinical, trait, trait.positive, par
     deconvolution_subgroups = dt[["Deconvolution groups - Linear-based correlation"]] #Save cell subgroups  
     
     ####################### Testing set
-    testing_set = replicate_deconvolution_subgroups(dt, features, deconv_test) #Replicate subgroups
+    testing_set = replicate_deconvolution_subgroups(dt, deconv_test) #Replicate subgroups
     
     #Extract target variable
     target = traitData_test %>%
@@ -1206,6 +1467,44 @@ compute.raw.deconvolution.ML = function(deconv, clinical, trait, trait.positive,
   
 }
 
+compute.simple.ML = function(train, test, target, metric = "Accuracy", stack, feature.selection = F, file_name = NULL, return = F){
+
+  #Cross-validation training (5 k-folds and 100 repetitions)
+  training = compute.k_fold_CV(train, k_folds = 5, n_rep = 100, metric = metric, stacking = stack, boruta = feature.selection, boruta_iterations = 100, fix_boruta = F, boruta_threshold = 0.8, file_name = file_name, return= return)
+  
+  if(length(training)!=0){
+    ####################### Testing 
+    if(stack){
+      model = training[["Meta_learner"]]
+      var_importance = calculate_feature_importance_stacking(training[["Variable_importance"]], training[["Base_models"]], model)
+      prediction = compute.prediction.stacked(model, test, target, training[["ML_models"]], training[["Base_models"]])
+      
+    }else{
+      model = training[["Model"]] #Save best ML model based on the Accuracy/AUC from CV per partition
+      var_importance = varImp(model, scale = F) #Retrieve variable importance
+      prediction = compute.prediction(model, test, target)
+    }
+    
+    auc_roc_score = prediction[["AUC"]][["AUROC"]]
+    auc_prc_score = prediction[["AUC"]][["AUPRC"]]
+    
+    metrics = prediction[["Metrics"]]
+    predictions = prediction[["Predictions"]]
+    
+    if(return == T){
+      get_curves(metrics, "specificity", "sensitivity", "recall", "precision", "model", auc_roc_score, auc_prc_score, file_name)
+    }
+    
+    return(list(Model = model, Variable_importance = var_importance, Prediction_metrics = metrics, AUC = list(AUROC = auc_roc_score, AUPRC = auc_prc_score), Prediction = predictions))
+  }else{  #No features are selected as predictive
+    
+    message("No features selected as predictive after Boruta runs. No model returned.")
+    
+    return(NULL)
+  }
+  
+}
+
 #Main ML Pipeline for doing Leaving-one-dataset-out (LODO)
 
 compute.LODO.ML = function(raw.counts, normalized = F, deconv, tf.universe, paths.universe, clinical, trait, trait.positive, trait.out, out, metric = "Accuracy", stack, feature.selection = T, doParallel = F, workers = NULL, deconv_methods = c("Quantiseq", "CBSX", "Epidish", "DeconRNASeq", "DWLS"), file_name = NULL, return = T){
@@ -1274,6 +1573,7 @@ compute.LODO.ML = function(raw.counts, normalized = F, deconv, tf.universe, path
     deconvolution_subgroups = dt[["Deconvolution groups - Linear-based correlation"]] #Save cell subgroups  
     ####################### Testing set
     testing_set = compute_cell_groups_signatures(dt, network, cell.groups, features, deconv_test, tfs_test) #Compute features in testing set
+    
     #Extract target variable
     target = traitData_test %>%
       mutate(target = ifelse(traitData_test[,trait] == trait.positive, "yes", "no")) %>%
@@ -1370,11 +1670,15 @@ compute.bootstrap.ML = function(raw.counts, normalized = F, deconv, clinical, tr
         saveRDS(list(result = result, seed = random.seed), 
                 file = file.path(paste0(folder, "/ML_result_", iteration, ".rds")))
         
+        gc()
+        
       }, error = function(e) {
 
         # Save error information as RDS file with random seed identifier
         saveRDS(list(result = NULL, error = e$message, seed = random.seed), 
                 file = file.path(paste0(folder, "/ML_result_", iteration, ".rds")))
+        
+        gc()
       })
       
     }
@@ -1724,12 +2028,12 @@ calculate_auc_resample = function(obs, pred){
   prob_obs = data.frame("yes" = pred, "obs" = obs)
   
   prob_obs = prob_obs %>%
-    arrange(desc(pred)) %>% #need to be arrange for apply cumulative sum
-    mutate(is_yes = (obs == "yes"),
-           tp = cumsum(is_yes), #true positive above the threshold - cumulative sum to refer to the threshold 
-           fp = cumsum(!is_yes), #false positive above the threshold - cumulative sum to refer to the threshold
-           fpr = fp/sum(obs == 'no'),
-           tpr = tp/sum(obs == 'yes'))
+    dplyr::arrange(desc(pred)) %>% #need to be arrange for apply cumulative sum
+    dplyr::mutate(is_yes = (obs == "yes"),
+            tp = cumsum(is_yes), #true positive above the threshold - cumulative sum to refer to the threshold 
+            fp = cumsum(!is_yes), #false positive above the threshold - cumulative sum to refer to the threshold
+            fpr = fp/sum(obs == 'no'),
+            tpr = tp/sum(obs == 'yes'))
   
   auc_value = calculate_auc(prob_obs$fpr, prob_obs$tpr)
   
@@ -1740,15 +2044,15 @@ get_sensitivity_specificity = function(predictions, observed, ml.model){
   prob_obs = bind_cols(predictions, observed = observed) 
   
   prob_obs = prob_obs %>%
-    arrange(desc(yes)) %>% #need to be arrange for apply cumulative sum
-    mutate(is_yes = (observed == "yes"),
-           tp = cumsum(is_yes), #true positive above the threshold - cumulative sum to refer to the threshold 
-           fp = cumsum(!is_yes), #false positive above the threshold - cumulative sum to refer to the threshold
-           sensitivity = tp/sum(observed == 'yes'),
-           fpr = fp/sum(observed == 'no'),
-           specificity = 1 - fpr) %>%
-    select(sensitivity, specificity, fpr) %>%
-    mutate(model = ml.model)
+    dplyr::arrange(desc(yes)) %>% #need to be arrange for apply cumulative sum
+    dplyr::mutate(is_yes = (observed == "yes"),
+                  tp = cumsum(is_yes), #true positive above the threshold - cumulative sum to refer to the threshold 
+                  fp = cumsum(!is_yes), #false positive above the threshold - cumulative sum to refer to the threshold
+                  sensitivity = tp/sum(observed == 'yes'),
+                  fpr = fp/sum(observed == 'no'),
+                  specificity = 1 - fpr) %>%
+    dplyr::select(sensitivity, specificity, fpr) %>%
+    dplyr::mutate(model = ml.model)
   
   # starts_at_zero <- any(prob_obs$sensitivity == 0 & prob_obs$fpr == 0)
   
@@ -1765,9 +2069,9 @@ get_sensitivity_specificity = function(predictions, observed, ml.model){
   # }
   
   prob_obs = prob_obs %>%
-    mutate(Accuracy = calculate_accuracy(., observed),
-           precision = calculate_precision(., observed),
-           recall = calculate_recall(., observed)) 
+    dplyr::mutate(Accuracy = calculate_accuracy(., observed),
+                  precision = calculate_precision(., observed),
+                  recall = calculate_recall(., observed)) 
   
   
   return(prob_obs)
@@ -2204,7 +2508,7 @@ identify.predictive.cell.group = function(folder_path, deconvolution, AUC = 0.7,
     
     # Perform bootstrapping with different seeds
     for (i in 1:n_bootstrap) {
-      seed = sample.int(100000, 1) # Set a different random seed for each bootstrap iteration
+      set.seed(sample.int(100000, 1)) # Set a different random seed for each bootstrap iteration
       
       bootstrap_impacts <- numeric(n_bootstrap) # Initialize vector to hold impacts across bootstrap iterations
       
@@ -2254,7 +2558,7 @@ identify.predictive.cell.group = function(folder_path, deconvolution, AUC = 0.7,
   # Keep only features with positive impact in clustering
   presence_matrix_important = presence_matrix[,features] 
   
-  # Remove cell groups with 0 and 1 features (because all the features were discard/no important for clustering) and 
+  # Remove cell groups with 0 or 1 cells only (because all the features were discard/no important for clustering) and 
   idx <- which(rowSums(presence_matrix_important) %in% c(0, 1))
   
   if(length(idx)>0){

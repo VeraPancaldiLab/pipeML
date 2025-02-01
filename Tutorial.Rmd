@@ -1,0 +1,61 @@
+---
+title: "Tutorial"
+output: html_document
+date: "2025-02-01"
+---
+
+This is a tutorial for using `pipeML` and explain how to use the main functions of the pipeline to train and test machine learning models. Details of the parameters of each function can be obtained from `machine_learning.R`
+
+Set up environment
+```{r setup, include=FALSE}
+source("machine_learning.R") #Load functions and packages
+```
+
+Load data
+```{r}
+raw.counts = read.csv("data/raw_counts_Mariathasan.csv", row.names = 1) 
+traitData = read.csv("data/clinical_Mariathasan.csv", row.names = 1)
+```
+
+Machine Learning models for predicting a clinical trait using the cell groups scores.
+
+If you have already set up your train and test data, you can use the following function. Train_data should be a data frame with a column named as "target" and the classes labels as 'yes' and 'no'. Target corresponds to the vector with the true labels (the ones to predict). The `stack` parameter indicates if you want to apply ensemble models during the training, if `feature.selection = T` it will performs an iterative boruta algorithm to choose predictive features (see README for more information).
+```{r}
+res = compute.simple.ML(train_data, test_data, target = "target", metric = "Accuracy", stack = T, feature.selection = F, file_name = "Benchmark", return = T)
+```
+
+If you have cell deconvolution results from [multideconv](https://github.com/mhurtado13/multideconv/tree/main) you can use your results to train a ML model. For this input your deconvolution results (without subgroupping) in the following function.
+```{r}
+res_ml_deconvolution = compute.deconvolution.ML(deconv, coldata, trait = "R.NR", trait.positive = "R", partition = 0.75, 
+                                                metric = "Accuracy", stack = T, feature.selection = F, seed =  seed, 
+                                                file_name = "Deconvolution_subgroup", return = T)
+```
+
+`pipeML` can be used with [CellTFusion](https://github.com/VeraPancaldiLab/CellTFusion_paper). Cell groups will be construct and used associations loadings to train ML models. The following functions have been developed with this purpose. 
+
+Run the ML pipeline with one train-test split (set seed for reproducibility). It will save a ROC and Recall curves in the `Results/` and return a list of objects containing the ML model, the predictive features, the variable importance, the cell groups composition and the prediction metrics.
+```{r}
+res_ml = compute.ML(raw.counts = raw.counts, normalized = T, clinical = traitData, trait = "Best.Confirmed.Overall.Response", 
+                    trait.positive = "CR", partition = 0.8, metric = "Accuracy", stack = T, feature.selection = F, 
+                    seed = 1234, doParallel = T,  workers = 2, file_name = "Test", return = T)
+```
+
+Run ML pipeline with multiple train-test splits for consistency. It will save each ML model in the `Results/` directory. Due to RAM issues in Rstudio, it is advisable to not run so many iterations at once (6-10) and we advise to do it in different sessions after cleaning the swap or to run it in a powerful computer.
+```{r}
+compute.bootstrap.ML(raw.counts = raw.counts, normalized = T, clinical = traitData, trait = "Best.Confirmed.Overall.Response", 
+                     trait.positive = "CR", partition = 0.8, metric = "Accuracy", iterations = 2, feature.selection = F, 
+                     stack = T, workers = 2, file.name = "Test", return = F)
+```
+
+In order to see the mean AUC across all the ML models, run the following function. It will save a boxplot with AUC scores distribution across iterations
+```{r}
+get_pooled_roc_curves(file.name = "Deconvolution_subgroups", folder_path = "Results/ML_models_Test") 
+```
+
+If you have different cohorts available, you can apply the Leaving-one-dataset-out (LODO) approach.
+```{r}
+res_ml = compute.LODO.ML(raw.counts = raw.counts, normalized = T, clinical = traitData, trait = "Response", 
+                         trait.positive = "R", trait.out = "Cohort", out = cohort, metric = "Accuracy", stack = T, 
+                         feature.selection = F, doParallel = T, workers = 4, file_name = "Test", return = F)
+```
+
