@@ -45,11 +45,11 @@ pipeML is a robust pipeline done in R to train and test machine learning models 
 ## Key features
 
 * Stratified data split
-* Iterative Boruta algorithm for feature selection
+* Iterative Boruta algorithm for feature selection 
 * Repeated k-fold cross validation (kCV)
 * Hyperparameter tuning based on AUC or Accuracy
 * Stratified k-fold construction
-* Model stacking
+* Model stacking implementation based on GLM
 * 13 Machine Learning methods implemented
   * Bagged CART
   * Random Forest (RF)
