@@ -1,6 +1,11 @@
 
 
-##Machine learning pipeline functions adapted for CellTFusion (https://github.com/VeraPancaldiLab/CellTFusion)
+##Machine learning pipeline functions pipeML: https://github.com/mhurtado13/pipeML
+
+# author: Marcelo Hurtado
+# email: marcelo.hurtado@inserm.fr
+# organization: INSERM CRCT - Pancaldi team 21
+# place: Toulouse, France
 
 libraries_set <- function(){
   suppressMessages(library("BiocManager"))
