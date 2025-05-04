@@ -1,8 +1,22 @@
 ---
-title: "Tutorial"
-output: html_document
-date: "2025-02-01"
+title: "pipeML"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{pipeML}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
 ---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(pipeML)
+```
 
 This is a tutorial for using `pipeML` and explain how to use the main functions of the pipeline to train and test machine learning models. Details of the parameters of each function can be obtained from `machine_learning.R`
 
