@@ -1,17 +1,17 @@
 
 dir.create("Results", showWarnings = FALSE, recursive = TRUE)
 
-#' Compute boruta algorithm
+#' Compute Boruta algorithm
 #'
-#' @param data A dataframe with the column of the variable to predict as "target" and the features to test
-#' @param seed A numeric value to set the seed for ensuring reproducibility
-#' @param fix Parameter from Boruta(). It tests whether the features classified as 'Tentative' need to be judge with an additional test to either confirm then or not (See TentativeRoughFix() from Boruta package for more information)
+#' @param data A data frame with the column of the variable to predict named "target" and the predictor features as additional columns.
+#' @param seed A numeric value used to set the random seed for reproducibility.
+#' @param fix Logical. If TRUE, applies TentativeRoughFix() from the Boruta package to resolve tentative features.
 #'
 #' @return A list containing:
-#'
-#' - Matrix of feature importance
-#' - A character vector with the decision corresponding to each feature
-#'
+#' \itemize{
+#'   \item A data frame with feature importance statistics.
+#'   \item A character vector indicating the Boruta decision for each feature (Confirmed, Tentative, or Rejected).
+#' }
 compute.boruta <- function(data, seed, fix = TRUE) {
 
   set.seed(seed)
@@ -34,24 +34,23 @@ compute.boruta <- function(data, seed, fix = TRUE) {
   return(list(res, decision))
 }
 
-#' Merge boruta results
+#' Merge Boruta Results
 #'
-#' Merge boruta results after performing several iterations of the algorithm.
+#' Merge results from multiple Boruta runs to identify robust feature selections.
 #'
-#' @param importance_values A matrix with the importance values along each iteration.
-#' @param decisions A matrix with the decision labels along each iteration.
-#' @param file_name File name for plots.
-#' @param iterations Number of iterations performed.
-#' @param threshold A numeric value with the threshold for considering final labels (e.g. features labeled as 'confirmed' more than > threshold are final considered as 'confirmed')
-#' @param return Whether to save or not the plots in Results/ directory
+#' @param importance_values A list of data frames with feature importance values from each iteration.
+#' @param decisions A list of character vectors with the decision labels from each iteration.
+#' @param file_name A string used for naming the output plot file.
+#' @param iterations Integer. The number of Boruta iterations performed.
+#' @param threshold A numeric value between 0 and 1. Features labeled as 'Confirmed' or 'Tentative' in more than \code{threshold * iterations} will be retained.
+#' @param return Logical. Whether to save plots in the "Results/" directory.
 #'
 #' @return A list containing:
-#'
-#' - Confirmed features
-#' - Tentative features
-#' - Matrix of feature importance
-#'
-#'
+#' \itemize{
+#'   \item A vector of confirmed features.
+#'   \item A vector of tentative features.
+#'   \item A data frame with median importance values and final decisions.
+#' }
 merge_boruta_results = function(importance_values, decisions, file_name, iterations, threshold, return = TRUE){
 
   ### Construct matrix of importance
@@ -103,29 +102,39 @@ merge_boruta_results = function(importance_values, decisions, file_name, iterati
   return(list(Confirmed = confirmed_vars, Tentative = tentative_vars, Matrix_Importance = median_df))
 }
 
-#' Compute feature selection using repeated Boruta algorithm
+#' Compute Feature Selection Using Repeated Boruta Algorithm
 #'
-#' @param data A dataframe with the target column name as "target" and the features to test.
-#' @param iterations Number of iterations to run Boruta.
-#' @param fix Parameter from Boruta(). It tests whether the features classified as 'Tentative' need to be judge with an additional test to either confirm then or not (See TentativeRoughFix() from Boruta package for more information)
-#' @param doParallel Whether to do or not parallelization.
-#' @param workers Number of processes available to run on parallel. If no number is set, this will correspond to detectCores() - 1
-#' @param file_name File name for the csv files and plots saved in the Results/ directory
-#' @param threshold Threshold to consider the features as confirmed after several iterations of Boruta. If boruta_threshold = 0.8, features labeled as confirmed in more than 80% of the times will be finally considered as confirmed.
-#' @param return Whether to save or not the plots in the Results/ directory.
+#' Repeatedly applies the Boruta feature selection algorithm and aggregates results to determine consistently selected features.
 #'
-#' @return A list containing
+#' @param data A data frame with the column "target" as the response and other columns as features.
+#' @param iterations Integer. The number of Boruta iterations to perform.
+#' @param fix Logical. If TRUE, applies TentativeRoughFix() to resolve tentative features after each iteration.
+#' @param doParallel Logical. Whether to use parallel processing.
+#' @param workers Integer. Number of CPU cores to use for parallel execution. If NULL, uses all available cores minus one.
+#' @param file_name A string for naming output plots and CSV files saved in the "Results/" directory.
+#' @param threshold A numeric value between 0 and 1. A feature must be confirmed in more than \code{threshold * iterations} to be finally labeled as confirmed.
+#' @param return Logical. Whether to save the resulting plots in the "Results/" directory.
 #'
-#' - Confirmed features
-#' - Tentative features
-#' - Matrix of feature importance
+#' @return A list containing:
+#' \itemize{
+#'   \item A vector of confirmed features.
+#'   \item A vector of tentative features.
+#'   \item A data frame with median importance values and final decisions.
+#' }
 #'
 #' @export
 #'
 #' @examples
-#'
-#' res_boruta = feature.selection.boruta(training_set, iterations = 10, fix = FALSE, doParallel = TRUE, workers = 4, threshold = 0.8, file_name = "Test", return = FALSE)
-#'
+#' res_boruta <- feature.selection.boruta(
+#'   data = training_set,
+#'   iterations = 10,
+#'   fix = FALSE,
+#'   doParallel = TRUE,
+#'   workers = 4,
+#'   threshold = 0.8,
+#'   file_name = "Test",
+#'   return = FALSE
+#' )
 feature.selection.boruta <- function(data, iterations = NULL, fix, doParallel = F, workers=NULL, file_name = NULL, threshold = NULL, return) {
   if(doParallel){
     if(is.null(iterations) == T){
@@ -194,40 +203,54 @@ feature.selection.boruta <- function(data, iterations = NULL, fix, doParallel = 
 
 }
 
-#' Compute k fold cross validation
+#' Perform repeated stratified k-fold cross-validation for model training and tuning
 #'
-#' Perfoms a repeated and stratified k fold cross validation on a dataset in order to train and tune hyperparameters of 13 machine learning methods based either on the Accuracy or AUC scores from their predictions.
+#' This function performs repeated stratified k-fold cross-validation on a dataset to train and tune hyperparameters for 13 machine learning methods. Optionally, it can also perform model stacking and Boruta-based feature selection. Performance is evaluated using user-specified metrics such as Accuracy, AUROC, or AUPRC.
 #'
-#' @param model A dataframe with the features and a target column named 'target' corresponding to the trait to predict
-#' @param k_folds Number of k folds to perform during cross validation (Default is 5)
-#' @param n_rep Number of repeated folds to perform during cross validation (Default is 100)
-#' @param stacking Either to do or not model stacking
-#' @param metric Metric to be used for tuning the hyperparameters and selecting the base models (if stacking = T). Metrics supported are Accuracy, AUROC and AUPRC.
-#' @param boruta Whether to do or not Boruta for feature selection before training the model. Take into account that many ML models already give a weight to the features so no previous feature selection approach is necessarily (unless there are features with multicollinearity)
-#' @param boruta_iterations Number of iterations Boruta needs to be run. Boruta applies random number generator in each run so to be consistent regarding the confirmed features we advised to do several iterations of the algorithm (Default is 100)
-#' @param fix_boruta Parameter from Boruta(). See compute.boruta() for more information
-#' @param tentative Whether to consider the tentative features as part of the dataframe to train or not.
-#' @param boruta_threshold Threshold to consider the features as confirmed after several iterations of Boruta. If boruta_threshold = 0.8, features labeled as confirmed in more than 80% of the times will be finally considered as confirmed.
-#' @param file_name File name for the plots to be saved in the Results/ directory.
-#' @param LODO if LODO = TRUE, folds construction will be stratified by cohorts.
-#' @param return Whether to return and save the plots generated during the function
+#' @param model A data frame containing features and a target column named 'target' corresponding to the response variable to predict.
+#' @param k_folds Integer. Number of folds for k-fold cross-validation. Default is 5.
+#' @param n_rep Integer. Number of repetitions of the k-fold cross-validation. Default is 100.
+#' @param stacking Logical. Whether to perform model stacking. Default is FALSE.
+#' @param metric Character. Metric used for hyperparameter tuning and model evaluation. Supported values are "Accuracy", "AUROC", and "AUPRC".
+#' @param boruta Logical. Whether to apply Boruta for feature selection before model training. Note that many ML models handle feature importance internally, so prior selection is optional unless multicollinearity is a concern. Default is FALSE.
+#' @param boruta_iterations Integer. Number of iterations to run Boruta. Since Boruta involves randomness, repeated runs improve consistency. Default is 100.
+#' @param fix_boruta Logical. Whether to fix Boruta’s internal parameters. See `compute.boruta()` for details.
+#' @param tentative Logical. Whether to include tentative features as confirmed in the training dataset.
+#' @param boruta_threshold Numeric. Threshold for confirming features after multiple Boruta iterations. For example, 0.8 means features must be confirmed in at least 80% of iterations. Default is 0.8.
+#' @param file_name Character. File name used for saving output plots in the `Results/` directory.
+#' @param LODO Logical. If TRUE, performs Leave-One-Dataset-Out (LODO) cross-validation by stratifying folds based on cohort membership.
+#' @param return Logical. Whether to return the results and generated plots.
 #'
-#' @return A list containing
-#' - Features used during training
-#' - The selected machine learning model
-#' - All the machine learning models trained.
+#' @return A list containing:
+#' \itemize{
+#'   \item Features used during training
+#'   \item The selected machine learning model
+#'   \item All trained machine learning models
+#' }
 #'
-#' If stacking = TRUE, list will also include
-#' - Base models
-#' - Meta-learner
-#' - Matrix of weighted feature importance. See calculate_feature_importance_stacking() for more information.
+#' If \code{stacking = TRUE}, the list will also include:
+#' \itemize{
+#'   \item Base models
+#'   \item Meta-learner
+#'   \item Matrix of weighted feature importance (see \code{calculate_feature_importance_stacking()})
+#' }
 #'
 #' @export
 #'
 #' @examples
-#'
-#'  training = compute.k_fold_CV(train_data, k_folds = 5, n_rep = 100, metric = "Accuracy", stacking = TRUE, boruta = FALSE, boruta_iterations = 100, fix_boruta = FALSE, boruta_threshold = 0.8, file_name = "Test", return= TRUE)
-#'
+#' training <- compute.k_fold_CV(
+#'   train_data,
+#'   k_folds = 5,
+#'   n_rep = 100,
+#'   metric = "Accuracy",
+#'   stacking = TRUE,
+#'   boruta = FALSE,
+#'   boruta_iterations = 100,
+#'   fix_boruta = FALSE,
+#'   boruta_threshold = 0.8,
+#'   file_name = "Test",
+#'   return = TRUE
+#' )
 compute.k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "Accuracy", boruta, boruta_iterations = NULL, fix_boruta = NULL, tentative = FALSE, boruta_threshold = NULL, file_name = NULL, LODO = FALSE, return = FALSE){
 
   if(!(metric %in% c("AUROC", "AUPRC","Accuracy"))){
@@ -641,30 +664,47 @@ compute.k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 }
 
 
-#' Compute models training
+#' Train machine learning models with optional stacking and feature selection
 #'
-#' @param features_train Data frame with features to use for training the ML models
-#' @param target_var Vector containing the variable to predict
-#' @param trait.positive Value to be consider as positive during training
-#' @param metric Metric to be used for tuning the hyperparameters and selecting the base models (if stacking = T). Metrics supported are Accuracy, AUROC and AUPRC.
-#' @param stack Either to do or not model stacking
-#' @param k_folds Number of k folds to perform during cross validation
-#' @param n_rep Number of repeated folds to perform during cross validation
-#' @param feature.selection Whether to do or not feature selection with boruta before training
-#' @param seed Value to ensure reproducibility
-#' @param LODO if LODO = TRUE, folds construction will be stratified by cohorts
-#' @param batch_id Vector containing the cohort each sample belongs to (only needed if LODO = TRUE)
-#' @param file_name File name for the plots to be saved in the Results/ directory
-#' @param return Whether to return and save the plots generated during the function
+#' This function trains one or more machine learning models using repeated k-fold cross-validation, with optional model stacking and feature selection using Boruta. It supports stratified cross-validation, including Leave-One-Dataset-Out (LODO) validation when cohort information is available.
 #'
-#' @return
-#' List with model or metalearner (if stacking = TRUE) trained and the features used (if feature.selection = FALSE, all features are returned)
+#' @param features_train A data frame containing the features used for training.
+#' @param target_var A vector containing the target variable to predict.
+#' @param trait.positive Value in \code{target_var} to be considered as the positive class.
+#' @param metric Character. Metric used for hyperparameter tuning and model selection. Supported values are \code{"Accuracy"}, \code{"AUROC"}, and \code{"AUPRC"}.
+#' @param stack Logical. Whether to perform model stacking. Default is \code{FALSE}.
+#' @param k_folds Integer. Number of folds to use in cross-validation.
+#' @param n_rep Integer. Number of repetitions of the cross-validation.
+#' @param feature.selection Logical. Whether to apply Boruta feature selection before model training. Default is \code{FALSE}.
+#' @param seed Integer. Random seed for reproducibility.
+#' @param LODO Logical. If \code{TRUE}, constructs folds stratified by cohorts (Leave-One-Dataset-Out CV).
+#' @param batch_id A vector indicating the cohort or batch for each sample (required only if \code{LODO = TRUE}).
+#' @param file_name Character. File name used to save plots in the \code{Results/} directory.
+#' @param return Logical. Whether to return and save the plots generated by the function.
+#'
+#' @return A list containing:
+#' \itemize{
+#'   \item Trained model (or meta-learner if \code{stack = TRUE})
+#'   \item Features used in model training (all features if \code{feature.selection = FALSE})
+#' }
+#'
 #' @export
 #'
 #' @examples
-#'
-#' res = compute.features.training.ML(x, y, "R", metric = "AUROC", stack = FALSE, k_folds = 10, n_rep = 5, feature.selection = FALSE, seed = 123, LODO = FALSE, batch_id = NULL, file_name = "Test", return = FALSE)
-#'
+#' res <- compute.features.training.ML(
+#'   x, y,
+#'   trait.positive = "R",
+#'   metric = "AUROC",
+#'   stack = FALSE,
+#'   k_folds = 10,
+#'   n_rep = 5,
+#'   feature.selection = FALSE,
+#'   seed = 123,
+#'   LODO = FALSE,
+#'   batch_id = NULL,
+#'   file_name = "Test",
+#'   return = FALSE
+#' )
 compute.features.training.ML = function(features_train, target_var, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5, feature.selection = FALSE, seed, LODO = FALSE, batch_id = NULL, file_name = NULL, return = FALSE){
 
   set.seed(seed)
@@ -705,39 +745,53 @@ compute.features.training.ML = function(features_train, target_var, trait.positi
 
 }
 
-#' Compute machine learning predictions
+#' Train and evaluate machine learning models with optional stacking and feature selection
 #'
-#' @param features_train Data frame with features to use for training the ML models
-#' @param features_test Data frame with features to use for testing the trained ML models
-#' @param clinical Data frame with clinical data including the target variable and batch_id (if LODO = TRUE) information. Rownames should correspond to the samples
-#' @param trait Column name of target variable from clinical
-#' @param trait.positive Value to be consider as positive during training
-#' @param metric Metric to be used for tuning the hyperparameters and selecting the base models (if stacking = T). Metrics supported are Accuracy, AUROC and AUPRC.
-#' @param stack Either to do or not model stacking
-#' @param k_folds Number of k folds to perform during cross validation
-#' @param n_rep Number of repeated folds to perform during cross validation
-#' @param feature.selection Whether to do or not feature selection with boruta before training
-#' @param seed Value to ensure reproducibility
-#' @param LODO if LODO = TRUE, folds construction will be stratified by cohorts
-#' @param batch_id Vector containing the cohort each sample belongs to (only needed if LODO = TRUE)
-#' @param file_name File name for the plots to be saved in the Results/ directory
-#' @param return Whether to return and save the plots generated during the function
+#' This function trains machine learning models using cross-validation on training data and evaluates them on test data. It supports feature selection with Boruta, model stacking, and cohort-based (LODO) validation.
 #'
-#' @return
+#' @param features_train A data frame of features used for training the models.
+#' @param features_test A data frame of features used for testing the models.
+#' @param clinical A data frame containing clinical information, including the target variable and optionally a batch ID. Row names must match the sample identifiers in \code{features_train} and \code{features_test}.
+#' @param trait Character. The name of the column in \code{clinical} corresponding to the target variable.
+#' @param trait.positive Value in \code{trait} to be considered as the positive class.
+#' @param metric Character. Metric used for hyperparameter tuning and model selection. Supported values are \code{"Accuracy"}, \code{"AUROC"}, and \code{"AUPRC"}.
+#' @param stack Logical. Whether to apply model stacking. Default is \code{FALSE}.
+#' @param k_folds Integer. Number of folds for cross-validation.
+#' @param n_rep Integer. Number of cross-validation repetitions.
+#' @param feature.selection Logical. Whether to apply Boruta feature selection before training. Default is \code{FALSE}.
+#' @param seed Integer. Random seed for reproducibility.
+#' @param LODO Logical. If \code{TRUE}, folds are constructed in a Leave-One-Dataset-Out (LODO) manner based on cohorts.
+#' @param batch_id A vector indicating the cohort/batch for each sample (only required if \code{LODO = TRUE}).
+#' @param file_name Character. Base name used to save plots in the \code{Results/} directory.
+#' @param return Logical. Whether to return and save plots generated by the function.
 #'
-#' A list containing:
-#' - Trained model
-#' - Features used to train the model
-#' - Prediction metrics
-#' - AUC scors (AUROC and AUPRC)
-#' - Predictions probabilities
+#' @return A list containing:
+#' \itemize{
+#'   \item Trained model (or meta-learner if stacking was used)
+#'   \item Features used in model training
+#'   \item Prediction performance metrics
+#'   \item AUC scores (AUROC and AUPRC)
+#'   \item Predicted class probabilities on test data
+#' }
 #'
 #' @export
 #'
 #' @examples
-#'
-#' res = compute.features.ML(x, y, clinical, "Response", "R", metric = "AUROC", stack = FALSE, k_folds = 10, n_rep = 5, feature.selection = FALSE, seed = 123, LODO = FALSE, batch_id = NULL, file_name = "Test", return = FALSE)
-#'
+#' res <- compute.features.ML(
+#'   x, y, clinical,
+#'   trait = "Response",
+#'   trait.positive = "R",
+#'   metric = "AUROC",
+#'   stack = FALSE,
+#'   k_folds = 10,
+#'   n_rep = 5,
+#'   feature.selection = FALSE,
+#'   seed = 123,
+#'   LODO = FALSE,
+#'   batch_id = NULL,
+#'   file_name = "Test",
+#'   return = FALSE
+#' )
 compute.features.ML = function(features_train, features_test, clinical, trait, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5, feature.selection = FALSE, seed, LODO = FALSE, batch_id = NULL, file_name = NULL, return = FALSE){
 
   # Train cohort
@@ -809,16 +863,30 @@ compute.features.ML = function(features_train, features_test, clinical, trait, t
 
 }
 
-#' Pool performance curves
+#' Plot Pooled AUROC and AUPRC Performance Curves
 #'
-#' Plot boxplots from pooled metrics from different iterations, mean AUC-ROC and AUC-PRC are calculated.
+#' This function reads multiple `.rds` files containing machine learning results, pools the AUROC and AUPRC metrics,
+#' and generates boxplots summarizing performance across iterations. Median values are annotated on the plots.
 #'
-#' @param file.name String with the file name to saved the plots
-#' @param folder_path Folder path of the directory where the ML models are
+#' @param file.name Character. Name to use when saving the plots (used as a prefix in the output file names).
+#' @param folder_path Character. Path to the directory containing the `.rds` files with ML model results.
 #'
-#' @return Boxplots in the Results/ directory.
+#' @return
+#' Saves two PDF files in the \code{Results/} directory:
+#' \itemize{
+#'   \item Boxplot of AUROC values with median annotation
+#'   \item Boxplot of AUPRC values with median annotation
+#' }
+#' No value is returned to the R environment.
+#'
+#' @details
+#' Each `.rds` file is expected to contain a list with a \code{result$AUC} element that includes
+#' both \code{AUROC} and \code{AUPRC} values.
+#'
 #' @export
 #'
+#' @examples
+#' get_pooled_roc_curves(file.name = "Combined_Model", folder_path = "Results/Models/")
 get_pooled_roc_curves = function(file.name, folder_path){
 
   # Get a list of all RDS files in the folder
@@ -887,17 +955,36 @@ get_pooled_roc_curves = function(file.name, folder_path){
 
 }
 
-#' Pool performance curves from different folders
+#' Plot Pooled AUROC and AUPRC Boxplots Across Multiple Folders
 #'
-#' Similar to get_pooled_roc_curves() but for comparing different cohorts
-#' @param folder_paths Folders paths where the ML models are
-#' @param file_name File name of the plot to return
-#' @param width Numeric value with the width of the plot
-#' @param height Numeric value with the height of the plot
+#' This function aggregates AUROC and AUPRC metrics from multiple folders (typically corresponding to different cohorts or models),
+#' and generates boxplots comparing model performance across groups.
 #'
-#' @return Boxplots in the Results/ directory.
+#' @param folder_paths Character vector. Paths to folders containing `.rds` files with ML model performance results.
+#' @param file_name Character. Prefix for the saved PDF files containing the plots.
+#' @param width Numeric. Width of the saved plots in inches. Default is 12.
+#' @param height Numeric. Height of the saved plots in inches. Default is 8.
+#'
+#' @return
+#' Saves two PDF files in the \code{Results/} directory:
+#' \itemize{
+#'   \item \code{Boxplots_AUROC_performance_<file_name>.pdf}
+#'   \item \code{Boxplots_AUPRC_performance_<file_name>.pdf}
+#' }
+#' No object is returned to the R environment.
+#'
+#' @details
+#' Each `.rds` file is expected to contain a list object with a \code{result$AUC} element,
+#' which includes numeric values for both \code{AUROC} and \code{AUPRC}.
+#' Folder names are used as grouping labels in the plots.
+#'
+#' Red dashed lines are drawn at a fixed reference value (e.g., 0.7) for visual interpretation.
+#'
 #' @export
 #'
+#' @examples
+#' get_pooled_boxplots(folder_paths = c("Results/Cohort1", "Results/Cohort2"),
+#'                     file_name = "TME_Comparison")
 get_pooled_boxplots = function(folder_paths, file_name, width = 12, height = 8) {
 
   # Initialize cumulative data frame
@@ -976,25 +1063,35 @@ get_pooled_boxplots = function(folder_paths, file_name, width = 12, height = 8) 
 
 }
 
-#' Compute Accuracy values for each machine learning model
+#' Compute Cross-Validation Accuracy for ML Models
 #'
-#' @param models List of trained models
-#' @param file_name (Optional) File name for plot
-#' @param base_models Boolean value to specify if base models for stacking need to be chosen or not
-#' @param return Boolean value to specify if plot the accuracy values across models should be saved or not
+#' This function extracts cross-validated accuracy values from a list of trained machine learning models,
+#' summarizes their median and standard deviation, and optionally plots a bar chart or selects base models for stacking.
 #'
-#' @return A list containing
+#' @param models A named list of trained ML models, each with a \code{resample} element containing cross-validated accuracy.
+#' @param file_name (Optional) Character string specifying the filename prefix for the saved accuracy plot (PDF format).
+#' @param base_models Logical. If \code{TRUE}, the function selects and returns base models using \code{choose_base_models()} for stacking.
+#' @param return Logical. If \code{TRUE}, the function saves a barplot of the model accuracy values in the \code{Results/} directory.
 #'
-#' - Accuracy values for each model
-#' - Top model with best accuracy
-#' - If base_models = T, it returns a character vector with the chosen base models (see choose_base_models())
+#' @return A list containing:
+#' \itemize{
+#'   \item \code{Accuracy}: A data frame with the median and standard deviation of accuracy for each model.
+#'   \item \code{Top_model}: A character string naming the model with the highest median accuracy.
+#'   \item \code{Base_models} (optional): A character vector of selected base models if \code{base_models = TRUE}.
+#' }
+#'
+#' @details
+#' This function assumes that each model in the list has a \code{$resample} component containing
+#' a column named \code{Accuracy}. It calculates the median and standard deviation of accuracy
+#' for each model and creates a barplot (if \code{return = TRUE}) with error bars.
+#'
+#' If \code{base_models = TRUE}, it calls a helper function \code{choose_base_models()} to select
+#' models for use in stacking.
 #'
 #' @export
 #'
 #' @examples
-#'
-#' res = compute_cv_accuracy(ml_models, base_models = TRUE, file_name = "Test", return = TRUE)
-#'
+#' res <- compute_cv_accuracy(models = ml_models, file_name = "MyModels", base_models = TRUE, return = TRUE)
 compute_cv_accuracy = function(models, file_name = NULL, base_models = FALSE, return = TRUE){
 
   # Bind accuracy values from each model
@@ -1048,26 +1145,38 @@ compute_cv_accuracy = function(models, file_name = NULL, base_models = FALSE, re
 
 }
 
-#' Compute AUC values for each machine learning model
+#' Compute Cross-Validated AUC Values for Machine Learning Models
 #'
-#' @param models List of trained models
-#' @param file_name (Optional) File name for plot
-#' @param base_models Boolean value to specify if base models for stacking need to be chosen or not
-#' @param AUC_type AUROC or AUPRC, corresponding to the metric from which top model should be choose
-#' @param return Boolean value to specify if plot the AUC values across models should be saved or not
+#' This function computes cross-validated AUROC and AUPRC scores for a list of trained machine learning models.
+#' It can also save performance barplots and optionally select base models for stacking.
 #'
-#' @return A list containing
+#' @param models A named list of trained machine learning models. Each model should contain a \code{resample}
+#'   data frame with AUROC and AUPRC values from cross-validation.
+#' @param file_name (Optional) Character string. Used as the prefix for the plot filenames if \code{save_plot = TRUE}.
+#' @param base_models Logical. If \code{TRUE}, selects a subset of models as base learners for stacking using the \code{choose_base_models()} function.
+#' @param AUC_type Character. Either \code{"AUROC"} or \code{"AUPRC"}; determines which metric is used to select the top-performing model.
+#' @param save_plot Logical. If \code{TRUE}, generates and saves barplots of median AUROC and AUPRC values (with error bars) to the "Results" directory.
 #'
-#' - AUC values for each model
-#' - Top model with best AUC
-#' - If base_models = TRUE, it returns a character vector with the chosen base models (see choose_base_models())
+#' @return A list containing:
+#' \describe{
+#'   \item{\code{AUROC}}{A data frame with median and standard deviation of AUROC values for each model.}
+#'   \item{\code{AUPRC}}{A data frame with median and standard deviation of AUPRC values for each model.}
+#'   \item{\code{Top_model}}{The name of the model with the highest median value for the selected metric (\code{AUC_type}).}
+#'   \item{\code{Base_models}}{(Optional) A character vector of selected base models for stacking, returned if \code{base_models = TRUE}.}
+#' }
 #'
 #' @export
 #'
 #' @examples
-#'
-#' res = compute_cv_AUC(ml_models, file_name = "Test", base_models = TRUE, AUC_type = "AUROC", return = FALSE)
-#'
+#' \dontrun{
+#' res <- compute_cv_AUC(
+#'   models = ml_models,
+#'   file_name = "Model_Performance",
+#'   base_models = TRUE,
+#'   AUC_type = "AUROC",
+#'   save_plot = TRUE
+#' )
+#' }
 compute_cv_AUC = function(models, file_name = NULL, base_models = FALSE, AUC_type = "AUROC", return = TRUE){
 
   if(!(AUC_type %in% c("AUROC", "AUPRC"))){
@@ -1160,14 +1269,24 @@ compute_cv_AUC = function(models, file_name = NULL, base_models = FALSE, AUC_typ
 
 }
 
-#' Choose three base models for stacking based either in Accuracy or AUC scores
+#' Choose Top Base Models for Stacking Based on Accuracy or AUC Scores
 #'
-#' @param models List with trained machine learning models
-#' @param metric Metric to choose the top base models (either Accuracy or AUC). Default is Accuracy
+#' This function selects three base models for stacking based on either Accuracy or AUC metrics. It chooses the top models from
+#' different categories (e.g., tree-based methods, linear models, instance-based methods) according to the specified metric.
 #'
-#' @return A character vector with the base models
+#' @param models A list of trained machine learning models. Each model must contain a \code{resample} data frame with
+#'   performance metrics (Accuracy, AUROC, AUPRC) from cross-validation.
+#' @param metric A character string specifying the metric to use for model selection. Can be either "Accuracy", "AUROC", or "AUPRC".
+#'   Default is "Accuracy".
+#'
+#' @return A character vector containing the names of the top models selected based on the specified metric.
+#'
 #' @export
 #'
+#' @examples
+#' \dontrun{
+#' base_models = choose_base_models(models = ml_models, metric = "AUROC")
+#' }
 choose_base_models = function(models, metric = "Accuracy"){
 
   #Bind accuracy values from each model
@@ -1266,17 +1385,19 @@ calculate_auc_prc_resample = function(obs, pred) {
   return(auc_prc_value)
 }
 
-#' Compute F1 score
+#' Compute F1 Score
 #'
-#' @param metrics Prediction metrics
-#' @param target Vector with the target variable values
+#' The F1 score is the harmonic mean of precision and recall, and is used to evaluate the balance between the two metrics.
+#' It is particularly useful when the class distribution is imbalanced.
 #'
-#' @return F1 score
+#' @param metrics A vector of predicted class labels or probabilities.
+#' @param target A vector of true class labels.
+#'
+#' @return The F1 score, a numeric value between 0 and 1.
 #' @export
 #'
 #' @examples
-#'
-#' f1_scores = calculate_f1(metrics, target)
+#' f1_scores = calculate_f1(predictions, target)
 calculate_f1 = function(metrics, target) {
 
   confusion_values <- calculate_confusion_values(metrics, target)
@@ -1292,18 +1413,19 @@ calculate_f1 = function(metrics, target) {
   return(f1_score)
 }
 
-#' Compute Matthews Correlation Coefficient (MCC) score
+#' Compute Matthews Correlation Coefficient (MCC) Score
 #'
-#' @param metrics Prediction metrics
-#' @param target Vector with the target variable values
+#' The Matthews correlation coefficient (MCC) is a metric used for binary classification problems.
+#' It takes into account true and false positives and negatives, and is considered a balanced metric.
 #'
-#' @return MCC score
+#' @param metrics A vector of predicted class labels or probabilities.
+#' @param target A vector of true class labels.
+#'
+#' @return The MCC score, a numeric value between -1 and 1.
 #' @export
 #'
 #' @examples
-#'
-#' mcc_scores = calculate_mcc(metrics, target)
-#'
+#' mcc_scores = calculate_mcc(predictions, target)
 calculate_mcc = function(metrics, target) {
 
   confusion_values <- calculate_confusion_values(metrics, target)
@@ -1320,21 +1442,20 @@ calculate_mcc = function(metrics, target) {
   return(mcc)
 }
 
-#' Calculate prediction metrics
+#' Calculate Sensitivity and Specificity Values
 #'
-#' Calculate sensitivity and specificity values from prediction values
+#' This function calculates sensitivity (recall), specificity, and other related metrics (accuracy, precision, recall, F1 score, MCC)
+#' from predicted and true class labels.
 #'
-#' @param predictions A character vector with the prediction values
-#' @param observed A character vector with the true labels
-#' @param ml.model Trained machine learning model
+#' @param predictions A vector of predicted class labels or probabilities.
+#' @param observed A vector of true class labels.
+#' @param ml.model The trained machine learning model used to generate predictions.
 #'
-#' @return A matrix with the prediction metrics
+#' @return A data frame containing sensitivity, specificity, precision, recall, F1 score, MCC, and other metrics.
 #' @export
 #'
 #' @examples
-#'
-#' prediction_metrics = get_sensitivity_specificity(predict, target, model)
-#'
+#' prediction_metrics = get_sensitivity_specificity(predictions, target, model)
 get_sensitivity_specificity = function(predictions, observed, ml.model){
   prob_obs = dplyr::bind_cols(predictions, observed = observed)
 
@@ -1361,17 +1482,19 @@ get_sensitivity_specificity = function(predictions, observed, ml.model){
 
 }
 
-#' Calculates AUC from ROC curve
+#' Calculate AUC from ROC Curve
 #'
-#' @param fpr A numeric column with the false positive rate values obtained from get_sensitivity_specificity()
-#' @param sensitivity A numeric column with the sensitivity values obtained from get_sensitivity_specificity()
+#' This function calculates the Area Under the Receiver Operating Characteristic (ROC) curve.
+#' It uses the trapezoidal rule to compute the AUC from the false positive rate (FPR) and sensitivity (true positive rate).
 #'
-#' @return A numeric value corresponding to the AUC from the precision-recall curve
+#' @param fpr A numeric vector of false positive rates from the ROC curve.
+#' @param sensitivity A numeric vector of sensitivities (true positive rates) from the ROC curve.
+#'
+#' @return The AUC score, a numeric value between 0 and 1.
 #' @export
 #'
 #' @examples
-#'
-#' sens_spec = get_sensitivity_specificity(predict, target, model)
+#' sens_spec = get_sensitivity_specificity(predictions, target, model)
 #' auroc = calculate_auroc(sens_spec$fpr, sens_spec$sensitivity)
 #'
 calculate_auroc <- function(fpr, sensitivity) {
@@ -1391,19 +1514,20 @@ calculate_auroc <- function(fpr, sensitivity) {
 
 }
 
-#' Calculates AUC from precision-recall curve
+#' Calculate AUC from Precision-Recall Curve
 #'
-#' @param recall A numeric column with the recall values obtained from get_sensitivity_specificity()
-#' @param precision A numeric column with the precision values obtained from get_sensitivity_specificity()
+#' This function calculates the Area Under the Precision-Recall Curve (AUPRC).
+#' It uses the trapezoidal rule to compute the AUPRC from the recall and precision values.
 #'
-#' @return A numeric value corresponding to the AUC from the precision-recall curve
+#' @param recall A numeric vector of recall values (sensitivity) from the precision-recall curve.
+#' @param precision A numeric vector of precision values from the precision-recall curve.
+#'
+#' @return The AUPRC score, a numeric value between 0 and 1.
 #' @export
 #'
 #' @examples
-#'
-#' sens_spec = get_sensitivity_specificity(predict, target, model)
+#' sens_spec = get_sensitivity_specificity(predictions, target, model)
 #' auprc = calculate_auprc(sens_spec$recall, sens_spec$precision)
-#'
 calculate_auprc <- function(recall, precision) {
   # Sort by Recall to ensure trapezoidal rule is correctly applied
   ordered <- order(recall)
@@ -1418,19 +1542,45 @@ calculate_auprc <- function(recall, precision) {
   return(auprc)
 }
 
-#' Compute weighted feature importance from base models and meta-learner for stacking models
+#' Compute Weighted Feature Importance from Base Models and Meta-Learner for Stacking Models
 #'
-#' @param base_importance A matrix of feature importance from base models
-#' @param base_models A character vector with chosen base models
-#' @param meta_learner A caret object with the meta-learner model trained using base models
+#' This function computes the feature importance by weighing the feature importances from
+#' multiple base models in a stacking ensemble, combined with the meta-learner's model importance.
+#' The final importance score for each feature is calculated by multiplying the base model's
+#' feature importance with the meta-learner's weight for each base model.
 #'
-#' @return A matrix of feature importance weighted from the base models and the meta-learner
-#' @export
+#' @param base_importance A list where each element corresponds to a base model and contains a data frame
+#'                        with feature importances. Each data frame should have a column called `importance`
+#'                        (either for the positive class or overall, depending on the type of model).
+#' @param base_models A character vector with the names of the base models whose feature importances are
+#'                    provided in `base_importance`.
+#' @param meta_learner A `caret` object representing the trained meta-learner model. This model is used to
+#'                     obtain weights for each base model, based on their performance in the ensemble.
+#'
+#' @return A data frame with two columns:
+#'   \item{features}{The feature names.}
+#'   \item{final_importance}{The final weighted importance score for each feature, calculated by summing
+#'                           the weighted importances across all base models. Features are sorted in descending
+#'                           order of their final importance score.}
+#'
+#' @details
+#' The function extracts feature importance values from the base models, then computes the weighted importance
+#' for each feature based on the meta-learner's performance. The meta-learner's feature importance is normalized
+#' to ensure the sum of the importances across all models is 1, and it is used as the weight for each base model.
+#' The feature importances from all base models are then aggregated and weighted by their respective meta-learner
+#' importance scores.
 #'
 #' @examples
+#' # Assuming `base_importance` is a list of feature importance matrices from base models,
+#' # `base_models` is a vector of model names, and `meta_learner` is the trained meta-learner model:
+#' var_importance = calculate_feature_importance_stacking(base_importance, base_models, meta_learner)
 #'
-#' var_importance = calculate_feature_importance_stacking(variable_importance, base_models, meta-learner)
+#' @seealso \code{\link[caret]{varImp}}
 #'
+#' @import caret
+#' @import dplyr
+#' @import tibble
+#' @export
 calculate_feature_importance_stacking = function(base_importance, base_models, meta_learner){
 
   #Extract features importance values within each base model for the meta-learner
@@ -1481,24 +1631,52 @@ calculate_feature_importance_stacking = function(base_importance, base_models, m
 
 }
 
-#' Compute prediction
+#' Compute Prediction Metrics for a Trained Machine Learning Model
 #'
-#' @param model Trained machine learning model
-#' @param test_data A matrix with the testing dataset
-#' @param target Character vector with the true values
+#' This function computes prediction metrics for a given machine learning model, including
+#' the confusion matrix, AUROC, AUPRC, and other performance metrics such as Accuracy, Sensitivity,
+#' Specificity, Precision, Recall, F1 score, and MCC. The function also determines the optimal
+#' classification threshold based on a chosen metric (e.g., Accuracy, F1, or AUROC) and generates
+#' a confusion matrix plot.
 #'
-#' @return A list containing
+#' @param model A trained machine learning model (e.g., from `caret` or other model training functions).
+#' @param test_data A matrix or data frame containing the testing dataset (features only).
+#' @param target A character vector of true target values for the test data (the observed labels).
+#' @param file.name A character string to specify the filename for saving the confusion matrix plot
+#'                  (optional). If `NULL`, the plot is not saved.
+#' @param maximize A character string indicating which metric to maximize when selecting the best
+#'                 threshold for the confusion matrix. Options include "Accuracy", "Precision",
+#'                 "Recall", "Specificity", "Sensitivity", "F1", or "MCC". Default is "Accuracy".
 #'
-#' - Prediction metrics
-#' - AUROC and AUPRC
-#' - Prediction values
+#' @return A list containing:
+#' \item{Metrics}{A data frame with various performance metrics (Accuracy, Sensitivity, Specificity,
+#'                Precision, Recall, F1 score, MCC) for each threshold.}
+#' \item{AUC}{A list containing the AUROC and AUPRC values.}
+#' \item{Predictions}{A data frame with the predicted probabilities for each class (e.g., `yes` or `no`).}
 #'
-#' @export
+#' @details
+#' This function first generates predictions for the test dataset using the trained machine learning model.
+#' It then calculates performance metrics for a range of threshold values and selects the threshold that maximizes
+#' the chosen metric (e.g., Accuracy, F1 score, etc.). The function returns the metrics for the best threshold,
+#' including AUROC and AUPRC, and produces a confusion matrix plot that compares predicted versus actual labels.
+#'
+#' The confusion matrix plot is saved as a PDF with the name `Confusion_Matrix_<file.name>.pdf` if a valid
+#' `file.name` is provided.
 #'
 #' @examples
+#' # Example of usage with a trained model, testing data, and true labels:
+#' prediction_results = compute.prediction(model = trained_model,
+#'                                         test_data = testing_set,
+#'                                         target = true_labels)
 #'
-#' prediction = compute.prediction(model, testing_set, target)
+#' @seealso \code{\link[caret]{confusionMatrix}}, \code{\link[caret]{varImp}}, \code{\link[ggplot2]{ggplot}}
 #'
+#' @import caret
+#' @import dplyr
+#' @import ggplot2
+#' @import reshape2
+#' @import grDevices
+#' @export
 compute.prediction = function(model, test_data, target, file.name = NULL, maximize = "Accuracy"){
   # Maximize: parameter for choosing threshold for confusing matrix: maximize sensitivity, specificity, F1, AUROC, AUPRC
   cat("Predicting target variable using provided ML model.................................................\n")
@@ -1602,16 +1780,22 @@ compute.prediction.stacked = function(super.learner, test_data, target, ml.model
 
 #' Calculates accuracy values from prediction
 #'
-#' @param metrics A Dataframe with metrics obtained using get_sensitivity_specificity()
-#' @param target A character vector containing the true values from the target variable
+#' This function calculates the accuracy of a model based on the provided metrics and the true target values.
+#' The accuracy is computed as the ratio of correct predictions (both true positives and true negatives)
+#' to the total number of predictions.
 #'
-#' @return A numeric vector with the accuracy values
+#' @param metrics A data frame with metrics obtained using `get_sensitivity_specificity()`, containing
+#'   at least two columns: "Sensitivity" and "Specificity".
+#' @param target A character vector containing the true values from the target variable.
+#'   It should have the same length as the predictions.
+#'
+#' @return A numeric vector representing the accuracy values.
+#'   The result is the fraction of correct predictions out of all predictions.
 #' @export
 #'
 #' @examples
-#'
-#'observed_values = c("yes", "yes", "no", "yes")
-#'accuracy = calculate_accuracy(metrics, observed_values)
+#' observed_values = c("yes", "yes", "no", "yes")
+#' accuracy = calculate_accuracy(metrics, observed_values)
 #'
 calculate_accuracy <- function(metrics, target) {
   sensitivity = metrics[,"Sensitivity", drop = T]
@@ -1630,14 +1814,22 @@ calculate_accuracy <- function(metrics, target) {
 
 #' Calculate confusion values
 #'
-#' @param metrics A Dataframe with metrics obtained using get_sensitivity_specificity()
-#' @param target A character vector containing the true values from the target variable
+#' This function computes the confusion matrix values (True Positives, False Negatives,
+#' True Negatives, and False Positives) based on the given metrics and the true target values.
 #'
-#' @return A list containing the True positives (TP), False negatives (FN), True negatives (TN) and False positives (FP)
+#' @param metrics A data frame with metrics obtained using `get_sensitivity_specificity()`, containing
+#'   at least two columns: "Sensitivity" and "Specificity".
+#' @param target A character vector containing the true values from the target variable.
+#'   It should have the same length as the predictions.
+#'
+#' @return A list containing four elements:
+#'   - `TP`: True Positives
+#'   - `FN`: False Negatives
+#'   - `TN`: True Negatives
+#'   - `FP`: False Positives
 #' @export
 #'
 #' @examples
-#'
 #' target = c("yes", "no", "yes", "no", "no")
 #' metrics = get_sensitivity_specificity(predict, target, model)
 #' confusion_values = calculate_confusion_values(metrics, target)
@@ -1661,14 +1853,19 @@ calculate_confusion_values <- function(metrics, target) {
 
 #' Calculate precision values
 #'
-#' @param metrics A Dataframe with metrics obtained using get_sensitivity_specificity()
-#' @param target A character vector containing the true values from the target variable
+#' This function calculates the precision of a model based on the provided metrics and the true target values.
+#' Precision is defined as the ratio of true positive predictions to all positive predictions (true positives + false positives).
 #'
-#' @return A numeric vector with precision values
+#' @param metrics A data frame with metrics obtained using `get_sensitivity_specificity()`, containing
+#'   at least two columns: "Sensitivity" and "Specificity".
+#' @param target A character vector containing the true values from the target variable.
+#'   It should have the same length as the predictions.
+#'
+#' @return A numeric vector representing the precision values.
+#'   Precision is the fraction of true positive predictions among all positive predictions.
 #' @export
 #'
 #' @examples
-#'
 #' observed = c("yes", "no", "yes", "no", "no")
 #' metrics = get_sensitivity_specificity(predict, target, model)
 #' precision = calculate_precision(metrics, observed)
@@ -1685,14 +1882,19 @@ calculate_precision <- function(metrics, target) {
 
 #' Calculate recall values
 #'
-#' @param metrics A Dataframe with metrics obtained using get_sensitivity_specificity()
-#' @param target A character vector containing the true values from the target variable
+#' This function calculates the recall (also known as sensitivity) of a model based on the provided metrics and the true target values.
+#' Recall is defined as the ratio of true positive predictions to all actual positive instances (true positives + false negatives).
 #'
-#' @return A numeric vector with recall values
+#' @param metrics A data frame with metrics obtained using `get_sensitivity_specificity()`, containing
+#'   at least two columns: "Sensitivity" and "Specificity".
+#' @param target A character vector containing the true values from the target variable.
+#'   It should have the same length as the predictions.
+#'
+#' @return A numeric vector representing the recall values.
+#'   Recall is the fraction of actual positive instances that were correctly predicted.
 #' @export
 #'
 #' @examples
-#'
 #' observed = c("yes", "no", "yes", "no", "no")
 #' metrics = get_sensitivity_specificity(predict, target, model)
 #' recall = calculate_recall(metrics, observed)
@@ -1708,26 +1910,28 @@ calculate_recall <- function(metrics, target) {
   return(recall)
 }
 
-#'
 #' Get performance curves
 #'
-#' Get ROC and precision-recall curves
+#' This function generates and saves the Receiver Operating Characteristic (ROC) curve
+#' and Precision-Recall curve based on the provided metrics. It also includes the AUC values
+#' for both curves in the plot legends.
 #'
-#' @param data A matrix with the prediction metrics
-#' @param spec Name of column with the specificity values
-#' @param sens Name of column with the sensitivity values
-#' @param reca Name of column with the recall values
-#' @param prec Name of column with the precision values
-#' @param color Name of column with the cohort names. Each cohort will have a color. If several cohorts are present, different curves will be plot.
-#' @param auc_roc AUC-ROC value
-#' @param auc_prc AUC-PRC value
-#' @param plot_title Title for the plots
+#' @param data A data frame containing the prediction metrics.
+#' @param spec The name of the column containing the specificity values.
+#' @param sens The name of the column containing the sensitivity values.
+#' @param reca The name of the column containing the recall values.
+#' @param prec The name of the column containing the precision values.
+#' @param color The name of the column containing the cohort names. Each cohort will have a
+#'        corresponding color in the plot. Multiple cohorts will result in different curves.
+#' @param auc_roc A numeric value representing the AUC for the ROC curve.
+#' @param auc_prc A numeric value representing the AUC for the Precision-Recall curve.
+#' @param file.name A character string used as the file name prefix for saving the plots.
 #'
-#' @return ROC and precision-recall curves saved in Results/ directory.
+#' @return Saves two PDF plots: one for the ROC curve and one for the Precision-Recall curve
+#'         in the "Results/" directory.
 #' @export
 #'
 #' @examples
-#'
 #' get_curves(metrics, "specificity", "sensitivity", "recall", "precision", "model", auc_roc_score, auc_prc_score, "Test")
 #'
 get_curves = function(data, spec, sens, reca, prec, color, auc_roc, auc_prc, file.name){
@@ -1773,15 +1977,19 @@ get_curves = function(data, spec, sens, reca, prec, color, auc_roc, auc_prc, fil
 
 #' Extract ML models from a directory based on specific AUC score
 #'
-#' @param folder_path Directory path where all the ML models are
-#' @param metric AUC should be choose from ROC or PRC
-#' @param AUC Numeric value with the minimum AUC score models should have
+#' This function searches a directory for machine learning models and filters them based on a
+#' specified AUC threshold for either the ROC or Precision-Recall curves. It returns a list of
+#' model file names that meet the specified AUC criteria.
 #'
-#' @return List with the names of the ML models that fulfill the criteria
+#' @param folder_path A character string specifying the directory path where the machine learning
+#'                    models are stored.
+#' @param metric A character string indicating which AUC metric to use. Choose either "ROC" or "PRC".
+#' @param AUC A numeric value representing the minimum acceptable AUC score for the models.
+#'
+#' @return A character vector with the file paths of the ML models that meet the AUC criteria.
 #' @export
 #'
 #' @examples
-#'
 #' find.ML.models("Results/ML_models", "ROC", 0.7)
 find.ML.models = function(folder_path, metric, AUC){
 
@@ -2145,14 +2353,27 @@ compute_shap_values <- function(model_trained, data_train, method, n_cores = 2) 
 
 #' Plot SHAP values
 #'
-#' @param shap_df Importance matrix returned from compute.variable.importance()
-#' @param ml_model ML model name
-#' @param file_name Name of plot to save in Results/ directory
-#' @param width A numeric value specifying the width of the plot to return
-#' @param height A numeric value specifying the height of the plot to return
+#' Plots the variable importance based on SHAP (SHapley Additive exPlanations) values
+#' and saves the plot to the `Results/` directory.
 #'
-#' @return A plot saved in Results directory
+#' @param shap_df A data frame or matrix containing SHAP values where rows represent samples and columns represent features.
+#' @param ml_model A character string representing the name of the machine learning model.
+#' @param file_name A character string representing the name of the file to save the plot in the `Results/` directory.
+#' @param width A numeric value specifying the width of the plot in inches (default is 10).
+#' @param height A numeric value specifying the height of the plot in inches (default is 10).
+#'
+#' @return A plot saved as a PDF file in the `Results/` directory showing the variable importance of the machine learning model.
+#'
+#' @details This function generates a bar plot of the SHAP values, where the features are sorted by their mean SHAP value. The plot distinguishes
+#' between features that increase the predicted outcome (colored in red) and those that decrease the predicted outcome (colored in blue).
+#' The plot is saved as a PDF file in the `Results/` directory, with the filename specified by the user.
+#'
 #' @export
+#'
+#' @examples
+#' shap_df = data.frame(feature1 = rnorm(100), feature2 = rnorm(100))
+#' ml_model = "RandomForest"
+#' plot_shap_values(shap_df, ml_model, "shap_plot")
 #'
 plot_shap_values = function(shap_df, ml_model, file_name, width = 10, height = 10){
 
@@ -2189,16 +2410,22 @@ plot_shap_values = function(shap_df, ml_model, file_name, width = 10, height = 1
 
 #' Compute variable importance using SHAP values
 #'
-#' @param model Model trained
-#' @param stacking Whether model was trained using stacking or not
-#' @param n_cores Number of workers to use for parallelization
+#' Computes the variable importance for a machine learning model using SHAP (SHapley Additive exPlanations) values.
 #'
-#' @return A matrix with the SHAP values per sample
+#' @param model A trained machine learning model.
+#' @param stacking A logical value indicating whether the model was trained using stacking (default is FALSE).
+#' @param n_cores An integer specifying the number of workers to use for parallel computation (default is 2).
+#'
+#' @return A data frame with SHAP values representing the variable importance for each feature.
+#'
+#' @details If `stacking` is TRUE, the function computes the SHAP values for each base model in the stacked ensemble model and
+#' averages them. If `stacking` is FALSE, the function computes the SHAP values for the provided single machine learning model.
+#' The computed SHAP values are returned as a data frame with features as rows and samples as columns.
+#'
 #' @export
 #'
 #' @examples
-#'
-#' importance = compute.variable.importance(ml_model, FALSE, 2)
+#' importance = compute.variable.importance(ml_model, stacking = FALSE, n_cores = 2)
 #'
 compute.variable.importance = function(model, stacking = FALSE, n_cores = 2){
 
