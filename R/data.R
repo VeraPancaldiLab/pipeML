@@ -22,17 +22,6 @@
 #' head(raw.counts)
 "raw.counts"
 
-#' ML model trained
-#'
-#' Machine learning model trained
-#'
-#' @format Output from compute.features.ML()
-#'
-#' @examples
-#' data(model_trained)
-#' head(model_trained)
-"model_trained"
-
 #' Clinical data
 #'
 #' Metadata containing the variable to predict

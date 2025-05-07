@@ -35,10 +35,9 @@ Use repetive feature selection through Boruta algorithm
 deconvolution$target = as.factor(traitData$Best.Confirmed.Overall.Response)
 res_boruta <- feature.selection.boruta(
   data = deconvolution,
-  iterations = 10,
+  iterations = 5,
   fix = FALSE,
   doParallel = FALSE,
-  workers = 2,
   threshold = 0.8,
   file_name = "Test",
   return = FALSE
@@ -57,10 +56,9 @@ If user would like to get rid of tentative features, set the parameter fix = TRU
 ```{r, eval = FALSE}
 res_boruta <- feature.selection.boruta(
   data = deconvolution,
-  iterations = 10,
+  iterations = 5,
   fix = TRUE,
   doParallel = FALSE,
-  workers = 2,
   threshold = 0.8,
   file_name = "Test",
   return = FALSE
@@ -120,13 +118,14 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     trait.positive = "CR",
                                     metric = "AUROC",
                                     stack = TRUE,
-                                    k_folds = 3,
-                                    n_rep = 3,
+                                    k_folds = 2,
+                                    n_rep = 2,
                                     feature.selection = FALSE,
                                     seed = 123,
                                     LODO = FALSE,
                                     batch_id = NULL,
                                     file_name = "Test",
+                                    ncores = 2,
                                     return = FALSE)
 ```
 
@@ -148,15 +147,16 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     trait.positive = "CR",
                                     metric = "AUROC",
                                     stack = TRUE,
-                                    k_folds = 3,
-                                    n_rep = 3,
+                                    k_folds = 2,
+                                    n_rep = 2,
                                     feature.selection = TRUE,
-                                    n_boruta = 5, 
+                                    n_boruta = 2, 
                                     boruta_fix = TRUE, 
                                     seed = 123,
                                     LODO = FALSE,
                                     batch_id = NULL,
                                     file_name = "Test",
+                                    ncores = 2,
                                     return = FALSE)
 ```
 

@@ -1,0 +1,57 @@
+url: ~
+template:
+  bootstrap: 5
+
+reference:
+- title: Main
+  desc: >
+    Compute cell type deconvolution
+  contents:
+  - compute.deconvolution
+  - compute.deconvolution.analysis
+  - compute.deconvolution.preprocessing
+  - compute_methods_variable_signature
+- title: Single cell functions
+  desc: >
+    Single cell data manipulation for deconvolution
+  contents:
+  - create_metacells
+  - create_sc_pseudobulk
+  - create_sc_signatures
+  - compute_sc_deconvolution_methods
+  - compute.benchmark
+- title: Utils
+  desc: >
+    Internal use (not exported functions)
+  contents:
+  - computeCBSX
+  - computeCBSX_parallel
+  - computeDWLS
+  - computeDWLS_parallel
+  - computeDeconRNASeq
+  - computeEpiDISH
+  - computeMCP
+  - computeMOMF
+  - computeMOMF_parallel
+  - computeQuantiseq
+  - computeXCell
+  - compute_subgroups
+  - compute.cell.types
+  - remove_subgroups
+  - remove_low_variance
+  - removeCorrelatedFeatures
+  - correlation
+- title: Package Data
+  desc: >
+    Example data
+  contents:
+  - raw_counts
+  - deconv_bulk
+  - deconvolution
+  - metacells_data
+  - metacells_metadata
+  - pseudobulk
+  - cells_groundtruth
+  - subgroups
+  - sample_labels
+  - cell_labels

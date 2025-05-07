@@ -286,7 +286,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
   ######### Machine Learning models
   if(is.null(ncores) == TRUE){
-    ncores = parallel::detectCores() - 1
+    ncores = parallel::detectCores() - 2
   }
   cl <- parallel::makeCluster(ncores)
   doParallel::registerDoParallel(cl)
