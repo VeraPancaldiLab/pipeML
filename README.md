@@ -27,7 +27,7 @@ its complexity allows a robust implementation during each step of the
 pipeline (Figure 1).
 
 <p align="center">
-<img src="man/MLpipeline.png?raw=true" />
+<img src="man/figures/MLpipeline.png?raw=true" />
 </p>
 <p align="center">
 <i> Figure 1. Machine learning pipeline. </i>

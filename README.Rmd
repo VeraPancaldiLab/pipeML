@@ -34,7 +34,7 @@ pak::pkg_install("VeraPancaldiLab/pipeML")
 pipeML is a robust pipeline done in R to train and test machine learning models for classification tasks. It is develop for a fast and easy use, its complexity allows a robust implementation during each step of the pipeline (Figure 1). 
 
 <p align="center">
- <img src="man/MLpipeline.png?raw=true" />
+ <img src="man/figures/MLpipeline.png?raw=true" />
 </p>
 
 <p align="center"><i>

@@ -8,6 +8,13 @@
 \description{
 pipeML is develop for a fast and easy use, its complexity allows a robust implementation during each step of the pipeline.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/VeraPancaldiLab/pipeML}
+}
+
+}
 \author{
 \strong{Maintainer}: Marcelo Hurtado \email{marcelo.hurtado@inserm.fr} (\href{https://orcid.org/0009-0004-6712-0864}{ORCID})
 
