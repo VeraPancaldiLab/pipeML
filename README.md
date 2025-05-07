@@ -1,0 +1,114 @@
+pipeML
+================
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+A robust R machine learning pipeline for classification tasks and
+survival analysis
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+## Installation
+
+You can install the development version of `pipeML` from
+[GitHub](https://github.com/) with:
+
+``` r
+# install.packages("pak")
+pak::pkg_install("VeraPancaldiLab/pipeML")
+```
+
+## Description
+
+pipeML is a robust pipeline done in R to train and test machine learning
+models for classification tasks. It is develop for a fast and easy use,
+its complexity allows a robust implementation during each step of the
+pipeline (Figure 1).
+
+<p align="center">
+<img src="man/MLpipeline.png?raw=true" />
+</p>
+<p align="center">
+<i> Figure 1. Machine learning pipeline. </i>
+</p>
+
+## Key features
+
+- Stratified data split
+- Iterative Boruta algorithm for feature selection
+- Repeated k-fold cross validation (kCV)
+- Hyperparameter tuning based on AUC or Accuracy
+- Stratified k-fold construction
+- Model stacking implementation based on GLM
+- 13 Machine Learning methods implemented
+  - Bagged CART
+  - Random Forest (RF)
+  - C50
+  - Logistic regression (LG)
+  - CART
+  - Naive Bayes (NB)
+  - Regularized Lasso
+  - Ridge regression
+  - Linear Discriminant Analysis (LDA)
+  - Regularized Logistic Regression (Elastic net)
+  - K-nearest neighbors (KNN)
+  - Support vector machine with radial kernel (SVMr)
+  - Support vector machine with linear kernel (SVMl)
+
+## General usage
+
+These are basic examples which shows you how to use `pipeML` for
+different tasks. For a detailed tutorial, see [Get
+started](https://VeraPancaldiLab.github.io/pipeML/articles/pipeML.html)
+
+``` r
+library(pipeML)
+```
+
+The main function to compute the ML pipeline is through the `compute.ML`
+function. Refer to `examples/mlpipeline.Rmd` to see a detailed
+explanation of the parameters inside the function.
+
+``` r
+res_ml = compute.ML(raw.counts, normalized = T, clinical, trait = "Response",trait.positive = "CR", partition = 0.8, metric = "AUC", stack = T, feature.selection = F,seed = 1234, doParallel = T,  workers = 2, file_name = "Test", return = T)
+```
+
+The previous function is a one-partition run meaning it will
+partitionate your data into train and test once. For reproducibility, a
+seed needs to be specified. For a robust analysis we recommend testing
+performance from different partitions of train/test. For doing this
+users can use the `compute.bootstrap.ML` function:
+
+``` r
+compute.bootstrap.ML(raw.counts, normalized = T, clinical, trait = "Response", trait.positive = "YES", partition = 0.8, metric = "Accuracy", iterations = 20, feature.selection = F, stack = T, workers = 4, file.name = "Test", return = F)
+```
+
+ML will be saved in your working directory inside a `Results` folder. In
+order to pool the performance across all models we provide the function
+`get_pooled_roc_curves` that allows you to plot a boxplot with the
+AUC-ROC and AUC-PRC scores across all your ML models.
+
+``` r
+get_pooled_roc_curves("Test", "Results/ML_models") #Get boxplot with AUC scores distribution across iterations
+```
+
+pipeML provides also a function to perform the Leaving-One-Dataset-Out
+(LODO) approach.
+
+``` r
+res_ml = compute.LODO.ML(raw.counts, normalized = T, clinical, trait = "Response",trait.positive = "R", trait.out = "Cohort", out = "Dupont", metric = "Accuracy", stack = T, feature.selection = F, doParallel = T, workers = 4, file_name = "Test", return = F)
+```
+
+## Authors
+
+`pipeML` was developed by [Marcelo
+Hurtado](https://github.com/mhurtado13) in supervision of [Vera
+Pancaldi](https://github.com/VeraPancaldi) and is part of the
+[Pancaldi](https://github.com/VeraPancaldiLab) team. Currently, Marcelo
+is the primary maintainer of this package.
+
+## Citing pipeML
+
+If you use `pipeML` in a scientific publication, we would appreciate
+citation to the :

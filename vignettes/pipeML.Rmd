@@ -16,60 +16,236 @@ knitr::opts_chunk$set(
 
 ```{r setup}
 library(pipeML)
+library(caret)
 ```
 
 This is a tutorial for using `pipeML` and explain how to use the main functions of the pipeline to train and test machine learning models. Details of the parameters of each function can be obtained from `machine_learning.R`
 
-Set up environment
-```{r setup, include=FALSE}
-source("machine_learning.R") #Load functions and packages
-```
-
 Load data
 ```{r}
-raw.counts = read.csv("data/raw_counts_Mariathasan.csv", row.names = 1) 
-traitData = read.csv("data/clinical_Mariathasan.csv", row.names = 1)
+raw.counts = pipeML::raw.counts
+traitData = pipeML::traitData
+deconvolution = pipeML::deconvolution
 ```
 
-Machine Learning models for predicting a clinical trait using the cell groups scores.
+Feature selection
 
-If you have already set up your train and test data, you can use the following function. Train_data should be a data frame with a column named as "target" and the classes labels as 'yes' and 'no'. Target corresponds to the vector with the true labels (the ones to predict). The `stack` parameter indicates if you want to apply ensemble models during the training, if `feature.selection = T` it will performs an iterative boruta algorithm to choose predictive features (see README for more information).
+Use repetive feature selection through Boruta algorithm
 ```{r}
-res = compute.simple.ML(train_data, test_data, target = "target", metric = "Accuracy", stack = T, feature.selection = F, file_name = "Benchmark", return = T)
+deconvolution$target = as.factor(traitData$Best.Confirmed.Overall.Response)
+res_boruta <- feature.selection.boruta(
+  data = deconvolution,
+  iterations = 10,
+  fix = FALSE,
+  doParallel = FALSE,
+  workers = 2,
+  threshold = 0.8,
+  file_name = "Test",
+  return = FALSE
+)
 ```
 
-If you have cell deconvolution results from [multideconv](https://github.com/mhurtado13/multideconv/tree/main) you can use your results to train a ML model. For this input your deconvolution results (without subgroupping) in the following function.
 ```{r}
-res_ml_deconvolution = compute.deconvolution.ML(deconv, coldata, trait = "R.NR", trait.positive = "R", partition = 0.75, 
-                                                metric = "Accuracy", stack = T, feature.selection = F, seed =  seed, 
-                                                file_name = "Deconvolution_subgroup", return = T)
+head(res_boruta$Matrix_Importance)
+
+cat("Confirmed features:\n", res_boruta$Confirmed)
+
+cat("Tentative features:\n", res_boruta$Tentative)
 ```
 
-`pipeML` can be used with [CellTFusion](https://github.com/VeraPancaldiLab/CellTFusion_paper). Cell groups will be construct and used associations loadings to train ML models. The following functions have been developed with this purpose. 
-
-Run the ML pipeline with one train-test split (set seed for reproducibility). It will save a ROC and Recall curves in the `Results/` and return a list of objects containing the ML model, the predictive features, the variable importance, the cell groups composition and the prediction metrics.
-```{r}
-res_ml = compute.ML(raw.counts = raw.counts, normalized = T, clinical = traitData, trait = "Best.Confirmed.Overall.Response", 
-                    trait.positive = "CR", partition = 0.8, metric = "Accuracy", stack = T, feature.selection = F, 
-                    seed = 1234, doParallel = T,  workers = 2, file_name = "Test", return = T)
+If user would like to get rid of tentative features, set the parameter fix = TRUE to run a second test and identify whether these tentative features are further confirmed
+```{r, eval = FALSE}
+res_boruta <- feature.selection.boruta(
+  data = deconvolution,
+  iterations = 10,
+  fix = TRUE,
+  doParallel = FALSE,
+  workers = 2,
+  threshold = 0.8,
+  file_name = "Test",
+  return = FALSE
+)
 ```
 
-Run ML pipeline with multiple train-test splits for consistency. It will save each ML model in the `Results/` directory. Due to RAM issues in Rstudio, it is advisable to not run so many iterations at once (6-10) and we advise to do it in different sessions after cleaning the swap or to run it in a powerful computer.
-```{r}
-compute.bootstrap.ML(raw.counts = raw.counts, normalized = T, clinical = traitData, trait = "Best.Confirmed.Overall.Response", 
-                     trait.positive = "CR", partition = 0.8, metric = "Accuracy", iterations = 2, feature.selection = F, 
-                     stack = T, workers = 2, file.name = "Test", return = F)
+To speed up process, user can allow parallelization with the following (Fix paralellization)
+```{r, eval = FALSE}
+res_boruta <- feature.selection.boruta(
+  data = deconvolution,
+  iterations = 10,
+  fix = FALSE,
+  doParallel = FALSE,
+  workers = 2,
+  threshold = 0.8,
+  file_name = "Test",
+  return = FALSE
+)
 ```
 
-In order to see the mean AUC across all the ML models, run the following function. It will save a boxplot with AUC scores distribution across iterations
+Train machine learning models with optional stacking and feature selection
+
+Perform repeated stratified k-fold cross-validation for model training and tuning
 ```{r}
-get_pooled_roc_curves(file.name = "Deconvolution_subgroups", folder_path = "Results/ML_models_Test") 
+deconvolution = pipeML::deconvolution
+traitData = pipeML::traitData
+res <- compute_features.training.ML(features_train = deconvolution, 
+                                    target_var = traitData$Best.Confirmed.Overall.Response,
+                                    trait.positive = "CR",
+                                    metric = "AUROC",
+                                    stack = FALSE,
+                                    k_folds = 2,
+                                    n_rep = 2,
+                                    feature.selection = FALSE,
+                                    seed = 123,
+                                    LODO = FALSE,
+                                    batch_id = NULL,
+                                    file_name = "Test",
+                                    ncores = 2,
+                                    return = FALSE)
 ```
 
-If you have different cohorts available, you can apply the Leaving-one-dataset-out (LODO) approach.
+Best model trained can be found at
+```{r, eval = FALSE}
+res[[1]]$Model
+```
+
+The list of all the ML models trained and tuned can be found at
+```{r, eval = FALSE}
+res[[1]]$ML_Models
+```
+
+For applying model stacking user can set parameter stack = TRUE
 ```{r}
-res_ml = compute.LODO.ML(raw.counts = raw.counts, normalized = T, clinical = traitData, trait = "Response", 
-                         trait.positive = "R", trait.out = "Cohort", out = cohort, metric = "Accuracy", stack = T, 
-                         feature.selection = F, doParallel = T, workers = 4, file_name = "Test", return = F)
+res <- compute_features.training.ML(features_train = deconvolution, 
+                                    target_var = traitData$Best.Confirmed.Overall.Response,
+                                    trait.positive = "CR",
+                                    metric = "AUROC",
+                                    stack = TRUE,
+                                    k_folds = 3,
+                                    n_rep = 3,
+                                    feature.selection = FALSE,
+                                    seed = 123,
+                                    LODO = FALSE,
+                                    batch_id = NULL,
+                                    file_name = "Test",
+                                    return = FALSE)
+```
+
+To check which are the base models chosen
+```{r}
+res$Model$Base_models
+```
+
+To access the meta-learner 
+```{r, eval = FALSE}
+res$Model$Meta_learner
+```
+
+If feature selection is required set parameter feature.selection = TRUE, here you will also have to set n_boruta to set the number of iterations you want to perform the Boruta algorithm and boruta_fixt to set whether to get rid of tentative features or not (see feature.selection.boruta())
+
+```{r}
+res <- compute_features.training.ML(features_train = deconvolution, 
+                                    target_var = traitData$Best.Confirmed.Overall.Response,
+                                    trait.positive = "CR",
+                                    metric = "AUROC",
+                                    stack = TRUE,
+                                    k_folds = 3,
+                                    n_rep = 3,
+                                    feature.selection = TRUE,
+                                    n_boruta = 5, 
+                                    boruta_fix = TRUE, 
+                                    seed = 123,
+                                    LODO = FALSE,
+                                    batch_id = NULL,
+                                    file_name = "Test",
+                                    return = FALSE)
+```
+
+In this case, function will return also selected features from Boruta (if feature.selection = FALSE), it returns by default all features
+```{r}
+res$Features
+```
+
+For parallelization user can set the number of cores to use (Default = detectCores() - 1) 
+```{r, eval = FALSE}
+res <- compute_features.training.ML(features_train = deconvolution, 
+                                    target_var = traitData$Best.Confirmed.Overall.Response,
+                                    trait.positive = "CR",
+                                    metric = "AUROC",
+                                    stack = TRUE,
+                                    k_folds = 3,
+                                    n_rep = 3,
+                                    feature.selection = FALSE,
+                                    seed = 123,
+                                    LODO = FALSE,
+                                    batch_id = NULL,
+                                    file_name = "Test",
+                                    ncores = 3,
+                                    return = FALSE)
+```
+
+If train data features came from different cohorts, pipeML gives the option to use this information to construct the k-folds. If LODO = TRUE, folds construction will be stratified across cohorts to maintain the same percentage of each one during each partition, this information should be present in the column named as it is given in the argument 'batch_id'
+```{r, eval = FALSE}
+res <- compute_features.training.ML(features_train = deconvolution, 
+                                    target_var = traitData$Best.Confirmed.Overall.Response,
+                                    trait.positive = "CR",
+                                    metric = "AUROC",
+                                    stack = TRUE,
+                                    k_folds = 3,
+                                    n_rep = 3,
+                                    feature.selection = FALSE,
+                                    seed = 123,
+                                    LODO = TRUE,
+                                    batch_id = "cohort",
+                                    file_name = "Test",
+                                    ncores = 3,
+                                    return = FALSE)
+```
+
+If you have a testing set you can train the model and predict directly using the following function. Additionally, user can maximize a metric to choose a threshold and return the prediction metrics values (Accuracy, Sensitivity, Specificity, F1 score, MCC score, Recall and Precision)
+```{r, eval = FALSE}
+deconvolution = pipeML::deconvolution
+data_train = deconvolution[1:100,]
+data_test = deconvolution[!rownames(deconvolution) %in% rownames(data_train),]
+res <- compute_features.ML(features_train = data_train, 
+                           features_test = data_test, 
+                           clinical = traitData,
+                           trait = "Best.Confirmed.Overall.Response",
+                           trait.positive = "CR",
+                           metric = "AUROC",
+                           stack = FALSE,
+                           k_folds = 3,
+                           n_rep = 3,
+                           feature.selection = FALSE,
+                           seed = 123,
+                           LODO = FALSE,
+                           batch_id = NULL,
+                           file_name = "Test",
+                           maximize = "F1",
+                           return = FALSE)
+```
+
+Retrieve boxplot from several ML models
+```{r, eval = FALSE}
+get_pooled_roc_curves(file.name = "Combined_Model", folder_path = "Results/Models/")
+```
+
+Compare performance across cohorts
+```{r, eval = FALSE}
+get_pooled_boxplots(folder_paths = c("Results/Cohort1", "Results/Cohort2"), file_name = "TME_Comparison")
+```
+
+Get predictions metrics
+```{r, eval = FALSE}
+head(res$Prediction_metrics)
+```
+
+Compute variable importance
+```{r, eval = FALSE}
+importance = compute_variable.importance(res$Model, stacking = FALSE, n_cores = 2)
+```
+
+Plot SHAP values
+```{r, eval = FALSE}
+plot_shap_values(importance, "glm", "shap_plot")
 ```
 
