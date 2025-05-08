@@ -12,6 +12,7 @@ pipeML is develop for a fast and easy use, its complexity allows a robust implem
 Useful links:
 \itemize{
   \item \url{https://github.com/VeraPancaldiLab/pipeML}
+  \item \url{https://verapancaldilab.github.io/pipeML/}
 }
 
 }
