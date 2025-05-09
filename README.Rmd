@@ -31,7 +31,7 @@ pak::pkg_install("VeraPancaldiLab/pipeML")
 
 ## Description
 
-pipeML is a robust pipeline done in R to train and test machine learning models for classification tasks. It is develop for a fast and easy use, its complexity allows a robust implementation during each step of the pipeline (Figure 1). 
+pipeML is a robust R-based pipeline designed to streamline the training and testing of machine learning models for classification tasks. It is developed for fast, user-friendly deployment while maintaining the flexibility and complexity needed for rigorous, reliable implementation at every stage of the pipeline (Figure 1).
 
 <p align="center">
  <img src="man/figures/MLpipeline.png?raw=true" />
@@ -46,9 +46,11 @@ pipeML is a robust pipeline done in R to train and test machine learning models 
 * Stratified data split
 * Iterative Boruta algorithm for feature selection 
 * Repeated k-fold cross validation (kCV)
-* Hyperparameter tuning based on AUC or Accuracy
+* Hyperparameter tuning based on AUROC, AUPRC or Accuracy
 * Stratified k-fold construction
+* SHAP values implementation for feature importance
 * Model stacking implementation based on GLM
+* Visualization functions for RO and PR curves
 * 13 Machine Learning methods implemented
   * Bagged CART
   * Random Forest (RF)
@@ -63,6 +65,7 @@ pipeML is a robust pipeline done in R to train and test machine learning models 
   * K-nearest neighbors (KNN)
   * Support vector machine with radial kernel (SVMr)
   * Support vector machine with linear kernel (SVMl)
+  * Extreme Gradient Boosting (XGboost)
 
 ## General usage
 
@@ -72,7 +75,7 @@ These are basic examples which shows you how to use `pipeML` for different tasks
 library(pipeML)
 ```
 
-The main function to compute the ML pipeline is through the `compute.ML` function. Refer to `examples/mlpipeline.Rmd` to see a detailed explanation of the parameters inside the function. 
+The main function to compute the ML pipeline is through the `compute.ML` function.
 
 ```r
 res_ml = compute.ML(raw.counts, normalized = T, clinical, trait = "Response",trait.positive = "CR", partition = 0.8, metric = "AUC", stack = T, feature.selection = F,seed = 1234, doParallel = T,  workers = 2, file_name = "Test", return = T)
@@ -104,5 +107,6 @@ res_ml = compute.LODO.ML(raw.counts, normalized = T, clinical, trait = "Response
 
 If you use `pipeML` in a scientific publication, we would appreciate citation to the :
 
+Hurtado M, Pancaldi V (2025). pipeML: A robust R machine learning pipeline for classification tasks and survival analysis. R package version 0.0.1, https://github.com/VeraPancaldiLab/pipeML.
 
 

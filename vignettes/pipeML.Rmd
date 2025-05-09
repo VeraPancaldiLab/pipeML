@@ -19,7 +19,7 @@ library(pipeML)
 library(caret)
 ```
 
-This is a tutorial for using `pipeML` and explain how to use the main functions of the pipeline to train and test machine learning models. Details of the parameters of each function can be obtained from `machine_learning.R`
+This tutorial demonstrates how to use the `pipeML` package for training and testing machine learning models. It introduces the main functions of the pipeline and guides you through additional functions for visualization. 
 
 Load data
 ```{r}
@@ -30,7 +30,7 @@ deconvolution = pipeML::deconvolution
 
 Feature selection
 
-Use repetive feature selection through Boruta algorithm
+Apply repeated feature selection using the Boruta algorithm:
 ```{r}
 deconvolution$target = as.factor(traitData$Best.Confirmed.Overall.Response)
 res_boruta <- feature.selection.boruta(
@@ -44,6 +44,7 @@ res_boruta <- feature.selection.boruta(
 )
 ```
 
+Inspect the results:
 ```{r}
 head(res_boruta$Matrix_Importance)
 
@@ -52,7 +53,7 @@ cat("Confirmed features:\n", res_boruta$Confirmed)
 cat("Tentative features:\n", res_boruta$Tentative)
 ```
 
-If user would like to get rid of tentative features, set the parameter fix = TRUE to run a second test and identify whether these tentative features are further confirmed
+To further assess tentative features, set `fix = TRUE` to rerun the selection and confirm or reject them:
 ```{r, eval = FALSE}
 res_boruta <- feature.selection.boruta(
   data = deconvolution,
@@ -65,7 +66,7 @@ res_boruta <- feature.selection.boruta(
 )
 ```
 
-To speed up process, user can allow parallelization with the following (Fix paralellization)
+For faster execution, enable parallelization (ensure parameters `doParallel` and `workers` are set):
 ```{r, eval = FALSE}
 res_boruta <- feature.selection.boruta(
   data = deconvolution,
@@ -79,9 +80,9 @@ res_boruta <- feature.selection.boruta(
 )
 ```
 
-Train machine learning models with optional stacking and feature selection
+Train Machine Learning models (with optional stacking and feature selection)
 
-Perform repeated stratified k-fold cross-validation for model training and tuning
+Train and tune models using repeated stratified k-fold cross-validation:
 ```{r}
 deconvolution = pipeML::deconvolution
 traitData = pipeML::traitData
@@ -101,17 +102,17 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     return = FALSE)
 ```
 
-Best model trained can be found at
+Access the best-trained model:
 ```{r, eval = FALSE}
 res[[1]]$Model
 ```
 
-The list of all the ML models trained and tuned can be found at
+View all trained and tuned machine learning models:
 ```{r, eval = FALSE}
 res[[1]]$ML_Models
 ```
 
-For applying model stacking user can set parameter stack = TRUE
+To apply model stacking, set `stack = TRUE`:
 ```{r}
 res <- compute_features.training.ML(features_train = deconvolution, 
                                     target_var = traitData$Best.Confirmed.Overall.Response,
@@ -129,18 +130,17 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     return = FALSE)
 ```
 
-To check which are the base models chosen
+Inspect the base models used in stacking:
 ```{r}
 res$Model$Base_models
 ```
 
-To access the meta-learner 
+Access the meta-learner:
 ```{r, eval = FALSE}
 res$Model$Meta_learner
 ```
 
-If feature selection is required set parameter feature.selection = TRUE, here you will also have to set n_boruta to set the number of iterations you want to perform the Boruta algorithm and boruta_fixt to set whether to get rid of tentative features or not (see feature.selection.boruta())
-
+To enable feature selection during model training, set `feature.selection = TRUE`. You must also specify the number of Boruta iterations via the `n_boruta` parameter and whether to resolve tentative features using the `boruta_fix` parameter (refer to `feature.selection.boruta()` for more details).
 ```{r}
 res <- compute_features.training.ML(features_train = deconvolution, 
                                     target_var = traitData$Best.Confirmed.Overall.Response,
@@ -160,12 +160,12 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     return = FALSE)
 ```
 
-In this case, function will return also selected features from Boruta (if feature.selection = FALSE), it returns by default all features
+When `feature.selection = TRUE`, the function will also return the features selected by Boruta. If set to `FALSE`, it returns all features by default.
 ```{r}
 res$Features
 ```
 
-For parallelization user can set the number of cores to use (Default = detectCores() - 1) 
+To enable parallelization, specify the number of cores via the `ncores` parameter (default is `detectCores() - 1`).
 ```{r, eval = FALSE}
 res <- compute_features.training.ML(features_train = deconvolution, 
                                     target_var = traitData$Best.Confirmed.Overall.Response,
@@ -183,7 +183,7 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     return = FALSE)
 ```
 
-If train data features came from different cohorts, pipeML gives the option to use this information to construct the k-folds. If LODO = TRUE, folds construction will be stratified across cohorts to maintain the same percentage of each one during each partition, this information should be present in the column named as it is given in the argument 'batch_id'
+If the training features are derived from multiple cohorts, you can instruct pipeML to incorporate this batch information into the k-fold construction. Set `LODO = TRUE` and provide the column name identifying the cohorts using the `batch_id` parameter. The function will then stratify folds to preserve cohort distribution across partitions.
 ```{r, eval = FALSE}
 res <- compute_features.training.ML(features_train = deconvolution, 
                                     target_var = traitData$Best.Confirmed.Overall.Response,
@@ -201,7 +201,7 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     return = FALSE)
 ```
 
-If you have a testing set you can train the model and predict directly using the following function. Additionally, user can maximize a metric to choose a threshold and return the prediction metrics values (Accuracy, Sensitivity, Specificity, F1 score, MCC score, Recall and Precision)
+If you already have a separate testing dataset, you can directly train the model and perform predictions using the following function. You can also choose to optimize a specific metric to select a decision threshold and return detailed prediction performance metrics such as Accuracy, Sensitivity, Specificity, F1 score, MCC, Recall, and Precision.
 ```{r, eval = FALSE}
 deconvolution = pipeML::deconvolution
 data_train = deconvolution[1:100,]
@@ -224,27 +224,27 @@ res <- compute_features.ML(features_train = data_train,
                            return = FALSE)
 ```
 
-Retrieve boxplot from several ML models
+You can generate ROC curve boxplots across multiple models:
 ```{r, eval = FALSE}
 get_pooled_roc_curves(file.name = "Combined_Model", folder_path = "Results/Models/")
 ```
 
-Compare performance across cohorts
+To compare model performance across different cohorts:
 ```{r, eval = FALSE}
 get_pooled_boxplots(folder_paths = c("Results/Cohort1", "Results/Cohort2"), file_name = "TME_Comparison")
 ```
 
-Get predictions metrics
+Access the prediction metrics:
 ```{r, eval = FALSE}
 head(res$Prediction_metrics)
 ```
 
-Compute variable importance
+To compute variable importance:
 ```{r, eval = FALSE}
 importance = compute_variable.importance(res$Model, stacking = FALSE, n_cores = 2)
 ```
 
-Plot SHAP values
+And to visualize SHAP values:
 ```{r, eval = FALSE}
 plot_shap_values(importance, "glm", "shap_plot")
 ```

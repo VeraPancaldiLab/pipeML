@@ -1,9 +1,11 @@
 Package: pipeML
 Title: A robust R machine learning pipeline for classification tasks and survival analysis
 Version: 0.0.1
-Authors@R: 
+Authors@R:c( 
     person("Marcelo", "Hurtado", , "marcelo.hurtado@inserm.fr", role = c("aut", "cre"),
-           comment = c(ORCID = "0009-0004-6712-0864"))
+           comment = c(ORCID = "0009-0004-6712-0864")),
+    person("Vera", "Pancaldi", , "vera.pancaldi@inserm.fr", role = "aut",
+           comment = c(ORCID = "0000-0002-7433-624X")))
 Description: pipeML is develop for a fast and easy use, its complexity allows a robust implementation during each step of the pipeline.
 License: GPL (>= 3)
 Encoding: UTF-8
@@ -42,4 +44,4 @@ VignetteBuilder: knitr
 Depends: 
     R (>= 4.3)
 Config/testthat/edition: 3
-URL: https://github.com/VeraPancaldiLab/pipeML, https://verapancaldilab.github.io/pipeML/
+URL: https://github.com/VeraPancaldiLab/pipeML
