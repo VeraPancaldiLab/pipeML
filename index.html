@@ -64,7 +64,7 @@
 <div class="section level2">
 <h2 id="description">Description<a class="anchor" aria-label="anchor" href="#description"></a>
 </h2>
-<p>pipeML is a robust pipeline done in R to train and test machine learning models for classification tasks. It is develop for a fast and easy use, its complexity allows a robust implementation during each step of the pipeline (Figure 1).</p>
+<p>pipeML is a robust R-based pipeline designed to streamline the training and testing of machine learning models for classification tasks. It is developed for fast, user-friendly deployment while maintaining the flexibility and complexity needed for rigorous, reliable implementation at every stage of the pipeline (Figure 1).</p>
 <p align="center">
 <img src="reference/figures/MLpipeline.png?raw=true"></p>
 <p align="center">
@@ -78,9 +78,11 @@
 <li>Stratified data split</li>
 <li>Iterative Boruta algorithm for feature selection</li>
 <li>Repeated k-fold cross validation (kCV)</li>
-<li>Hyperparameter tuning based on AUC or Accuracy</li>
+<li>Hyperparameter tuning based on AUROC, AUPRC or Accuracy</li>
 <li>Stratified k-fold construction</li>
+<li>SHAP values implementation for feature importance</li>
 <li>Model stacking implementation based on GLM</li>
+<li>Visualization functions for RO and PR curves</li>
 <li>13 Machine Learning methods implemented
 <ul>
 <li>Bagged CART</li>
@@ -96,6 +98,7 @@
 <li>K-nearest neighbors (KNN)</li>
 <li>Support vector machine with radial kernel (SVMr)</li>
 <li>Support vector machine with linear kernel (SVMl)</li>
+<li>Extreme Gradient Boosting (XGboost)</li>
 </ul>
 </li>
 </ul>
@@ -106,7 +109,7 @@
 <p>These are basic examples which shows you how to use <code>pipeML</code> for different tasks. For a detailed tutorial, see <a href="https://VeraPancaldiLab.github.io/pipeML/articles/pipeML.html" class="external-link">Get started</a></p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/VeraPancaldiLab/pipeML" class="external-link">pipeML</a></span><span class="op">)</span></span></code></pre></div>
-<p>The main function to compute the ML pipeline is through the <code>compute.ML</code> function. Refer to <code>examples/mlpipeline.Rmd</code> to see a detailed explanation of the parameters inside the function.</p>
+<p>The main function to compute the ML pipeline is through the <code>compute.ML</code> function.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_ml</span> <span class="op">=</span> <span class="fu">compute.ML</span><span class="op">(</span><span class="va">raw.counts</span>, normalized <span class="op">=</span> <span class="cn">T</span>, <span class="va">clinical</span>, trait <span class="op">=</span> <span class="st">"Response"</span>,trait.positive <span class="op">=</span> <span class="st">"CR"</span>, partition <span class="op">=</span> <span class="fl">0.8</span>, metric <span class="op">=</span> <span class="st">"AUC"</span>, stack <span class="op">=</span> <span class="cn">T</span>, feature.selection <span class="op">=</span> <span class="cn">F</span>,seed <span class="op">=</span> <span class="fl">1234</span>, doParallel <span class="op">=</span> <span class="cn">T</span>,  workers <span class="op">=</span> <span class="fl">2</span>, file_name <span class="op">=</span> <span class="st">"Test"</span>, return <span class="op">=</span> <span class="cn">T</span><span class="op">)</span></span></code></pre></div>
 <p>The previous function is a one-partition run meaning it will partitionate your data into train and test once. For reproducibility, a seed needs to be specified. For a robust analysis we recommend testing performance from different partitions of train/test. For doing this users can use the <code>compute.bootstrap.ML</code> function:</p>
@@ -128,6 +131,7 @@
 <h2 id="citing-pipeml">Citing pipeML<a class="anchor" aria-label="anchor" href="#citing-pipeml"></a>
 </h2>
 <p>If you use <code>pipeML</code> in a scientific publication, we would appreciate citation to the :</p>
+<p>Hurtado M, Pancaldi V (2025). pipeML: A robust R machine learning pipeline for classification tasks and survival analysis. R package version 0.0.1, <a href="https://github.com/VeraPancaldiLab/pipeML" class="external-link uri">https://github.com/VeraPancaldiLab/pipeML</a>.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
@@ -157,6 +161,7 @@
 <h2 data-toc-skip>Developers</h2>
 <ul class="list-unstyled">
 <li>Marcelo Hurtado <br><small class="roles"> Author, maintainer </small> <a href="https://orcid.org/0009-0004-6712-0864" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
+<li>Vera Pancaldi <br><small class="roles"> Author </small> <a href="https://orcid.org/0000-0002-7433-624X" target="orcid.widget" aria-label="ORCID" class="external-link"><span class="fab fa-orcid orcid" aria-hidden="true"></span></a>  </li>
 </ul>
 </div>
 
@@ -167,7 +172,7 @@
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by Marcelo Hurtado.</p>
+  <p>Developed by Marcelo Hurtado, Vera Pancaldi.</p>
 </div>
 
 <div class="pkgdown-footer-right">
