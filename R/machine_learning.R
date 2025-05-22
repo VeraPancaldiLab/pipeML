@@ -1573,7 +1573,8 @@ calculate_feature_importance_stacking = function(base_importance, base_models, m
 #'
 #' @param model A trained machine learning model (e.g., from `caret` or other model training functions).
 #' @param test_data A matrix or data frame containing the testing dataset (features only).
-#' @param target A character vector of true target values for the test data (the observed labels).
+#' @param target_var A character vector of true target values for the test data (the observed labels).
+#' @param trait.positive Value in \code{target_var} to be considered as the positive class.
 #' @param file.name A character string to specify the filename for saving the confusion matrix plot
 #'                  (optional). If `NULL`, the plot is not saved.
 #' @param maximize A character string indicating which metric to maximize when selecting the best
@@ -1605,7 +1606,11 @@ calculate_feature_importance_stacking = function(base_importance, base_models, m
 #' @import reshape2
 #' @import grDevices
 #' @export
-compute_prediction = function(model, test_data, target, file.name = NULL, maximize = "Accuracy", return = F){
+compute_prediction = function(model, test_data, target_var, trait.positive, file.name = NULL, maximize = "Accuracy", return = F){
+
+  target = as.factor(ifelse(target_var == trait.positive, 'yes', 'no'))
+  target <- factor(target, levels = c("no", "yes"))  # Order (just in case) to ensure positive class is not well defined
+
   # Maximize: parameter for choosing threshold for confusing matrix: maximize sensitivity, specificity, F1, AUROC, AUPRC
   cat("Predicting target variable using provided ML model.................................................\n")
 
@@ -2237,7 +2242,8 @@ compute_shap_values <- function(model_trained, data_train, method, n_cores = 2) 
 
   # Check if trivial predictions were found
   if (any(sapply(importance_list, is.null))) {
-    stop("Trivial predictions were found in some resamples. SHAP values cannot be calculated")
+    warning("Trivial predictions were found in some resamples. SHAP values cannot be calculated")
+    return(NULL)
   }
 
   # Combine and summarize importance results
