@@ -786,20 +786,13 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
     features = training[["Features"]] #Save selected features per partition (only useful if Boruta = TRUE - needs to be improve it)
     ####################### Testing set
 
-    #Extract target variable
-    target = traitData_test %>%
-      dplyr::mutate(target = ifelse(traitData_test[,trait] == trait.positive, "yes", "no")) %>%
-      dplyr::pull(target)
-
-    target = factor(target, levels = c("no", "yes"))
-
     if(stack){
       model = training[["Meta_learner"]]
       prediction = compute_prediction.stacked(model, features_test, target, training[["ML_models"]], training[["Base_models"]])
 
     }else{
       model = training[["Model"]] #Save best ML model based on the Accuracy/AUC from CV per partition
-      prediction = compute_prediction(model, features_test, target, file_name, maximize = maximize, return = return)
+      prediction = compute_prediction(model, features_test, traitData_test[,trait], trait.positive, file_name, maximize = maximize, return = return)
     }
 
     auc_roc_score = prediction[["AUC"]][["AUROC"]]
