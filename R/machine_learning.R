@@ -806,7 +806,7 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
     }
 
 
-    return(list(Model = model, Features = features, Prediction_metrics = metrics, AUC = list(AUROC = auc_roc_score, AUPRC = auc_prc_score), Prediction = predictions))
+    return(list(Model = model, Features = features, Metrics = metrics, AUC = list(AUROC = auc_roc_score, AUPRC = auc_prc_score), Prediction = predictions))
   }else{  #No features are selected as predictive
 
     message("No features selected as predictive after Boruta runs. No model returned.")
