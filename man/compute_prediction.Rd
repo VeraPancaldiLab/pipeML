@@ -7,18 +7,24 @@
 compute_prediction(
   model,
   test_data,
-  target,
+  target_var,
+  trait.positive,
+  stack = FALSE,
   file.name = NULL,
   maximize = "Accuracy",
   return = F
 )
 }
 \arguments{
-\item{model}{A trained machine learning model (e.g., from \code{caret} or other model training functions).}
+\item{model}{The trained machine learning model returned from \code{compute_features.training.ML()} or \code{compute_features.ML()}.}
 
 \item{test_data}{A matrix or data frame containing the testing dataset (features only).}
 
-\item{target}{A character vector of true target values for the test data (the observed labels).}
+\item{target_var}{A character vector of true target values for the test data (the observed labels).}
+
+\item{trait.positive}{Value in \code{target_var} to be considered as the positive class.}
+
+\item{stack}{Logical. If stacking was used during model training, this parameter should be set to TRUE in order to use the meta-learner for prediction. Default is FALSE.}
 
 \item{file.name}{A character string to specify the filename for saving the confusion matrix plot
 (optional). If \code{NULL}, the plot is not saved.}

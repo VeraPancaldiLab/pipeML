@@ -12,12 +12,16 @@ pipeML is develop for a fast and easy use, its complexity allows a robust implem
 Useful links:
 \itemize{
   \item \url{https://github.com/VeraPancaldiLab/pipeML}
-  \item \url{https://verapancaldilab.github.io/pipeML/}
 }
 
 }
 \author{
 \strong{Maintainer}: Marcelo Hurtado \email{marcelo.hurtado@inserm.fr} (\href{https://orcid.org/0009-0004-6712-0864}{ORCID})
+
+Authors:
+\itemize{
+  \item Vera Pancaldi \email{vera.pancaldi@inserm.fr} (\href{https://orcid.org/0000-0002-7433-624X}{ORCID})
+}
 
 }
 \keyword{internal}
