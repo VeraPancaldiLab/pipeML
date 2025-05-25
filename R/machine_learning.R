@@ -787,12 +787,9 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
     ####################### Testing set
 
     if(stack){
-      model = training[["Meta_learner"]]
-      prediction = compute_prediction.stacked(model, features_test, target, training[["ML_models"]], training[["Base_models"]])
-
+      prediction = compute_prediction(training, features_test, traitData_test[,trait], trait.positive, stack = TRUE, file.name = file_name, maximize = maximize, return = return)
     }else{
-      model = training[["Model"]] #Save best ML model based on the Accuracy/AUC from CV per partition
-      prediction = compute_prediction(model, features_test, traitData_test[,trait], trait.positive, file_name, maximize = maximize, return = return)
+      prediction = compute_prediction(training, features_test, traitData_test[,trait], trait.positive, stack = FALSE, file.name = file_name, maximize = maximize, return = return)
     }
 
     auc_roc_score = prediction[["AUC"]][["AUROC"]]
@@ -805,8 +802,7 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
       get_curves(metrics, "Specificity", "Sensitivity", "Recall", "Precision", "model", auc_roc_score, auc_prc_score, file_name)
     }
 
-
-    return(list(Model = model, Features = features, Metrics = metrics, AUC = list(AUROC = auc_roc_score, AUPRC = auc_prc_score), Prediction = predictions))
+    return(list(Model = training, Features = features, Metrics = metrics, AUC = list(AUROC = auc_roc_score, AUPRC = auc_prc_score), Prediction = predictions))
   }else{  #No features are selected as predictive
 
     message("No features selected as predictive after Boruta runs. No model returned.")
@@ -1564,10 +1560,11 @@ calculate_feature_importance_stacking = function(base_importance, base_models, m
 #' classification threshold based on a chosen metric (e.g., Accuracy, F1, or AUROC) and generates
 #' a confusion matrix plot.
 #'
-#' @param model A trained machine learning model (e.g., from `caret` or other model training functions).
+#' @param model The trained machine learning model returned from `compute_features.training.ML()` or `compute_features.ML()`.
 #' @param test_data A matrix or data frame containing the testing dataset (features only).
 #' @param target_var A character vector of true target values for the test data (the observed labels).
 #' @param trait.positive Value in \code{target_var} to be considered as the positive class.
+#' @param stack Logical. If stacking was used during model training, this parameter should be set to TRUE in order to use the meta-learner for prediction. Default is FALSE.
 #' @param file.name A character string to specify the filename for saving the confusion matrix plot
 #'                  (optional). If `NULL`, the plot is not saved.
 #' @param maximize A character string indicating which metric to maximize when selecting the best
@@ -1599,7 +1596,7 @@ calculate_feature_importance_stacking = function(base_importance, base_models, m
 #' @import reshape2
 #' @import grDevices
 #' @export
-compute_prediction = function(model, test_data, target_var, trait.positive, file.name = NULL, maximize = "Accuracy", return = F){
+compute_prediction = function(model, test_data, target_var, trait.positive, stack = FALSE, file.name = NULL, maximize = "Accuracy", return = F){
 
   target = as.factor(ifelse(target_var == trait.positive, 'yes', 'no'))
   target <- factor(target, levels = c("no", "yes"))  # Order (just in case) to ensure positive class is not well defined
@@ -1611,94 +1608,73 @@ compute_prediction = function(model, test_data, target_var, trait.positive, file
     stop("Metric to maximize score to calculate confusion matrix not supported!")
   }
 
-  features <- colnames(test_data)
-  are_equal = dplyr::setequal(model[["coefnames"]], features)
-  if(are_equal == T){
+  if(stack == FALSE){
+    model = model$Model$Model
+    features <- colnames(test_data)
+    are_equal = dplyr::setequal(model[["coefnames"]], features)
+    if(are_equal == F){
+      stop("Testing set does not count with the same features as model")
+    }
     #Predict target variable
     predict <- data.frame(stats::predict(model, test_data, type = "prob"))
     #predict$yes = compute_platt.scaling(target, predict$yes)
-    #Get metrics
-    sens_spec = get_sensitivity_specificity(predict, target, model$method)
-    auroc = calculate_auroc(sens_spec$fpr, sens_spec$Sensitivity)
-    auprc = calculate_auprc(sens_spec$Recall, sens_spec$Precision)
+  }else{
+    super.learner = model$Model$Meta_learner
+    ml.models = model$Model$ML_models
+    base.models = model$Model$Base_models
 
-    ## Calculate confusion matrix based on best threshold
-    cat("Choosing the threshold that maximizes", maximize ,"for calculating the confusion matrix...................................................\n")
-    max_ind = which.max(sens_spec[,maximize])
-    best_threshold <- sens_spec$yes[max_ind] #Find the threshold that maximizes F1 score
-    cat("Best threshold: ", best_threshold, "\n")
-    cat("Accuracy: ", round(sens_spec$Accuracy[max_ind]*100,3), "\n")
-    cat("Sensitivity: ", round(sens_spec$Sensitivity[max_ind]*100,3), "\n")
-    cat("Specificity: ", round(sens_spec$Specificity[max_ind]*100,3), "\n")
-    cat("F1 score: ", round(sens_spec$F1[max_ind]*100, 3), "\n")
-    cat("MCC score: ", round(sens_spec$MCC[max_ind]*100, 3), "\n")
-    cat("Recall: ", round(sens_spec$Recall[max_ind]*100,3), "\n")
-    cat("Precision: ", round(sens_spec$Precision[max_ind]*100, 3), "\n")
-    predicted_classes <- ifelse(predict$yes >= best_threshold, "yes", "no") #Classify predictions based on the best threshold
-    conf_matrix <- caret::confusionMatrix(factor(predicted_classes, levels = c("no", "yes")), factor(target, levels = c("no", "yes"))) #Calculate confusion matrix values using the predicted_classes and true_labels
-    confusion_matrix <- as.data.frame(as.table(conf_matrix$table))
-    colnames(confusion_matrix) <- c("Prediction", "Actual", "Count")
-
-    confusion_matrix_melted <- reshape2::melt(confusion_matrix, id.vars = c("Prediction", "Actual"))
-
-    if(return == TRUE){
-      p = ggplot2::ggplot(confusion_matrix_melted, ggplot2::aes(x = Actual, y = Prediction, fill = value)) +
-        ggplot2::geom_tile(color = "black") +  # Add black border around tiles
-        ggplot2::geom_text(ggplot2::aes(label = value), color = "black", size = 6) +  # Numbers in black
-        ggplot2::scale_fill_gradient(low = "white", high = "red", limits = c(0, max(confusion_matrix_melted$value))) +
-        ggplot2::labs(title = "Confusion Matrix", x = "Actual", y = "Prediction") +
-        ggplot2::theme_minimal() +
-        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)) +
-        ggplot2::theme(axis.text.y = ggplot2::element_text(angle = 45, hjust = 1))
-
-      grDevices::pdf(paste0("Results/Confusion_Matrix_", file.name, ".pdf"))
-      print(p)
-      grDevices::dev.off()
+    #Learning from simple meta-learner
+    base_predictions = list()
+    for (i in 1:length(base.models)) {
+      base_predictions[[i]] = stats::predict(ml.models[[base.models[i]]], test_data, type = "prob")$yes
+      names(base_predictions)[i] = base.models[i]
     }
 
-    return(list(Metrics = sens_spec, AUC = list("AUROC" = auroc, "AUPRC" = auprc), Predictions = predict))
-  }else{
-    message("Testing set does not count with the same features as model")
-  }
-}
+    base_predictions = do.call(cbind, base_predictions)
 
-#' Compute prediction using stacking approach
-#'
-#' @param super.learner Meta-learner model
-#' @param test_data A matrix with the testing dataset
-#' @param target Character vector with the true values
-#' @param ml.models Machine learning models
-#' @param base.models A character vector with the base models for the meta-learner
-#'
-#' @return A list containing
-#'
-#' - Prediction metrics
-#' - AUROC and AUPRC
-#' - Prediction values
-#'
-#' @export
-#'
-compute_prediction.stacked = function(super.learner, test_data, target, ml.models, base.models){
-
-  #Learning from simple meta-learner
-  base_predictions = list()
-  for (i in 1:length(base.models)) {
-    base_predictions[[i]] = stats::predict(ml.models[[base.models[i]]], test_data, type = "prob")$yes
-    names(base_predictions)[i] = base.models[i]
+    predict = data.frame(stats::predict(super.learner, base_predictions, type = "prob"))
   }
 
-  base_predictions = do.call(cbind, base_predictions)
+  #Get metrics
+  sens_spec = get_sensitivity_specificity(predict, target, model$method)
+  auroc = calculate_auroc(sens_spec$fpr, sens_spec$Sensitivity)
+  auprc = calculate_auprc(sens_spec$Recall, sens_spec$Precision)
 
-  prediction_simple = data.frame(stats::predict(super.learner, base_predictions, type = "prob"))
+  ## Calculate confusion matrix based on best threshold
+  cat("Choosing the threshold that maximizes", maximize ,"for calculating the confusion matrix...................................................\n")
+  max_ind = which.max(sens_spec[,maximize])
+  best_threshold <- sens_spec$yes[max_ind] #Find the threshold that maximizes F1 score
+  cat("Best threshold: ", best_threshold, "\n")
+  cat("Accuracy: ", round(sens_spec$Accuracy[max_ind]*100,3), "\n")
+  cat("Sensitivity: ", round(sens_spec$Sensitivity[max_ind]*100,3), "\n")
+  cat("Specificity: ", round(sens_spec$Specificity[max_ind]*100,3), "\n")
+  cat("F1 score: ", round(sens_spec$F1[max_ind]*100, 3), "\n")
+  cat("MCC score: ", round(sens_spec$MCC[max_ind]*100, 3), "\n")
+  cat("Recall: ", round(sens_spec$Recall[max_ind]*100,3), "\n")
+  cat("Precision: ", round(sens_spec$Precision[max_ind]*100, 3), "\n")
+  predicted_classes <- ifelse(predict$yes >= best_threshold, "yes", "no") #Classify predictions based on the best threshold
+  conf_matrix <- caret::confusionMatrix(factor(predicted_classes, levels = c("no", "yes")), factor(target, levels = c("no", "yes"))) #Calculate confusion matrix values using the predicted_classes and true_labels
+  confusion_matrix <- as.data.frame(as.table(conf_matrix$table))
+  colnames(confusion_matrix) <- c("Prediction", "Actual", "Count")
 
-  #Metrics
+  confusion_matrix_melted <- reshape2::melt(confusion_matrix, id.vars = c("Prediction", "Actual"))
 
-  #Meta-learner simple
-  sens_spec_simple = get_sensitivity_specificity(prediction_simple, target, "Meta-learner_simple")
-  auroc_simple = calculate_auroc(sens_spec_simple$fpr, sens_spec_simple$Sensitivity)
-  auprc_simple = calculate_auprc(sens_spec_simple$Recall, sens_spec_simple$Precision)
+  if(return == TRUE){
+    p = ggplot2::ggplot(confusion_matrix_melted, ggplot2::aes(x = Actual, y = Prediction, fill = value)) +
+      ggplot2::geom_tile(color = "black") +  # Add black border around tiles
+      ggplot2::geom_text(ggplot2::aes(label = value), color = "black", size = 6) +  # Numbers in black
+      ggplot2::scale_fill_gradient(low = "white", high = "red", limits = c(0, max(confusion_matrix_melted$value))) +
+      ggplot2::labs(title = "Confusion Matrix", x = "Actual", y = "Prediction") +
+      ggplot2::theme_minimal() +
+      ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)) +
+      ggplot2::theme(axis.text.y = ggplot2::element_text(angle = 45, hjust = 1))
 
-  return(list(Metrics = sens_spec_simple, AUC = list("AUROC" = auroc_simple, "AUPRC" = auprc_simple), Predictions = prediction_simple))
+    grDevices::pdf(paste0("Results/Confusion_Matrix_", file.name, ".pdf"))
+    print(p)
+    grDevices::dev.off()
+  }
+
+  return(list(Metrics = sens_spec, AUC = list("AUROC" = auroc, "AUPRC" = auprc), Predictions = predict))
 
 }
 
