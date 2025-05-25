@@ -648,7 +648,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
 #' Train machine learning models with optional stacking and feature selection
 #'
-#' This function trains one or more machine learning models using repeated k-fold cross-validation, with optional model stacking and feature selection using Boruta. It supports stratified cross-validation, including Leave-One-Dataset-Out (LODO) validation when cohort information is available.
+#' This function trains one or more machine learning models using repeated k-fold cross-validation, with optional model stacking and feature selection using Boruta. It supports stratified cross-validation, including the construction of k-folds stratified by cohorts when this information is available.
 #'
 #' @param features_train A data frame containing the features used for training.
 #' @param target_var A vector containing the target variable to predict.
@@ -717,7 +717,7 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
 
 #' Train and evaluate machine learning models with optional stacking and feature selection
 #'
-#' This function trains machine learning models using cross-validation on training data and evaluates them on test data. It supports feature selection with Boruta, model stacking, and cohort-based (LODO) validation.
+#' This function trains machine learning models using cross-validation on training data and evaluates them on test data. It supports feature selection with Boruta, model stacking, cohort-based (LODO) validation, and allows for optimizing predictions by maximizing a specified performance metric.
 #'
 #' @param features_train A data frame of features used for training the models.
 #' @param features_test A data frame of features used for testing the models.
@@ -832,7 +832,6 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
 #' Each `.rds` file is expected to contain a list with a \code{result$AUC} element that includes
 #' both \code{AUROC} and \code{AUPRC} values.
 #'
-#' @export
 #'
 get_pooled_roc_curves = function(file.name, folder_path){
 
@@ -927,7 +926,6 @@ get_pooled_roc_curves = function(file.name, folder_path){
 #'
 #' Red dashed lines are drawn at a fixed reference value (e.g., 0.7) for visual interpretation.
 #'
-#' @export
 #'
 get_pooled_boxplots = function(folder_paths, file_name, width = 12, height = 8) {
 

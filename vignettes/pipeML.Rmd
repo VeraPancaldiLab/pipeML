@@ -140,6 +140,11 @@ Access the meta-learner:
 res$Model$Meta_learner
 ```
 
+After training, users can predict on new data by using the `compute_prediction()` function. You can specify which metric to maximize when determining the optimal classification threshold. Supported values for maximize include: "Accuracy", "Precision", "Recall", "Specificity", "Sensitivity", "F1", and "MCC".
+```{r, eval = FALSE}
+pred = pipeML::compute_prediction(res, testing_set, traitData$Best.Confirmed.Overall.Response, "CR", file.name = "Test", maximize = "Accuracy", return = F)
+```
+
 To enable feature selection during model training, set `feature.selection = TRUE`. You must also specify the number of Boruta iterations via the `n_boruta` parameter and whether to resolve tentative features using the `boruta_fix` parameter (refer to `feature.selection.boruta()` for more details).
 ```{r}
 res <- compute_features.training.ML(features_train = deconvolution, 
@@ -222,16 +227,6 @@ res <- compute_features.ML(features_train = data_train,
                            file_name = "Test",
                            maximize = "F1",
                            return = FALSE)
-```
-
-You can generate ROC curve boxplots across multiple models:
-```{r, eval = FALSE}
-get_pooled_roc_curves(file.name = "Combined_Model", folder_path = "Results/Models/")
-```
-
-To compare model performance across different cohorts:
-```{r, eval = FALSE}
-get_pooled_boxplots(folder_paths = c("Results/Cohort1", "Results/Cohort2"), file_name = "TME_Comparison")
 ```
 
 Access the prediction metrics:
