@@ -365,7 +365,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   #If both are ON it can slower performance (lead to over-parallelization and CPU contention)
   trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = F, classProbs = TRUE, savePredictions=T)
 
-  fit.xgbTree <- caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)
+  fit.xgbTree <- suppressWarnings(caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl))
 
   ####### Optimized based on metric (only AUC or Accuracy available)
   if(metric == "AUROC" || metric == "AUPRC"){
@@ -698,14 +698,8 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
 
   ####################################################Predicting
   if(length(training)!=0){
-    features = training[["Features"]] #Save selected features per partition (only useful if Boruta = TRUE- needs to be improve it)
-    if(stack){
-      model = training[["Meta_learner"]]
-    }else{
-      model = training[["Model"]] #Save best ML model based on the Accuracy/AUC from CV per partition
-    }
 
-    return(list(Model = training, Features = features))
+    return(training)
   }else{  #No features are selected as predictive
 
     message("No features selected as predictive after Boruta runs. No model returned.")
@@ -783,7 +777,6 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
 
   ####################################################Predicting
   if(length(training)!=0){
-    features = training[["Features"]] #Save selected features per partition (only useful if Boruta = TRUE - needs to be improve it)
     ####################### Testing set
 
     if(stack){
@@ -802,7 +795,7 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
       get_curves(metrics, "Specificity", "Sensitivity", "Recall", "Precision", "model", auc_roc_score, auc_prc_score, file_name)
     }
 
-    return(list(Model = training, Features = features, Metrics = metrics, AUC = list(AUROC = auc_roc_score, AUPRC = auc_prc_score), Prediction = predictions))
+    return(list(Model = training, Metrics = metrics, AUC = list(AUROC = auc_roc_score, AUPRC = auc_prc_score), Prediction = predictions))
   }else{  #No features are selected as predictive
 
     message("No features selected as predictive after Boruta runs. No model returned.")
@@ -1607,7 +1600,7 @@ compute_prediction = function(model, test_data, target_var, trait.positive, stac
   }
 
   if(stack == FALSE){
-    model = model$Model$Model
+    model = model$Model
     features <- colnames(test_data)
     are_equal = dplyr::setequal(model[["coefnames"]], features)
     if(are_equal == F){
@@ -1617,9 +1610,9 @@ compute_prediction = function(model, test_data, target_var, trait.positive, stac
     predict <- data.frame(stats::predict(model, test_data, type = "prob"))
     #predict$yes = compute_platt.scaling(target, predict$yes)
   }else{
-    super.learner = model$Model$Meta_learner
-    ml.models = model$Model$ML_models
-    base.models = model$Model$Base_models
+    super.learner = model$Meta_learner
+    ml.models = model$ML_models
+    base.models = model$Base_models
 
     #Learning from simple meta-learner
     base_predictions = list()
@@ -2294,9 +2287,9 @@ plot_shap_values = function(shap_df, ml_model, file_name, width = 10, height = 1
 compute_variable.importance = function(model, stacking = FALSE, n_cores = 2){
 
   if(stacking == TRUE){
-    base_models = model$Model$Base_models
-    ml_models = model$Model$ML_models
-    train_data = model$Model$ML_models$BAG$trainingData %>% #All training datasets are the same so BAG it's choosing randomly
+    base_models = model$Base_models
+    ml_models = model$ML_models
+    train_data = model$ML_models$BAG$trainingData %>% #All training datasets are the same so BAG it's choosing randomly
       dplyr::rename(target = .outcome)
 
     importance = list() #Save variable importance of each base model
@@ -2305,11 +2298,11 @@ compute_variable.importance = function(model, stacking = FALSE, n_cores = 2){
     }
     importance_df <- Reduce(function(x, y) (x + y) / length(importance), importance) #Take the mean importance
   }else{
-    train_data = model$trainingData %>%
+    train_data = model$Model$trainingData %>%
       dplyr::rename(target = .outcome)
-    ml_method = model$method
+    ml_method = model$Model$method
 
-    importance_df = compute_shap_values(model, train_data, ml_method, n_cores) ## Compute SHAP values for variable importance
+    importance_df = compute_shap_values(model$Model, train_data, ml_method, n_cores) ## Compute SHAP values for variable importance
   }
 
   return(importance_df)
