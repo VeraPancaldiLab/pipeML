@@ -1608,7 +1608,6 @@ compute_prediction = function(model, test_data, target_var, trait.positive, stac
     }
     #Predict target variable
     predict <- data.frame(stats::predict(model, test_data, type = "prob"))
-    #predict$yes = compute_platt.scaling(target, predict$yes)
   }else{
     super.learner = model$Meta_learner
     ml.models = model$ML_models
@@ -1907,7 +1906,7 @@ feature.importance.alignment = function(model){
   return(importance)
 }
 
-compute_platt.scaling = function(obs, yes){
+compute_platt.scaling = function(obs, yes){ ####DEPRECATED
   data = data.frame(obs = obs, yes = yes) #Create df from obs and yes to avoid nested problems using dplyr() when grouping by resamples
   # Fit a logistic regression model
   glm_model = stats::glm(obs ~ yes, family = binomial, data = data)
@@ -1960,14 +1959,11 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
   ## Calculate AUCs and integrate into prediction matrix
   ml_model$pred = ml_model$pred %>%
     dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) %>%
-    dplyr::mutate(calibrated_yes = compute_platt.scaling(obs, yes), # Apply Plat scaling to calibrate probabilities
-                  AUROC = calculate_auc_roc_resample(obs, calibrated_yes), # Calculate AUC-ROC if metric is "AUROC"
-                  AUPRC = calculate_auc_prc_resample(obs, calibrated_yes) # Calculate AUC-PRC if metric is "AUPRC"
+    dplyr::mutate(AUROC = calculate_auc_roc_resample(obs, yes), # Calculate AUC-ROC if metric is "AUROC"
+                  AUPRC = calculate_auc_prc_resample(obs, yes) # Calculate AUC-PRC if metric is "AUPRC"
     ) %>%
     dplyr::ungroup() %>%
-    data.frame() %>%
-    dplyr::select(-yes) %>%
-    dplyr::rename(yes = calibrated_yes)
+    data.frame()
 
   ## Calculate prediction metrics (Accuracy, Recall, Precision, F1, MCC)
   metrics <- ml_model$pred %>%
