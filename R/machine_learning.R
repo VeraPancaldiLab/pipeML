@@ -365,7 +365,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   #If both are ON it can slower performance (lead to over-parallelization and CPU contention)
   trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = F, classProbs = TRUE, savePredictions=T)
 
-  fit.xgbTree <- suppressWarnings(caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl))
+  fit.xgbTree <- invisible(utils::capture.output({caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)}, type = "output"))
 
   ####### Optimized based on metric (only AUC or Accuracy available)
   if(metric == "AUROC" || metric == "AUPRC"){
