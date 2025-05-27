@@ -78,5 +78,5 @@ A list containing:
 }
 }
 \description{
-This function trains machine learning models using cross-validation on training data and evaluates them on test data. It supports feature selection with Boruta, model stacking, and cohort-based (LODO) validation.
+This function trains machine learning models using cross-validation on training data and evaluates them on test data. It supports feature selection with Boruta, model stacking, cohort-based (LODO) validation, and allows for optimizing predictions by maximizing a specified performance metric.
 }

@@ -64,5 +64,5 @@ A list containing:
 }
 }
 \description{
-This function trains one or more machine learning models using repeated k-fold cross-validation, with optional model stacking and feature selection using Boruta. It supports stratified cross-validation, including Leave-One-Dataset-Out (LODO) validation when cohort information is available.
+This function trains one or more machine learning models using repeated k-fold cross-validation, with optional model stacking and feature selection using Boruta. It supports stratified cross-validation, including the construction of k-folds stratified by cohorts when this information is available.
 }
