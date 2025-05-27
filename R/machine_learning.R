@@ -1961,8 +1961,8 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
   ml_model$pred = ml_model$pred %>%
     dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) %>%
     dplyr::mutate(calibrated_yes = compute_platt.scaling(obs, yes), # Apply Plat scaling to calibrate probabilities
-                  AUROC= calculate_auc_roc_resample(obs, yes), # Calculate AUC-ROC if metric is "AUROC"
-                  AUPRC = calculate_auc_prc_resample(obs, yes) # Calculate AUC-PRC if metric is "AUPRC"
+                  AUROC = calculate_auc_roc_resample(obs, calibrated_yes), # Calculate AUC-ROC if metric is "AUROC"
+                  AUPRC = calculate_auc_prc_resample(obs, calibrated_yes) # Calculate AUC-PRC if metric is "AUPRC"
     ) %>%
     dplyr::ungroup() %>%
     data.frame() %>%
