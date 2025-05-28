@@ -17,6 +17,7 @@ knitr::opts_chunk$set(
 ```{r setup}
 library(pipeML)
 library(caret)
+library(dplyr)
 ```
 
 This tutorial demonstrates how to use the `pipeML` package for training and testing machine learning models. It introduces the main functions of the pipeline and guides you through additional functions for visualization. 
@@ -112,6 +113,14 @@ View all trained and tuned machine learning models:
 res[[1]]$ML_Models
 ```
 
+<p align="center">
+ <img src="Results/Training.png?raw=true" />
+</p>
+
+<p align="center"><i>
+   Figure 1. Models training performance.
+</i></p>
+
 To apply model stacking, set `stack = TRUE`:
 ```{r}
 res <- compute_features.training.ML(features_train = deconvolution, 
@@ -143,6 +152,11 @@ res$Model$Meta_learner
 After training, users can predict on new data by using the `compute_prediction()` function. You can specify which metric to maximize when determining the optimal classification threshold. Supported values for maximize include: "Accuracy", "Precision", "Recall", "Specificity", "Sensitivity", "F1", and "MCC".
 ```{r, eval = FALSE}
 pred = pipeML::compute_prediction(res, testing_set, traitData$Best.Confirmed.Overall.Response, "CR", file.name = "Test", maximize = "Accuracy", return = F)
+```
+
+If return = TRUE, compute_prediction() will saved the RO and PR curves in the `Results/` directory. It can also be retrieved with the following function
+```{r, eval = FALSE}
+get_curves(pred$Metrics, "Specificity", "Sensitivity", "Recall", "Precision", "Cohort", pred$AUC$AUROC, pred$AUC$AUPRC, "Test")
 ```
 
 To enable feature selection during model training, set `feature.selection = TRUE`. You must also specify the number of Boruta iterations via the `n_boruta` parameter and whether to resolve tentative features using the `boruta_fix` parameter (refer to `feature.selection.boruta()` for more details).
@@ -188,24 +202,6 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     return = FALSE)
 ```
 
-If the training features are derived from multiple cohorts, you can instruct pipeML to incorporate this batch information into the k-fold construction. Set `LODO = TRUE` and provide the column name identifying the cohorts using the `batch_id` parameter. The function will then stratify folds to preserve cohort distribution across partitions.
-```{r, eval = FALSE}
-res <- compute_features.training.ML(features_train = deconvolution, 
-                                    target_var = traitData$Best.Confirmed.Overall.Response,
-                                    trait.positive = "CR",
-                                    metric = "AUROC",
-                                    stack = TRUE,
-                                    k_folds = 3,
-                                    n_rep = 3,
-                                    feature.selection = FALSE,
-                                    seed = 123,
-                                    LODO = TRUE,
-                                    batch_id = "cohort",
-                                    file_name = "Test",
-                                    ncores = 3,
-                                    return = FALSE)
-```
-
 If you already have a separate testing dataset, you can directly train the model and perform predictions using the following function. You can also choose to optimize a specific metric to select a decision threshold and return detailed prediction performance metrics such as Accuracy, Sensitivity, Specificity, F1 score, MCC, Recall, and Precision.
 ```{r, eval = FALSE}
 deconvolution = pipeML::deconvolution
@@ -244,3 +240,114 @@ And to visualize SHAP values:
 plot_shap_values(importance, "glm", "shap_plot")
 ```
 
+<p align="center">
+ <img src="Results/var_importance.png?raw=true" />
+</p>
+
+<p align="center"><i>
+   Figure 2. Variable importance.
+</i></p>
+
+If your data includes features from multiple cohorts, pipeML provides a flexible approach to perform Leave-One-Dataset-Out (LODO) analysis. This is achieved by applying k-fold stratified sampling across batches, ensuring that each fold preserves the batch structure while maintaining class balance. For this set `LODO = TRUE` and provided the vector containing the batch information in the `batch_id` variable (this should be in the same order as your samples)
+
+Below, we demonstrate how to perform a LODO analysis using simulated datasets:
+
+Simulate datasets from different batches
+```{r}
+set.seed(123)
+
+# Simulate traitData with 3 cohorts
+traitData <- data.frame(
+  Sample = paste0("Sample", 1:90),
+  Response = sample(c("R", "NR"), 90, replace = TRUE),
+  Cohort = rep(paste0("Cohort", 1:3), each = 30),
+  stringsAsFactors = FALSE
+)
+rownames(traitData) <- traitData$Sample
+
+# Simulate counts matrix 
+counts_all <- matrix(rnorm(1000 * 90), nrow = 1000, ncol = 90)
+rownames(counts_all) <- paste0("Gene", 1:1000)
+colnames(counts_all) <- traitData$Sample
+
+# Simulate some example features 
+features_all <- matrix(runif(90 * 15), nrow = 90, ncol = 15)
+rownames(features_all) <- traitData$Sample
+colnames(features_all) <- paste0("Feature", 1:15)
+```
+
+Perform LODO analysis
+```{r}
+prediction = list()
+i = 1
+for (cohort in unique(traitData$Cohort)) {
+    
+  # Test cohort
+  traitData_test = traitData %>%
+    filter(Cohort == cohort)
+  counts_test = counts_all[,colnames(counts_all)%in%rownames(traitData_test)]
+  features_test = features_all[rownames(features_all)%in%rownames(traitData_test),]
+
+  # Train cohort
+  traitData_train = traitData %>%
+    filter(Cohort != cohort)
+  counts_train = counts_all[,colnames(counts_all)%in%rownames(traitData_train)]
+  features_train = features_all[rownames(features_all)%in%rownames(traitData_train),]
+
+  #### ML Training
+  res = pipeML::compute_features.training.ML(features_train, traitData_train$Response, "R", metric = "AUROC", 
+                                             stack = T, k_folds = 2, n_rep = 3, feature.selection = F, 
+                                             seed = 123, LODO = TRUE, batch_id = traitData_train$Cohort, 
+                                             ncores = 3, return = F)
+
+  ## Feature importance
+  importance = pipeML::compute_variable.importance(res, stacking = T, n_cores = 2)
+
+  #### ML predicting
+  
+  #### Testing
+  pred = pipeML::compute_prediction(res, features_test, traitData_test$Response, 
+                                    trait.positive = "R", stack = TRUE, return = F)
+
+  pred[["Importance"]] = importance
+  
+  #### Save results
+  prediction[[i]] = pred
+  names(prediction)[i] = cohort
+  i = i + 1
+}
+```
+
+Plot results: For plotting we will make use of our `get_curves` function adapted in a case for multiple cohorts.
+```{r}
+metrics = list()
+auroc = c() 
+auprc = c()
+for (i in 1:length(prediction)) {
+  metrics[[i]] = prediction[[i]]$Metrics %>%
+    dplyr::mutate(Cohort = names(prediction)[i], 
+                  AUROC = rep(prediction[[i]]$AUC$AUROC, nrow(prediction[[i]]$Metrics)),
+                  AUPRC = rep(prediction[[i]]$AUC$AUPRC, nrow(prediction[[i]]$Metrics))) %>%
+    tibble::rownames_to_column("Samples") 
+}
+metrics = do.call(rbind, metrics)
+metrics$Cohort = as.factor(metrics$Cohort)
+
+get_curves(metrics, "Specificity", "Sensitivity", "Recall", "Precision", "Cohort", metrics$AUROC, metrics$AUPRC, "Test")
+```
+
+<p align="center">
+ <img src="Results/ROC.png?raw=true" />
+</p>
+
+<p align="center"><i>
+   Figure 3. RO curves.
+</i></p>
+
+<p align="center">
+ <img src="Results/PR.png?raw=true" />
+</p>
+
+<p align="center"><i>
+   Figure 4. PR curves.
+</i></p>
