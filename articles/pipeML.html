@@ -82,7 +82,10 @@ for visualization.</p>
 <code class="sourceCode R"><span><span class="va">raw.counts</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/raw.counts.html">raw.counts</a></span></span>
 <span><span class="va">traitData</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/traitData.html">traitData</a></span></span>
 <span><span class="va">deconvolution</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/deconvolution.html">deconvolution</a></span></span></code></pre></div>
-<p>Feature selection</p>
+<div class="section level2">
+<h2 id="feature-selection">
+<strong>Feature selection</strong><a class="anchor" aria-label="anchor" href="#feature-selection"></a>
+</h2>
 <p>Apply repeated feature selection using the Boruta algorithm:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">deconvolution</span><span class="op">$</span><span class="va">target</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="va">traitData</span><span class="op">$</span><span class="va">Best.Confirmed.Overall.Response</span><span class="op">)</span></span>
@@ -141,8 +144,11 @@ rerun the selection and confirm or reject them:</p>
 <span>  file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
 <span>  return <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Train Machine Learning models (with optional stacking and feature
-selection)</p>
+</div>
+<div class="section level2">
+<h2 id="train-machine-learning-models">
+<strong>Train Machine Learning models</strong><a class="anchor" aria-label="anchor" href="#train-machine-learning-models"></a>
+</h2>
 <p>Train and tune models using repeated stratified k-fold
 cross-validation:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
@@ -174,7 +180,7 @@ cross-validation:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">ML_Models</span></span></code></pre></div>
 <p align="center">
-<img src="Results/Training.png?raw=true"></p>
+<img src="articles/Results/Training.png?raw=true"></p>
 <p align="center">
 <i> Figure 1. Models training performance. </i>
 </p>
@@ -209,6 +215,11 @@ cross-validation:</p>
 <p>Access the meta-learner:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">Meta_learner</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="model-prediction">
+<strong>Model prediction</strong><a class="anchor" aria-label="anchor" href="#model-prediction"></a>
+</h2>
 <p>After training, users can predict on new data by using the
 <code><a href="../reference/compute_prediction.html">compute_prediction()</a></code> function. You can specify which metric
 to maximize when determining the optimal classification threshold.
@@ -216,9 +227,9 @@ Supported values for maximize include: “Accuracy”, “Precision”,
 “Recall”, “Specificity”, “Sensitivity”, “F1”, and “MCC”.</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pred</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="fu"><a href="../reference/compute_prediction.html">compute_prediction</a></span><span class="op">(</span><span class="va">res</span>, <span class="va">testing_set</span>, <span class="va">traitData</span><span class="op">$</span><span class="va">Best.Confirmed.Overall.Response</span>, <span class="st">"CR"</span>, file.name <span class="op">=</span> <span class="st">"Test"</span>, maximize <span class="op">=</span> <span class="st">"Accuracy"</span>, return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span></code></pre></div>
-<p>If return = TRUE, compute_prediction() will saved the RO and PR
-curves in the <code>Results/</code> directory. It can also be retrieved
-with the following function</p>
+<p>If <code>return = TRUE</code>, <code><a href="../reference/compute_prediction.html">compute_prediction()</a></code> will
+saved the RO and PR curves in the <code>Results/</code> directory. It
+can also be retrieved with the following function</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_curves.html">get_curves</a></span><span class="op">(</span><span class="va">pred</span><span class="op">$</span><span class="va">Metrics</span>, <span class="st">"Specificity"</span>, <span class="st">"Sensitivity"</span>, <span class="st">"Recall"</span>, <span class="st">"Precision"</span>, <span class="st">"Cohort"</span>, <span class="va">pred</span><span class="op">$</span><span class="va">AUC</span><span class="op">$</span><span class="va">AUROC</span>, <span class="va">pred</span><span class="op">$</span><span class="va">AUC</span><span class="op">$</span><span class="va">AUPRC</span>, <span class="st">"Test"</span><span class="op">)</span></span></code></pre></div>
 <p>To enable feature selection during model training, set
@@ -291,6 +302,12 @@ returns all features by default.</p>
 <span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
 <span>                                    ncores <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                                    return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="train-and-predict-using-the-machine-learning-models">
+<strong>Train and predict using the machine learning
+models</strong><a class="anchor" aria-label="anchor" href="#train-and-predict-using-the-machine-learning-models"></a>
+</h2>
 <p>If you already have a separate testing dataset, you can directly
 train the model and perform predictions using the following function.
 You can also choose to optimize a specific metric to select a decision
@@ -327,10 +344,15 @@ Precision.</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_shap_values.html">plot_shap_values</a></span><span class="op">(</span><span class="va">importance</span>, <span class="st">"glm"</span>, <span class="st">"shap_plot"</span><span class="op">)</span></span></code></pre></div>
 <p align="center">
-<img src="Results/var_importance.png?raw=true"></p>
+<img src="articles/Results/var_importance.png?raw=true"></p>
 <p align="center">
 <i> Figure 2. Variable importance. </i>
 </p>
+</div>
+<div class="section level2">
+<h2 id="leaving-one-dataset-out-lodo-analysis">
+<strong>Leaving one dataset out (LODO) analysis</strong><a class="anchor" aria-label="anchor" href="#leaving-one-dataset-out-lodo-analysis"></a>
+</h2>
 <p>If your data includes features from multiple cohorts, pipeML provides
 a flexible approach to perform Leave-One-Dataset-Out (LODO) analysis.
 This is achieved by applying k-fold stratified sampling across batches,
@@ -506,16 +528,18 @@ cohorts.</p>
 <span><span class="co">#&gt; agg_png </span></span>
 <span><span class="co">#&gt;       2</span></span></code></pre></div>
 <p align="center">
-<img src="Results/ROC.png?raw=true"></p>
+<img src="articles/Results/ROC.png?raw=true"></p>
 <p align="center">
 <i> Figure 3. RO curves. </i>
 </p>
 <p align="center">
-<img src="Results/PR.png?raw=true"></p>
+<img src="articles/Results/PR.png?raw=true"></p>
 <p align="center">
 <i> Figure 4. PR curves. </i>
 </p>
-  </main>
+</div>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside>
 </div>
 
 
