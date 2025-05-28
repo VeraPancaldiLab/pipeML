@@ -104,10 +104,12 @@ automatically computes the prediction using the trained model in the
 testing set provided. It includes both previous functions.
 
 ``` r
-res = compute_features.ML(tme_features_train[[i]], tme_features_test[[i]], clinical = traitData, 
-                          trait = "Response", trait.positive = "R", metric = "AUROC", stack = F, 
-                          k_folds = 2, n_rep = 1, feature.selection = F, seed = 123, LODO = T, 
-                          batch_id = "Cohort", ncores = 2, maximize = "Accuracy", return = F)
+res = compute_features.ML(tme_features_train[[i]], tme_features_test[[i]], 
+                          clinical = traitData, trait = "Response", 
+                          trait.positive = "R", metric = "AUROC", stack = F, 
+                          k_folds = 2, n_rep = 1, feature.selection = F, 
+                          seed = 123, LODO = T, batch_id = "Cohort", 
+                          ncores = 2, maximize = "Accuracy", return = F)
 ```
 
 ## Issues
