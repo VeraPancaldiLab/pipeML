@@ -10,8 +10,7 @@ vignette: >
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>",
-  fig.path = "vignettes/Results/pipeML-",
+  comment = "#>"
 )
 ```
 
@@ -114,13 +113,9 @@ View all trained and tuned machine learning models:
 res[[1]]$ML_Models
 ```
 
-<p align="center">
- <img src="vignettes/Results/Training.png?raw=true" />
-</p>
-
-<p align="center"><i>
-   Figure 1. Models training performance.
-</i></p>
+```{r fig1, fig.cap="Figure 1. Models training performance.", fig.align='center', out.width='80%'}
+knitr::include_graphics("figures/Training.png")
+```
 
 To apply model stacking, set `stack = TRUE`:
 ```{r}
@@ -258,13 +253,9 @@ And to visualize SHAP values:
 plot_shap_values(importance, "glm", "shap_plot")
 ```
 
-<p align="center">
- <img src="vignettes/Results/var_importance.png?raw=true" />
-</p>
-
-<p align="center"><i>
-   Figure 2. Variable importance.
-</i></p>
+```{r fig2, fig.cap="Figure 2. Variable importance.", fig.align='center', out.width='80%'}
+knitr::include_graphics("figures/var_importance.png")
+```
 
 ## **Leaving one dataset out (LODO) analysis**
 
@@ -371,18 +362,10 @@ get_curves(metrics, "Specificity", "Sensitivity",
            metrics$AUROC, metrics$AUPRC, "Test")
 ```
 
-<p align="center">
- <img src="vignettes/Results/ROC.png?raw=true" />
-</p>
+```{r fig3, fig.cap="Figure 3. RO curves.", fig.align='center', out.width='80%'}
+knitr::include_graphics("figures/ROC.png")
+```
 
-<p align="center"><i>
-   Figure 3. RO curves.
-</i></p>
-
-<p align="center">
- <img src="vignettes/Results/PR.png?raw=true" />
-</p>
-
-<p align="center"><i>
-   Figure 4. PR curves.
-</i></p>
+```{r fig4, fig.cap="Figure 4. PR curves.", fig.align='center', out.width='80%'}
+knitr::include_graphics("figures/PR.png")
+```
