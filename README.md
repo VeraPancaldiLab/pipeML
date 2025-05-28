@@ -80,8 +80,10 @@ order to train different folds on the same dataset and evaluate
 performance.
 
 ``` r
-res_ml = compute_features.training.ML(features_train, clinical$Response, "CR", metric = "AUROC", stack = F, k_folds = 5, n_rep = 10, 
-feature.selection = F, seed = 123, file_name = "Test", ncores = 2, return = T)
+res_ml = compute_features.training.ML(features_train, clinical$Response, "CR", 
+                                      metric = "AUROC", stack = F, k_folds = 5, 
+                                      n_rep = 10, feature.selection = F, seed = 123, 
+                                      file_name = "Test", ncores = 2, return = T)
 ```
 
 After training, predictions on new data can be computed using the
@@ -91,7 +93,9 @@ Supported values for maximize include: “Accuracy”, “Precision”,
 “Recall”, “Specificity”, “Sensitivity”, “F1”, and “MCC”.
 
 ``` r
-pred = compute_prediction(res_ml, features_test, traitData_test$Response, "CR", stack = F, file.name = "Test", maximize = "Accuracy", return = T)
+pred = compute_prediction(res_ml, features_test, traitData_test$Response, 
+                          "CR", stack = F, file.name = "Test", 
+                          maximize = "Accuracy", return = T)
 ```
 
 `compute_features.ML()`: This function is intended for training on a
@@ -100,9 +104,10 @@ automatically computes the prediction using the trained model in the
 testing set provided. It includes both previous functions.
 
 ``` r
-res = compute_features.ML(tme_features_train[[i]], tme_features_test[[i]], clinical = traitData, trait = "Response", trait.positive = "R",
-                          metric = "AUROC", stack = F, k_folds = 2, n_rep = 1, feature.selection = F, seed = 123, LODO = T, batch_id = "Cohort", 
-                          file_name = paste0(names(tme_features_train)[i], "_", cohort), ncores = 2, maximize = "Accuracy", return = F)
+res = compute_features.ML(tme_features_train[[i]], tme_features_test[[i]], clinical = traitData, 
+                          trait = "Response", trait.positive = "R", metric = "AUROC", stack = F, 
+                          k_folds = 2, n_rep = 1, feature.selection = F, seed = 123, LODO = T, 
+                          batch_id = "Cohort", ncores = 2, maximize = "Accuracy", return = F)
 ```
 
 ## Issues

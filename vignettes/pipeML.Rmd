@@ -10,7 +10,8 @@ vignette: >
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  fig.path = "vignettes/Results/README-",
 )
 ```
 
@@ -114,7 +115,7 @@ res[[1]]$ML_Models
 ```
 
 <p align="center">
- <img src="../vignettes/Results/Training.png?raw=true" />
+ <img src="vignettes/Results/Training.png?raw=true" />
 </p>
 
 <p align="center"><i>
@@ -258,7 +259,7 @@ plot_shap_values(importance, "glm", "shap_plot")
 ```
 
 <p align="center">
- <img src="../vignettes/Results/var_importance.png?raw=true" />
+ <img src="vignettes/Results/var_importance.png?raw=true" />
 </p>
 
 <p align="center"><i>
@@ -371,7 +372,7 @@ get_curves(metrics, "Specificity", "Sensitivity",
 ```
 
 <p align="center">
- <img src="../vignettes/Results/ROC.png?raw=true" />
+ <img src="vignettes/Results/ROC.png?raw=true" />
 </p>
 
 <p align="center"><i>
@@ -379,7 +380,7 @@ get_curves(metrics, "Specificity", "Sensitivity",
 </i></p>
 
 <p align="center">
- <img src="../vignettes/Results/PR.png?raw=true" />
+ <img src="vignettes/Results/PR.png?raw=true" />
 </p>
 
 <p align="center"><i>
