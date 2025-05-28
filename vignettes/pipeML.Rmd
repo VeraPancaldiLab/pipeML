@@ -153,12 +153,23 @@ res$Model$Meta_learner
 
 After training, users can predict on new data by using the `compute_prediction()` function. You can specify which metric to maximize when determining the optimal classification threshold. Supported values for maximize include: "Accuracy", "Precision", "Recall", "Specificity", "Sensitivity", "F1", and "MCC".
 ```{r, eval = FALSE}
-pred = pipeML::compute_prediction(res, testing_set, traitData$Best.Confirmed.Overall.Response, "CR", file.name = "Test", maximize = "Accuracy", return = F)
+pred = pipeML::compute_prediction(model = res, 
+                                  test_data = testing_set, 
+                                  target_var = traitData$Best.Confirmed.Overall.Response, 
+                                  trait.positive = "CR", 
+                                  file.name = "Test", 
+                                  maximize = "Accuracy", 
+                                  return = F)
 ```
 
 If `return = TRUE`, `compute_prediction()` will saved the RO and PR curves in the `Results/` directory. It can also be retrieved with the following function
 ```{r, eval = FALSE}
-get_curves(pred$Metrics, "Specificity", "Sensitivity", "Recall", "Precision", "Cohort", pred$AUC$AUROC, pred$AUC$AUPRC, "Test")
+get_curves(pred$Metrics, spec = "Specificity", 
+           sens = "Sensitivity", reca = "Recall", 
+           prec = "Precision", color = "Cohort", 
+           auc_roc = pred$AUC$AUROC, 
+           auc_prc = pred$AUC$AUPRC, 
+           file.name = "Test")
 ```
 
 To enable feature selection during model training, set `feature.selection = TRUE`. You must also specify the number of Boruta iterations via the `n_boruta` parameter and whether to resolve tentative features using the `boruta_fix` parameter (refer to `feature.selection.boruta()` for more details).
@@ -236,7 +247,9 @@ head(res$Prediction_metrics)
 
 To compute variable importance:
 ```{r, eval = FALSE}
-importance = compute_variable.importance(res$Model, stacking = FALSE, n_cores = 2)
+importance = compute_variable.importance(res$Model, 
+                                         stacking = FALSE, 
+                                         n_cores = 2)
 ```
 
 And to visualize SHAP values:
@@ -301,10 +314,19 @@ for (cohort in unique(traitData$Cohort)) {
   features_train = features_all[rownames(features_all)%in%rownames(traitData_train),]
 
   #### ML Training
-  res = pipeML::compute_features.training.ML(features_train, traitData_train$Response, "R", metric = "AUROC", 
-                                             stack = T, k_folds = 2, n_rep = 3, feature.selection = F, 
-                                             seed = 123, LODO = TRUE, batch_id = traitData_train$Cohort, 
-                                             ncores = 3, return = F)
+  res = pipeML::compute_features.training.ML(features_train, 
+                                             traitData_train$Response, 
+                                             trait.positive = "R", 
+                                             metric = "AUROC", 
+                                             stack = T, 
+                                             k_folds = 2, 
+                                             n_rep = 3, 
+                                             feature.selection = F, 
+                                             seed = 123, 
+                                             LODO = TRUE,
+                                             batch_id = traitData_train$Cohort, 
+                                             ncores = 3, 
+                                             return = F)
 
   ## Feature importance
   importance = pipeML::compute_variable.importance(res, stacking = T, n_cores = 2)
@@ -312,8 +334,12 @@ for (cohort in unique(traitData$Cohort)) {
   #### ML predicting
   
   #### Testing
-  pred = pipeML::compute_prediction(res, features_test, traitData_test$Response, 
-                                    trait.positive = "R", stack = TRUE, return = F)
+  pred = pipeML::compute_prediction(model = res, 
+                                    test_data = features_test, 
+                                    target_var = traitData_test$Response, 
+                                    trait.positive = "R", 
+                                    stack = TRUE, 
+                                    return = F)
 
   pred[["Importance"]] = importance
   
@@ -324,7 +350,7 @@ for (cohort in unique(traitData$Cohort)) {
 }
 ```
 
-Plot results: For plotting we will make use of our `get_curves` function adapted in a case for multiple cohorts.
+For plotting we will make use of our `get_curves` function adapted in a case for multiple cohorts.
 ```{r}
 metrics = list()
 auroc = c() 
@@ -339,7 +365,9 @@ for (i in 1:length(prediction)) {
 metrics = do.call(rbind, metrics)
 metrics$Cohort = as.factor(metrics$Cohort)
 
-get_curves(metrics, "Specificity", "Sensitivity", "Recall", "Precision", "Cohort", metrics$AUROC, metrics$AUPRC, "Test")
+get_curves(metrics, "Specificity", "Sensitivity", 
+           "Recall", "Precision", "Cohort", 
+           metrics$AUROC, metrics$AUPRC, "Test")
 ```
 
 <p align="center">
