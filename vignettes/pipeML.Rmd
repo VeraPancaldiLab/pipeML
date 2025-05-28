@@ -29,7 +29,7 @@ traitData = pipeML::traitData
 deconvolution = pipeML::deconvolution
 ```
 
-Feature selection
+## **Feature selection**
 
 Apply repeated feature selection using the Boruta algorithm:
 ```{r}
@@ -81,7 +81,7 @@ res_boruta <- feature.selection.boruta(
 )
 ```
 
-Train Machine Learning models (with optional stacking and feature selection)
+## **Train Machine Learning models**
 
 Train and tune models using repeated stratified k-fold cross-validation:
 ```{r}
@@ -114,7 +114,7 @@ res[[1]]$ML_Models
 ```
 
 <p align="center">
- <img src="Results/Training.png?raw=true" />
+ <img src="vignettes/Results/Training.png?raw=true" />
 </p>
 
 <p align="center"><i>
@@ -149,12 +149,14 @@ Access the meta-learner:
 res$Model$Meta_learner
 ```
 
+## **Model prediction**
+
 After training, users can predict on new data by using the `compute_prediction()` function. You can specify which metric to maximize when determining the optimal classification threshold. Supported values for maximize include: "Accuracy", "Precision", "Recall", "Specificity", "Sensitivity", "F1", and "MCC".
 ```{r, eval = FALSE}
 pred = pipeML::compute_prediction(res, testing_set, traitData$Best.Confirmed.Overall.Response, "CR", file.name = "Test", maximize = "Accuracy", return = F)
 ```
 
-If return = TRUE, compute_prediction() will saved the RO and PR curves in the `Results/` directory. It can also be retrieved with the following function
+If `return = TRUE`, `compute_prediction()` will saved the RO and PR curves in the `Results/` directory. It can also be retrieved with the following function
 ```{r, eval = FALSE}
 get_curves(pred$Metrics, "Specificity", "Sensitivity", "Recall", "Precision", "Cohort", pred$AUC$AUROC, pred$AUC$AUPRC, "Test")
 ```
@@ -202,6 +204,8 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     return = FALSE)
 ```
 
+## **Train and predict using the machine learning models**
+
 If you already have a separate testing dataset, you can directly train the model and perform predictions using the following function. You can also choose to optimize a specific metric to select a decision threshold and return detailed prediction performance metrics such as Accuracy, Sensitivity, Specificity, F1 score, MCC, Recall, and Precision.
 ```{r, eval = FALSE}
 deconvolution = pipeML::deconvolution
@@ -241,12 +245,14 @@ plot_shap_values(importance, "glm", "shap_plot")
 ```
 
 <p align="center">
- <img src="Results/var_importance.png?raw=true" />
+ <img src="vignettes/Results/var_importance.png?raw=true" />
 </p>
 
 <p align="center"><i>
    Figure 2. Variable importance.
 </i></p>
+
+## **Leaving one dataset out (LODO) analysis**
 
 If your data includes features from multiple cohorts, pipeML provides a flexible approach to perform Leave-One-Dataset-Out (LODO) analysis. This is achieved by applying k-fold stratified sampling across batches, ensuring that each fold preserves the batch structure while maintaining class balance. For this set `LODO = TRUE` and provided the vector containing the batch information in the `batch_id` variable (this should be in the same order as your samples)
 
@@ -337,7 +343,7 @@ get_curves(metrics, "Specificity", "Sensitivity", "Recall", "Precision", "Cohort
 ```
 
 <p align="center">
- <img src="Results/ROC.png?raw=true" />
+ <img src="vignettes/Results/ROC.png?raw=true" />
 </p>
 
 <p align="center"><i>
@@ -345,7 +351,7 @@ get_curves(metrics, "Specificity", "Sensitivity", "Recall", "Precision", "Cohort
 </i></p>
 
 <p align="center">
- <img src="Results/PR.png?raw=true" />
+ <img src="vignettes/Results/PR.png?raw=true" />
 </p>
 
 <p align="center"><i>
