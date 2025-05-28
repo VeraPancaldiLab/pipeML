@@ -63,7 +63,16 @@
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/VeraPancaldiLab/pipeML" class="external-link">pipeML</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/topepo/caret/" class="external-link">caret</a></span><span class="op">)</span></span>
 <span><span class="co">#&gt; Loading required package: ggplot2</span></span>
-<span><span class="co">#&gt; Loading required package: lattice</span></span></code></pre></div>
+<span><span class="co">#&gt; Loading required package: lattice</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org" class="external-link">dplyr</a></span><span class="op">)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Attaching package: 'dplyr'</span></span>
+<span><span class="co">#&gt; The following objects are masked from 'package:stats':</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt;     filter, lag</span></span>
+<span><span class="co">#&gt; The following objects are masked from 'package:base':</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt;     intersect, setdiff, setequal, union</span></span></code></pre></div>
 <p>This tutorial demonstrates how to use the <code>pipeML</code> package
 for training and testing machine learning models. It introduces the main
 functions of the pipeline and guides you through additional functions
@@ -164,6 +173,11 @@ cross-validation:</p>
 <p>View all trained and tuned machine learning models:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">ML_Models</span></span></code></pre></div>
+<p align="center">
+<img src="Results/Training.png?raw=true"></p>
+<p align="center">
+<i> Figure 1. Models training performance. </i>
+</p>
 <p>To apply model stacking, set <code>stack = TRUE</code>:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">deconvolution</span>, </span>
@@ -202,13 +216,18 @@ Supported values for maximize include: “Accuracy”, “Precision”,
 “Recall”, “Specificity”, “Sensitivity”, “F1”, and “MCC”.</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pred</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="fu"><a href="../reference/compute_prediction.html">compute_prediction</a></span><span class="op">(</span><span class="va">res</span>, <span class="va">testing_set</span>, <span class="va">traitData</span><span class="op">$</span><span class="va">Best.Confirmed.Overall.Response</span>, <span class="st">"CR"</span>, file.name <span class="op">=</span> <span class="st">"Test"</span>, maximize <span class="op">=</span> <span class="st">"Accuracy"</span>, return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span></code></pre></div>
+<p>If return = TRUE, compute_prediction() will saved the RO and PR
+curves in the <code>Results/</code> directory. It can also be retrieved
+with the following function</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/get_curves.html">get_curves</a></span><span class="op">(</span><span class="va">pred</span><span class="op">$</span><span class="va">Metrics</span>, <span class="st">"Specificity"</span>, <span class="st">"Sensitivity"</span>, <span class="st">"Recall"</span>, <span class="st">"Precision"</span>, <span class="st">"Cohort"</span>, <span class="va">pred</span><span class="op">$</span><span class="va">AUC</span><span class="op">$</span><span class="va">AUROC</span>, <span class="va">pred</span><span class="op">$</span><span class="va">AUC</span><span class="op">$</span><span class="va">AUPRC</span>, <span class="st">"Test"</span><span class="op">)</span></span></code></pre></div>
 <p>To enable feature selection during model training, set
 <code>feature.selection = TRUE</code>. You must also specify the number
 of Boruta iterations via the <code>n_boruta</code> parameter and whether
 to resolve tentative features using the <code>boruta_fix</code>
 parameter (refer to <code><a href="../reference/feature.selection.boruta.html">feature.selection.boruta()</a></code> for more
 details).</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">deconvolution</span>, </span>
 <span>                                    target_var <span class="op">=</span> <span class="va">traitData</span><span class="op">$</span><span class="va">Best.Confirmed.Overall.Response</span>,</span>
 <span>                                    trait.positive <span class="op">=</span> <span class="st">"CR"</span>,</span>
@@ -242,7 +261,7 @@ details).</p>
 <p>When <code>feature.selection = TRUE</code>, the function will also
 return the features selected by Boruta. If set to <code>FALSE</code>, it
 returns all features by default.</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span><span class="op">$</span><span class="va">Features</span></span>
 <span><span class="co">#&gt;  [1] "CBSX_CBSX.NSCLC.PBMCs.scRNAseq_B.cells"</span></span>
 <span><span class="co">#&gt;  [2] "DeconRNASeq_LM22_Macrophages.M1"       </span></span>
@@ -257,7 +276,7 @@ returns all features by default.</p>
 <p>To enable parallelization, specify the number of cores via the
 <code>ncores</code> parameter (default is
 <code>detectCores() - 1</code>).</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">deconvolution</span>, </span>
 <span>                                    target_var <span class="op">=</span> <span class="va">traitData</span><span class="op">$</span><span class="va">Best.Confirmed.Overall.Response</span>,</span>
 <span>                                    trait.positive <span class="op">=</span> <span class="st">"CR"</span>,</span>
@@ -269,27 +288,6 @@ returns all features by default.</p>
 <span>                                    seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>                                    LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>                                    batch_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
-<span>                                    ncores <span class="op">=</span> <span class="fl">3</span>,</span>
-<span>                                    return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
-<p>If the training features are derived from multiple cohorts, you can
-instruct pipeML to incorporate this batch information into the k-fold
-construction. Set <code>LODO = TRUE</code> and provide the column name
-identifying the cohorts using the <code>batch_id</code> parameter. The
-function will then stratify folds to preserve cohort distribution across
-partitions.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">deconvolution</span>, </span>
-<span>                                    target_var <span class="op">=</span> <span class="va">traitData</span><span class="op">$</span><span class="va">Best.Confirmed.Overall.Response</span>,</span>
-<span>                                    trait.positive <span class="op">=</span> <span class="st">"CR"</span>,</span>
-<span>                                    metric <span class="op">=</span> <span class="st">"AUROC"</span>,</span>
-<span>                                    stack <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>                                    k_folds <span class="op">=</span> <span class="fl">3</span>,</span>
-<span>                                    n_rep <span class="op">=</span> <span class="fl">3</span>,</span>
-<span>                                    feature.selection <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>                                    seed <span class="op">=</span> <span class="fl">123</span>,</span>
-<span>                                    LODO <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>                                    batch_id <span class="op">=</span> <span class="st">"cohort"</span>,</span>
 <span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
 <span>                                    ncores <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                                    return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
@@ -328,6 +326,195 @@ Precision.</p>
 <p>And to visualize SHAP values:</p>
 <div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plot_shap_values.html">plot_shap_values</a></span><span class="op">(</span><span class="va">importance</span>, <span class="st">"glm"</span>, <span class="st">"shap_plot"</span><span class="op">)</span></span></code></pre></div>
+<p align="center">
+<img src="Results/var_importance.png?raw=true"></p>
+<p align="center">
+<i> Figure 2. Variable importance. </i>
+</p>
+<p>If your data includes features from multiple cohorts, pipeML provides
+a flexible approach to perform Leave-One-Dataset-Out (LODO) analysis.
+This is achieved by applying k-fold stratified sampling across batches,
+ensuring that each fold preserves the batch structure while maintaining
+class balance. For this set <code>LODO = TRUE</code> and provided the
+vector containing the batch information in the <code>batch_id</code>
+variable (this should be in the same order as your samples)</p>
+<p>Below, we demonstrate how to perform a LODO analysis using simulated
+datasets:</p>
+<p>Simulate datasets from different batches</p>
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Simulate traitData with 3 cohorts</span></span>
+<span><span class="va">traitData</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  Sample <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Sample"</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">90</span><span class="op">)</span>,</span>
+<span>  Response <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"R"</span>, <span class="st">"NR"</span><span class="op">)</span>, <span class="fl">90</span>, replace <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
+<span>  Cohort <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Cohort"</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">3</span><span class="op">)</span>, each <span class="op">=</span> <span class="fl">30</span><span class="op">)</span>,</span>
+<span>  stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">traitData</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">traitData</span><span class="op">$</span><span class="va">Sample</span></span>
+<span></span>
+<span><span class="co"># Simulate counts matrix </span></span>
+<span><span class="va">counts_all</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">1000</span> <span class="op">*</span> <span class="fl">90</span><span class="op">)</span>, nrow <span class="op">=</span> <span class="fl">1000</span>, ncol <span class="op">=</span> <span class="fl">90</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">counts_all</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Gene"</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">1000</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">counts_all</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">traitData</span><span class="op">$</span><span class="va">Sample</span></span>
+<span></span>
+<span><span class="co"># Simulate some example features </span></span>
+<span><span class="va">features_all</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="fl">90</span> <span class="op">*</span> <span class="fl">15</span><span class="op">)</span>, nrow <span class="op">=</span> <span class="fl">90</span>, ncol <span class="op">=</span> <span class="fl">15</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">features_all</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">traitData</span><span class="op">$</span><span class="va">Sample</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">features_all</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Feature"</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">15</span><span class="op">)</span></span></code></pre></div>
+<p>Perform LODO analysis</p>
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">prediction</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="va">i</span> <span class="op">=</span> <span class="fl">1</span></span>
+<span><span class="kw">for</span> <span class="op">(</span><span class="va">cohort</span> <span class="kw">in</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">traitData</span><span class="op">$</span><span class="va">Cohort</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    </span>
+<span>  <span class="co"># Test cohort</span></span>
+<span>  <span class="va">traitData_test</span> <span class="op">=</span> <span class="va">traitData</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">Cohort</span> <span class="op">==</span> <span class="va">cohort</span><span class="op">)</span></span>
+<span>  <span class="va">counts_test</span> <span class="op">=</span> <span class="va">counts_all</span><span class="op">[</span>,<span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">counts_all</span><span class="op">)</span><span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">traitData_test</span><span class="op">)</span><span class="op">]</span></span>
+<span>  <span class="va">features_test</span> <span class="op">=</span> <span class="va">features_all</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">features_all</span><span class="op">)</span><span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">traitData_test</span><span class="op">)</span>,<span class="op">]</span></span>
+<span></span>
+<span>  <span class="co"># Train cohort</span></span>
+<span>  <span class="va">traitData_train</span> <span class="op">=</span> <span class="va">traitData</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/filter.html" class="external-link">filter</a></span><span class="op">(</span><span class="va">Cohort</span> <span class="op">!=</span> <span class="va">cohort</span><span class="op">)</span></span>
+<span>  <span class="va">counts_train</span> <span class="op">=</span> <span class="va">counts_all</span><span class="op">[</span>,<span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">counts_all</span><span class="op">)</span><span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">traitData_train</span><span class="op">)</span><span class="op">]</span></span>
+<span>  <span class="va">features_train</span> <span class="op">=</span> <span class="va">features_all</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">features_all</span><span class="op">)</span><span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">traitData_train</span><span class="op">)</span>,<span class="op">]</span></span>
+<span></span>
+<span>  <span class="co">#### ML Training</span></span>
+<span>  <span class="va">res</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span><span class="va">features_train</span>, <span class="va">traitData_train</span><span class="op">$</span><span class="va">Response</span>, <span class="st">"R"</span>, metric <span class="op">=</span> <span class="st">"AUROC"</span>, </span>
+<span>                                             stack <span class="op">=</span> <span class="cn">T</span>, k_folds <span class="op">=</span> <span class="fl">2</span>, n_rep <span class="op">=</span> <span class="fl">3</span>, feature.selection <span class="op">=</span> <span class="cn">F</span>, </span>
+<span>                                             seed <span class="op">=</span> <span class="fl">123</span>, LODO <span class="op">=</span> <span class="cn">TRUE</span>, batch_id <span class="op">=</span> <span class="va">traitData_train</span><span class="op">$</span><span class="va">Cohort</span>, </span>
+<span>                                             ncores <span class="op">=</span> <span class="fl">3</span>, return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span>
+<span></span>
+<span>  <span class="co">## Feature importance</span></span>
+<span>  <span class="va">importance</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="fu"><a href="../reference/compute_variable.importance.html">compute_variable.importance</a></span><span class="op">(</span><span class="va">res</span>, stacking <span class="op">=</span> <span class="cn">T</span>, n_cores <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span>
+<span></span>
+<span>  <span class="co">#### ML predicting</span></span>
+<span>  </span>
+<span>  <span class="co">#### Testing</span></span>
+<span>  <span class="va">pred</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="fu"><a href="../reference/compute_prediction.html">compute_prediction</a></span><span class="op">(</span><span class="va">res</span>, <span class="va">features_test</span>, <span class="va">traitData_test</span><span class="op">$</span><span class="va">Response</span>, </span>
+<span>                                    trait.positive <span class="op">=</span> <span class="st">"R"</span>, stack <span class="op">=</span> <span class="cn">TRUE</span>, return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span>
+<span></span>
+<span>  <span class="va">pred</span><span class="op">[[</span><span class="st">"Importance"</span><span class="op">]</span><span class="op">]</span> <span class="op">=</span> <span class="va">importance</span></span>
+<span>  </span>
+<span>  <span class="co">#### Save results</span></span>
+<span>  <span class="va">prediction</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span> <span class="op">=</span> <span class="va">pred</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">prediction</span><span class="op">)</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">=</span> <span class="va">cohort</span></span>
+<span>  <span class="va">i</span> <span class="op">=</span> <span class="va">i</span> <span class="op">+</span> <span class="fl">1</span></span>
+<span><span class="op">}</span></span>
+<span><span class="co">#&gt; Training machine learning model...............................................................</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Models chosen are: C50, GLM, KNN </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Meta-learners ML model based on GLM</span></span>
+<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
+<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
+<span><span class="co">#&gt; Warning in compute_shap_values(ml_models[[base_models[i]]], train_data, :</span></span>
+<span><span class="co">#&gt; Trivial predictions were found in some resamples. SHAP values cannot be</span></span>
+<span><span class="co">#&gt; calculated</span></span>
+<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
+<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
+<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
+<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): Trivial</span></span>
+<span><span class="co">#&gt; predictions were found in some resamples. SHAP values cannot be calculated</span></span>
+<span><span class="co">#&gt; Predicting target variable using provided ML model.................................................</span></span>
+<span><span class="co">#&gt; Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................</span></span>
+<span><span class="co">#&gt; Best threshold:  0.8514192 </span></span>
+<span><span class="co">#&gt; Accuracy:  60 </span></span>
+<span><span class="co">#&gt; Sensitivity:  64.706 </span></span>
+<span><span class="co">#&gt; Specificity:  53.846 </span></span>
+<span><span class="co">#&gt; F1 score:  64.706 </span></span>
+<span><span class="co">#&gt; MCC score:  18.552 </span></span>
+<span><span class="co">#&gt; Recall:  64.706 </span></span>
+<span><span class="co">#&gt; Precision:  64.706 </span></span>
+<span><span class="co">#&gt; Training machine learning model...............................................................</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Models chosen are: GLMNET, SVM_linear, XGboost </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Meta-learners ML model based on GLM</span></span>
+<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
+<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
+<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
+<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
+<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
+<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
+<span><span class="co">#&gt; Predicting target variable using provided ML model.................................................</span></span>
+<span><span class="co">#&gt; Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................</span></span>
+<span><span class="co">#&gt; Best threshold:  0.1471158 </span></span>
+<span><span class="co">#&gt; Accuracy:  63.333 </span></span>
+<span><span class="co">#&gt; Sensitivity:  84.211 </span></span>
+<span><span class="co">#&gt; Specificity:  27.273 </span></span>
+<span><span class="co">#&gt; F1 score:  74.419 </span></span>
+<span><span class="co">#&gt; MCC score:  13.834 </span></span>
+<span><span class="co">#&gt; Recall:  84.211 </span></span>
+<span><span class="co">#&gt; Precision:  66.667 </span></span>
+<span><span class="co">#&gt; Training machine learning model...............................................................</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Models chosen are: LDA, SVM_linear, XGboost </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Meta-learners ML model based on GLM</span></span>
+<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
+<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
+<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
+<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
+<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
+<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
+<span><span class="co">#&gt; Predicting target variable using provided ML model.................................................</span></span>
+<span><span class="co">#&gt; Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................</span></span>
+<span><span class="co">#&gt; Best threshold:  0.08846727 </span></span>
+<span><span class="co">#&gt; Accuracy:  56.667 </span></span>
+<span><span class="co">#&gt; Sensitivity:  100 </span></span>
+<span><span class="co">#&gt; Specificity:  7.143 </span></span>
+<span><span class="co">#&gt; F1 score:  71.111 </span></span>
+<span><span class="co">#&gt; MCC score:  19.852 </span></span>
+<span><span class="co">#&gt; Recall:  100 </span></span>
+<span><span class="co">#&gt; Precision:  55.172</span></span></code></pre></div>
+<p>Plot results: For plotting we will make use of our
+<code>get_curves</code> function adapted in a case for multiple
+cohorts.</p>
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">metrics</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="va">auroc</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">)</span> </span>
+<span><span class="va">auprc</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="kw">for</span> <span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">prediction</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">metrics</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span> <span class="op">=</span> <span class="va">prediction</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">Metrics</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>Cohort <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">prediction</span><span class="op">)</span><span class="op">[</span><span class="va">i</span><span class="op">]</span>, </span>
+<span>                  AUROC <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="va">prediction</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">AUC</span><span class="op">$</span><span class="va">AUROC</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">prediction</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">Metrics</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>                  AUPRC <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="va">prediction</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">AUC</span><span class="op">$</span><span class="va">AUPRC</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">prediction</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">Metrics</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu">tibble</span><span class="fu">::</span><span class="fu"><a href="https://tibble.tidyverse.org/reference/rownames.html" class="external-link">rownames_to_column</a></span><span class="op">(</span><span class="st">"Samples"</span><span class="op">)</span> </span>
+<span><span class="op">}</span></span>
+<span><span class="va">metrics</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="va">metrics</span><span class="op">)</span></span>
+<span><span class="va">metrics</span><span class="op">$</span><span class="va">Cohort</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">as.factor</a></span><span class="op">(</span><span class="va">metrics</span><span class="op">$</span><span class="va">Cohort</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="../reference/get_curves.html">get_curves</a></span><span class="op">(</span><span class="va">metrics</span>, <span class="st">"Specificity"</span>, <span class="st">"Sensitivity"</span>, <span class="st">"Recall"</span>, <span class="st">"Precision"</span>, <span class="st">"Cohort"</span>, <span class="va">metrics</span><span class="op">$</span><span class="va">AUROC</span>, <span class="va">metrics</span><span class="op">$</span><span class="va">AUPRC</span>, <span class="st">"Test"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; agg_png </span></span>
+<span><span class="co">#&gt;       2</span></span></code></pre></div>
+<p align="center">
+<img src="Results/ROC.png?raw=true"></p>
+<p align="center">
+<i> Figure 3. RO curves. </i>
+</p>
+<p align="center">
+<img src="Results/PR.png?raw=true"></p>
+<p align="center">
+<i> Figure 4. PR curves. </i>
+</p>
   </main>
 </div>
 
