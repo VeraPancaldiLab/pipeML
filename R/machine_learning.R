@@ -2435,9 +2435,11 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
       ) %>%
       dplyr::ungroup()
 
-    ml_model$results <- ml_model$results %>%
-      dplyr::select(-dplyr::all_of(hyperparameters), -Accuracy, -Kappa, -AccuracySD, -KappaSD) %>%
-      dplyr::bind_cols(df_avg)
+    # ml_model$results <- ml_model$results %>%
+    #   dplyr::select(-dplyr::all_of(hyperparameters), -Accuracy, -Kappa, -AccuracySD, -KappaSD) %>%
+    #   dplyr::bind_cols(df_avg)
+
+    ml_model$results <- df_avg
 
     tune = which.max(ml_model$results[,metric])  #Tuning parameter (select combination with top AUROC or AUPRC)
 
