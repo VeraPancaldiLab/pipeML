@@ -1081,7 +1081,8 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
   training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack, boruta = feature.selection,
                                boruta_iterations = n_boruta, fix_boruta = boruta_fix, boruta_threshold = 0.8, file_name = file_name,
                                LODO = LODO, ncores = ncores, return= return, fold_construction_fun = fold_construction_fun,
-                               k_fold_training_fun = k_fold_training_fun, fold_construction_args, k_fold_training_args)
+                               k_fold_training_fun = k_fold_training_fun, fold_construction_args = fold_construction_args,
+                               k_fold_training_args = k_fold_training_args)
 
   ####################################################Predicting
   if(length(training)!=0){
@@ -1171,7 +1172,7 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
                                boruta = feature.selection, boruta_iterations = n_boruta, fix_boruta = boruta_fix,
                                boruta_threshold = 0.8, file_name = file_name, LODO = LODO, ncores = ncores, return= return,
                                fold_construction_fun = fold_construction_fun, k_fold_training_fun = k_fold_training_fun,
-                               fold_construction_args, k_fold_training_args)
+                               fold_construction_args = fold_construction_args, k_fold_training_args = k_fold_training_args)
 
   ####################################################Predicting
   if(length(training)!=0){
