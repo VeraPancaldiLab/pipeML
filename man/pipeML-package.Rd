@@ -6,6 +6,8 @@
 \alias{pipeML-package}
 \title{pipeML: A robust R machine learning pipeline for classification tasks and survival analysis}
 \description{
+\if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
+
 pipeML is develop for a fast and easy use, its complexity allows a robust implementation during each step of the pipeline.
 }
 \seealso{

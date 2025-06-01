@@ -220,6 +220,10 @@ feature.selection.boruta <- function(data, iterations = NULL, fix, doParallel = 
 #' @param LODO Logical. If TRUE, performs Leave-One-Dataset-Out (LODO) cross-validation by stratifying folds based on cohort membership.
 #' @param ncores Integer. Number of cores to use for parallelization. If not given, detectCores() - 1 will be used.
 #' @param return Logical. Whether to return the results and generated plots.
+#' @param fold_construction_fun Function. A custom function used to construct the cross-validation folds. It should return a list of training indices for each fold.
+#' @param k_fold_training_fun Function. A custom function used to train models within each fold.
+#' @param fold_construction_args List. Named list of additional arguments to pass to \code{fold_construction_fun}.
+#' @param k_fold_training_args List. Named list of additional arguments to pass to \code{k_fold_training_fun}.
 #'
 #' @return A list containing:
 #' \itemize{
@@ -236,7 +240,9 @@ feature.selection.boruta <- function(data, iterations = NULL, fix, doParallel = 
 #' }
 #'
 #'
-compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "Accuracy", boruta, boruta_iterations = NULL, fix_boruta = NULL, tentative = FALSE, boruta_threshold = NULL, file_name = NULL, LODO = FALSE, ncores = NULL, return = FALSE){
+compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "Accuracy", boruta, boruta_iterations = NULL, fix_boruta = NULL,
+                             tentative = FALSE, boruta_threshold = NULL, file_name = NULL, LODO = FALSE, ncores = NULL, return = FALSE,
+                             fold_construction_fun = NULL, k_fold_training_fun = NULL, fold_construction_args = list(), k_fold_training_args = list()){
 
   if(!(metric %in% c("AUROC", "AUPRC","Accuracy"))){
     stop("The metric assigned is not supported. Choose either accuracy or AUC.")
@@ -299,74 +305,128 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     multifolds = caret::createMultiFolds(train_data[,'target'], k = k_folds, times = n_rep) #repeated folds
   }
 
-  trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = T, classProbs = TRUE, savePredictions=T)
+  if(is.null(fold_construction_fun) | is.null(k_fold_training_fun)){ #No custom function provided, using normal CV
 
-  ##################################################### ML models
-  #To do: Re-calculate accuracy values based on tuning parameters optimized by the cv AUC - now the values are based on accuracy! be careful
+    trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = T, classProbs = TRUE, savePredictions=T)
 
-  ################## Bagged CART
-  fit.treebag <- caret::train(target~., data = train_data, method = "treebag", metric = "Accuracy",trControl = trainControl)
+    ##################################################### ML models
+    #To do: Re-calculate accuracy values based on tuning parameters optimized by the cv AUC - now the values are based on accuracy! be careful
 
-  ################## RF
-  fit.rf <- caret::train(target~., data = train_data, method = "rf", metric = "Accuracy",trControl = trainControl)
+    ################## Bagged CART
+    fit.treebag <- caret::train(target~., data = train_data, method = "treebag", metric = "Accuracy",trControl = trainControl)
 
-  ################## C5.0
-  fit.c50 <- caret::train(target~., data = train_data, method = "C5.0", metric = "Accuracy",trControl = trainControl)
+    ################## RF
+    fit.rf <- caret::train(target~., data = train_data, method = "rf", metric = "Accuracy",trControl = trainControl)
 
-  ################## LG - Logistic Regression
-  fit.glm <- caret::train(target~., data = train_data, method="glm", metric="Accuracy",trControl=trainControl)
+    ################## C5.0
+    fit.c50 <- caret::train(target~., data = train_data, method = "C5.0", metric = "Accuracy",trControl = trainControl)
 
-  ################## LDA - Linear Discriminate Analysis
-  fit.lda <- caret::train(target~., data = train_data, method="lda", metric="Accuracy",trControl=trainControl)
+    ################## LG - Logistic Regression
+    fit.glm <- caret::train(target~., data = train_data, method="glm", metric="Accuracy",trControl=trainControl)
 
-  ################## GLMNET - Regularized Logistic Regression (Elastic net)
-  fit.glmnet <- caret::train(target~., data = train_data, method="glmnet", metric="Accuracy",trControl=trainControl)
+    ################## LDA - Linear Discriminate Analysis
+    fit.lda <- caret::train(target~., data = train_data, method="lda", metric="Accuracy",trControl=trainControl)
 
-  ################## KNN - k-Nearest Neighbors
-  fit.knn <- caret::train(target~., data = train_data, method="knn", metric="Accuracy",trControl=trainControl)
+    ################## GLMNET - Regularized Logistic Regression (Elastic net)
+    fit.glmnet <- caret::train(target~., data = train_data, method="glmnet", metric="Accuracy",trControl=trainControl)
 
-  ################## CART - Classification and Regression Trees (CART),
-  fit.cart <- caret::train(target~., data = train_data, method="rpart", metric="Accuracy",trControl=trainControl)
+    ################## KNN - k-Nearest Neighbors
+    fit.knn <- caret::train(target~., data = train_data, method="knn", metric="Accuracy",trControl=trainControl)
 
-  # NB - Naive Bayes (NB)
-  #Grid = expand.grid(usekernel=TRUE,adjust=1,fL=c(0,0.2,0.5,0.8,1))
-  #fit.nb <- train(target~., data = train_data, method="nb", metric="Accuracy",trControl=trainControl, tuneGrid=Grid)
+    ################## CART - Classification and Regression Trees (CART),
+    fit.cart <- caret::train(target~., data = train_data, method="rpart", metric="Accuracy",trControl=trainControl)
 
-  ################## Regularized Lasso
-  fit.lasso <- caret::train(target~., data = train_data, method="glmnet", metric="Accuracy",trControl=trainControl, tuneGrid = expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 20)))
+    # NB - Naive Bayes (NB)
+    #Grid = expand.grid(usekernel=TRUE,adjust=1,fL=c(0,0.2,0.5,0.8,1))
+    #fit.nb <- train(target~., data = train_data, method="nb", metric="Accuracy",trControl=trainControl, tuneGrid=Grid)
 
-  ################## Ridge regression
-  fit.ridge <- caret::train(target~., data = train_data, method="glmnet", metric="Accuracy",trControl=trainControl, tuneGrid = expand.grid(alpha = 0, lambda = seq(0.001, 1, length = 20)))
+    ################## Regularized Lasso
+    fit.lasso <- caret::train(target~., data = train_data, method="glmnet", metric="Accuracy",trControl=trainControl, tuneGrid = expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 20)))
 
-  ################## Support Vector Machine with Radial Kernel
-  fit.svm_radial <- caret::train(target ~ ., data = train_data, method = "svmRadial", metric = "Accuracy", trControl = trainControl)
+    ################## Ridge regression
+    fit.ridge <- caret::train(target~., data = train_data, method="glmnet", metric="Accuracy",trControl=trainControl, tuneGrid = expand.grid(alpha = 0, lambda = seq(0.001, 1, length = 20)))
 
-  ################## Support Vector Machine with Linear Kernel
-  fit.svm_linear <- caret::train(target ~ ., data = train_data, method = "svmLinear", metric = "Accuracy", trControl = trainControl)
+    ################## Support Vector Machine with Radial Kernel
+    fit.svm_radial <- caret::train(target ~ ., data = train_data, method = "svmRadial", metric = "Accuracy", trControl = trainControl)
 
-  ################## XGboost
-  # param_grid <- expand.grid(
-  #   nrounds = seq(from = 200, to = nrounds, by = 50),
-  #   eta = c(0.025, 0.05, 0.1, 0.3),
-  #   max_depth = c(2, 3, 4, 5, 6),
-  #   gamma = 0,
-  #   colsample_bytree = 1,
-  #   min_child_weight = 1,
-  #   subsample = 1
-  # )
+    ################## Support Vector Machine with Linear Kernel
+    fit.svm_linear <- caret::train(target ~ ., data = train_data, method = "svmLinear", metric = "Accuracy", trControl = trainControl)
 
-  parallel::stopCluster(cl)  # stop the cluster after parallel execution
-  unregister_dopar() #Stop Dopar from running in the background
+    ################## XGboost
+    # param_grid <- expand.grid(
+    #   nrounds = seq(from = 200, to = nrounds, by = 50),
+    #   eta = c(0.025, 0.05, 0.1, 0.3),
+    #   max_depth = c(2, 3, 4, 5, 6),
+    #   gamma = 0,
+    #   colsample_bytree = 1,
+    #   min_child_weight = 1,
+    #   subsample = 1
+    # )
 
-  #### Set allowParallel = F
-  #Disable parallelization in xgbTree cause the xgboost algorithm has its own internal parallelization, controlled by the nthread parameter — it uses this to speed up tree construction within a single model.
-  #The caret package, on the other hand, can parallelize between models — for example, it can train different cross-validation folds or hyperparameter combinations at the same time if a parallel backend is registered
-  #https://stackoverflow.com/questions/39528392/parallel-processing-with-xgboost-and-caret
-  #If both are ON it can slower performance (lead to over-parallelization and CPU contention)
-  trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = F, classProbs = TRUE, savePredictions=T)
+    parallel::stopCluster(cl)  # stop the cluster after parallel execution
+    unregister_dopar() #Stop Dopar from running in the background
 
-  invisible(utils::capture.output({fit.xgbTree <- caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)}, type = "output"))
+    #### Set allowParallel = F
+    #Disable parallelization in xgbTree cause the xgboost algorithm has its own internal parallelization, controlled by the nthread parameter — it uses this to speed up tree construction within a single model.
+    #The caret package, on the other hand, can parallelize between models — for example, it can train different cross-validation folds or hyperparameter combinations at the same time if a parallel backend is registered
+    #https://stackoverflow.com/questions/39528392/parallel-processing-with-xgboost-and-caret
+    #If both are ON it can slower performance (lead to over-parallelization and CPU contention)
+    trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = F, classProbs = TRUE, savePredictions=T)
 
+    invisible(utils::capture.output({fit.xgbTree <- caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)}, type = "output"))
+
+  }else{
+
+    # Custom fold construction
+    x <- do.call(fold_construction_fun, c(list(data = train_data, folds = multifolds), fold_construction_args))
+    fold_data = x[[1]] # extract processed folds
+    training_set_complete = x[[2]] # extract complete training set
+
+    # Custom CV validation and hyperparameter tuning
+    fit.rf <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "rf",
+                                                  training_set_all = training_set_complete), k_fold_training_args))
+
+    fit.treebag <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "treebag",
+                                                       training_set_all = training_set_complete), k_fold_training_args))
+
+    fit.c50 <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "C5.0",
+                                                   training_set_all = training_set_complete), k_fold_training_args))
+
+    fit.glm <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "glm",
+                                                   training_set_all = training_set_complete), k_fold_training_args))
+
+    fit.lda <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "lda",
+                                                   training_set_all = training_set_complete), k_fold_training_args))
+
+    fit.glmnet <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "glmnet",
+                                                      training_set_all = training_set_complete), k_fold_training_args))
+
+    fit.knn <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "knn",
+                                                   training_set_all = training_set_complete), k_fold_training_args))
+
+    fit.cart <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "rpart",
+                                                    training_set_all = training_set_complete), k_fold_training_args))
+
+    fit.lasso <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "glmnet",
+                                                     tuneGrid = expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 20)),
+                                                     training_set_all = training_set_complete),
+                                                k_fold_training_args))
+
+    fit.ridge <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "glmnet",
+                                                     tuneGrid = expand.grid(alpha = 0, lambda = seq(0.001, 1, length = 20)),
+                                                     training_set_all = training_set_complete),
+                                                k_fold_training_args))
+
+    fit.svm_radial <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "svmRadial",
+                                                          training_set_all = training_set_complete), k_fold_training_args))
+
+    fit.svm_linear <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "svmLinear",
+                                                          training_set_all = training_set_complete), k_fold_training_args))
+
+    fit.xgbTree <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "xgbTree",
+                                                       training_set_all = training_set_complete), k_fold_training_args))
+
+  }
   ####### Optimized based on metric (only AUC or Accuracy available)
   if(metric == "AUROC" || metric == "AUPRC"){
 
@@ -435,96 +495,414 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
   }
 
-  ###Prediction with best tuned hyper-parameters (Missing to add platt scaling to calibrated probabilities (when tested it didnt converge, need to be checked)) See https://www.cs.cornell.edu/~alexn/papers/calibration.icml05.crc.rev3.pdf
+  if(is.null(fold_construction_fun)|is.null(k_fold_training_fun)){
 
-  ###Bagged CART
+    ###Prediction with best tuned hyper-parameters (Missing to add platt scaling to calibrated probabilities (when tested it didnt converge, need to be checked)) See https://www.cs.cornell.edu/~alexn/papers/calibration.icml05.crc.rev3.pdf
 
-  predictions.bag <- data.frame(stats::predict(fit.treebag, newdata = train_data, type = "prob")) %>% #Predictions using tuned model
-    dplyr::select(yes) %>%
-    dplyr::rename(BAG = yes)
+    ###Bagged CART
 
-  ###Random Forest
+    predictions.bag <- data.frame(stats::predict(fit.treebag, newdata = train_data, type = "prob")) %>% #Predictions using tuned model
+      dplyr::select(yes) %>%
+      dplyr::rename(BAG = yes)
 
-  predictions.rf = data.frame(stats::predict(fit.rf, newdata = train_data, type = "prob")) %>%
-    dplyr::select(yes) %>%
-    dplyr::rename(RF = yes) #Predictions of model (already ordered)
+    ###Random Forest
 
-  ###C5.0
+    predictions.rf = data.frame(stats::predict(fit.rf, newdata = train_data, type = "prob")) %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(RF = yes) #Predictions of model (already ordered)
 
-  predictions.c50 = data.frame(stats::predict(fit.c50$finalModel, newdata = train_data, type = "prob")) %>%
-    dplyr::select(yes) %>%
-    dplyr::rename(C50 = yes)  #Predictions of model (already ordered)
+    ###C5.0
 
-  ### LG
+    predictions.c50 = data.frame(stats::predict(fit.c50$finalModel, newdata = train_data, type = "prob")) %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(C50 = yes)  #Predictions of model (already ordered)
 
-  predictions.glm = stats::predict(fit.glm, newdata = train_data, type = "prob") %>%
-    data.frame() %>%
-    dplyr::select(yes) %>%
-    dplyr::rename(GLM = yes)  #Predictions of model (already ordered)
+    ### LG
 
-  ### LDA
+    predictions.glm = stats::predict(fit.glm, newdata = train_data, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(GLM = yes)  #Predictions of model (already ordered)
 
-  predictions.lda = stats::predict(fit.lda, newdata = train_data, type = "prob") %>%
-    data.frame() %>%
-    dplyr::select(yes) %>%
-    dplyr::rename(LDA = yes)  #Predictions of model (already ordered)
+    ### LDA
 
-  ### GLMNET
+    predictions.lda = stats::predict(fit.lda, newdata = train_data, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(LDA = yes)  #Predictions of model (already ordered)
 
-  predictions.glmnet = stats::predict(fit.glmnet, newdata = train_data, type = "prob") %>%
-    data.frame() %>%
-    dplyr::select(yes) %>%
-    dplyr::rename(GLMNET = yes)  #Predictions of model (already ordered)
+    ### GLMNET
 
-  ### KNN
+    predictions.glmnet = stats::predict(fit.glmnet, newdata = train_data, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(GLMNET = yes)  #Predictions of model (already ordered)
 
-  predictions.knn = stats::predict(fit.knn, newdata = train_data, type = "prob") %>%
-    data.frame() %>%
-    dplyr::select(yes) %>%
-    dplyr::rename(KNN = yes) #Predictions of model (already ordered)
+    ### KNN
 
-  ## CART
+    predictions.knn = stats::predict(fit.knn, newdata = train_data, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(KNN = yes) #Predictions of model (already ordered)
 
-  predictions.cart = stats::predict(fit.cart, newdata = train_data, type = "prob") %>%
-    data.frame() %>%
-    dplyr::select(yes) %>%
-    dplyr::rename(CART = yes)  #Predictions of model (already ordered)
+    ## CART
 
-  ## Regularized Lasso
+    predictions.cart = stats::predict(fit.cart, newdata = train_data, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(CART = yes)  #Predictions of model (already ordered)
 
-  predictions.lasso = stats::predict(fit.lasso, newdata = train_data, type = "prob") %>%
-    data.frame() %>%
-    dplyr::select(yes) %>%
-    dplyr::rename(LASSO = yes)  #Predictions of model (already ordered)
+    ## Regularized Lasso
 
-  ## Ridge regression
+    predictions.lasso = stats::predict(fit.lasso, newdata = train_data, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(LASSO = yes)  #Predictions of model (already ordered)
 
-  predictions.ridge = stats::predict(fit.ridge, newdata = train_data, type = "prob") %>%
-    data.frame() %>%
-    dplyr::select(yes) %>%
-    dplyr::rename(RIDGE = yes)  #Predictions of model (already ordered)
+    ## Ridge regression
 
-  ## SVM radial
+    predictions.ridge = stats::predict(fit.ridge, newdata = train_data, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(RIDGE = yes)  #Predictions of model (already ordered)
 
-  predictions.svm_radial = stats::predict(fit.svm_radial, newdata = train_data, type = "prob") %>%
-    data.frame() %>%
-    dplyr::select(yes) %>%
-    dplyr::rename(SVM_radial = yes)  #Predictions of model (already ordered)
+    ## SVM radial
 
-  ## SVM linear
+    predictions.svm_radial = stats::predict(fit.svm_radial, newdata = train_data, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(SVM_radial = yes)  #Predictions of model (already ordered)
 
-  predictions.svm_linear = stats::predict(fit.svm_linear, newdata = train_data, type = "prob") %>%
-    data.frame() %>%
-    dplyr::select(yes) %>%
-    dplyr::rename(SVM_linear = yes)  #Predictions of model (already ordered)
+    ## SVM linear
 
-  ## XGboost
+    predictions.svm_linear = stats::predict(fit.svm_linear, newdata = train_data, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(SVM_linear = yes)  #Predictions of model (already ordered)
 
-  predictions.xgboost = stats::predict(fit.xgbTree, newdata = train_data, type = "prob") %>%
-    data.frame() %>%
-    dplyr::select(yes) %>%
-    dplyr::rename(XGboost = yes)  #Predictions of model (already ordered)
+    ## XGboost
 
+    predictions.xgboost = stats::predict(fit.xgbTree, newdata = train_data, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(XGboost = yes)  #Predictions of model (already ordered)
+
+  }else{ # Training data is calculated from custom functions
+
+    ######## Bagged CART
+
+    # Train model with bestTune from CV
+    temp = fit.treebag
+    fit.treebag <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "treebag",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.treebag$results = temp$results
+    fit.treebag$pred = temp$pred
+    fit.treebag$resample = temp$resample
+    fit.treebag$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.bag = predict(fit.treebag, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(RF = yes) #Predictions of model (already ordered)
+
+    ######## RF
+
+    # Train model with bestTune from CV
+    temp = fit.rf
+    fit.rf <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "rf",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.rf$results = temp$results
+    fit.rf$pred = temp$pred
+    fit.rf$resample = temp$resample
+    fit.rf$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.rf = predict(fit.rf, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(RF = yes) #Predictions of model (already ordered)
+
+    ######## C5.0
+
+    # Train model with bestTune from CV
+    temp = fit.c50
+    fit.c50 <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "C5.0",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.c50$results = temp$results
+    fit.c50$pred = temp$pred
+    fit.c50$resample = temp$resample
+    fit.c50$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.c50 = predict(fit.c50, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(C50 = yes) #Predictions of model (already ordered)
+
+    ######## LG
+
+    # Train model with bestTune from CV
+    temp = fit.glm
+    fit.glm <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "glm",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.glm$results = temp$results
+    fit.glm$pred = temp$pred
+    fit.glm$resample = temp$resample
+    fit.glm$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.glm = predict(fit.glm, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(GLM = yes) #Predictions of model (already ordered)
+
+    ######## LDA
+
+    # Train model with bestTune from CV
+    temp = fit.lda
+    fit.lda <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "lda",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.lda$results = temp$results
+    fit.lda$pred = temp$pred
+    fit.lda$resample = temp$resample
+    fit.lda$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.lda = predict(fit.lda, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(LDA = yes) #Predictions of model (already ordered)
+
+
+    ### GLMNET
+
+    # Train model with bestTune from CV
+    temp = fit.glmnet
+    fit.glmnet <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "glmnet",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.glmnet$results = temp$results
+    fit.glmnet$pred = temp$pred
+    fit.glmnet$resample = temp$resample
+    fit.glmnet$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.glmnet = predict(fit.glmnet, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(GLMNET = yes) #Predictions of model (already ordered)
+
+    ### KNN
+
+    # Train model with bestTune from CV
+    temp = fit.knn
+    fit.knn <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "knn",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.knn$results = temp$results
+    fit.knn$pred = temp$pred
+    fit.knn$resample = temp$resample
+    fit.knn$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.knn = predict(fit.knn, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(KNN = yes) #Predictions of model (already ordered)
+
+    ## CART
+
+    # Train model with bestTune from CV
+    temp = fit.cart
+    fit.cart <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "rpart",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.cart$results = temp$results
+    fit.cart$pred = temp$pred
+    fit.cart$resample = temp$resample
+    fit.cart$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.cart = predict(fit.cart, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(CART = yes) #Predictions of model (already ordered)
+
+    ## Regularized Lasso
+
+    # Train model with bestTune from CV
+    temp = fit.lasso
+    fit.lasso <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "glmnet",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.lasso$results = temp$results
+    fit.lasso$pred = temp$pred
+    fit.lasso$resample = temp$resample
+    fit.lasso$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.lasso = predict(fit.lasso, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(LASSO = yes) #Predictions of model (already ordered)
+
+    ## Ridge regression
+
+    # Train model with bestTune from CV
+    temp = fit.ridge
+    fit.ridge <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "glmnet",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.ridge$results = temp$results
+    fit.ridge$pred = temp$pred
+    fit.ridge$resample = temp$resample
+    fit.ridge$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.ridge = predict(fit.ridge, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(RIDGE = yes) #Predictions of model (already ordered)
+
+    ## SVM radial
+
+    # Train model with bestTune from CV
+    temp = fit.svm_radial
+    fit.svm_radial <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "svmRadial",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.svm_radial$results = temp$results
+    fit.svm_radial$pred = temp$pred
+    fit.svm_radial$resample = temp$resample
+    fit.svm_radial$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.svm_radial = predict(fit.svm_radial, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(SVM_radial = yes) #Predictions of model (already ordered)
+
+    ## SVM linear
+
+    # Train model with bestTune from CV
+    temp = fit.svm_linear
+    fit.svm_linear <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "svmLinear",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.svm_linear$results = temp$results
+    fit.svm_linear$pred = temp$pred
+    fit.svm_linear$resample = temp$resample
+    fit.svm_linear$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.svm_linear = predict(fit.svm_linear, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(SVM_linear = yes) #Predictions of model (already ordered)
+
+    ## XGboost
+
+    # Train model with bestTune from CV
+    temp = fit.xgbTree
+    fit.xgbTree <- caret::train(
+      target ~ .,
+      data = training_set_complete,
+      method = "xgbTree",
+      trControl = trainControl(method = "none", classProbs = TRUE),
+      tuneGrid = temp$bestTune
+    )
+
+    # Return caret-like object
+    fit.xgbTree$results = temp$results
+    fit.xgbTree$pred = temp$pred
+    fit.xgbTree$resample = temp$resample
+    fit.xgbTree$bestTune = temp$bestTune
+
+    # Predictions in trained model
+    predictions.xgboost = predict(fit.xgbTree, newdata = training_set_complete, type = "prob") %>%
+      data.frame() %>%
+      dplyr::select(yes) %>%
+      dplyr::rename(XGboost = yes) #Predictions of model (already ordered)
+
+  }
   ############################################################## Save models
 
   ensembleResults <- list(BAG = fit.treebag,
@@ -1313,6 +1691,33 @@ calculate_auc_prc_resample = function(obs, pred) {
   auc_prc_value = calculate_auprc(prob_obs$recall, prob_obs$precision)
 
   return(auc_prc_value)
+}
+
+calculate_accuracy_kappa_resample <- function(obs, pred) {
+  # Ensure input is factor with the same levels
+  obs <- factor(obs)
+  pred <- factor(pred, levels = levels(obs))
+
+  # Confusion matrix components
+  cm <- table(pred, obs)
+
+  # Total observations
+  total <- sum(cm)
+
+  # Accuracy = (TP + TN) / Total
+  accuracy <- sum(diag(cm)) / total
+
+  # Row and column totals
+  row_totals <- rowSums(cm)
+  col_totals <- colSums(cm)
+
+  # Expected accuracy (by chance)
+  expected_accuracy <- sum(row_totals * col_totals) / (total ^ 2)
+
+  # Kappa = (observed - expected) / (1 - expected)
+  kappa <- (accuracy - expected_accuracy) / (1 - expected_accuracy)
+
+  return(c(Accuracy_resample = accuracy, Kappa_resample = kappa))
 }
 
 #' Compute F1 Score
