@@ -305,7 +305,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     multifolds = caret::createMultiFolds(train_data[,'target'], k = k_folds, times = n_rep) #repeated folds
   }
 
-  if(is.null(fold_construction_fun) | is.null(k_fold_training_fun)){ #No custom function provided, using normal CV
+  if(is.null(fold_construction_fun) || is.null(k_fold_training_fun)){ #No custom function provided, using normal CV
 
     trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = T, classProbs = TRUE, savePredictions=T)
 
@@ -495,7 +495,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
   }
 
-  if(is.null(fold_construction_fun)|is.null(k_fold_training_fun)){
+  if(is.null(fold_construction_fun)||is.null(k_fold_training_fun)){
 
     ###Prediction with best tuned hyper-parameters (Missing to add platt scaling to calibrated probabilities (when tested it didnt converge, need to be checked)) See https://www.cs.cornell.edu/~alexn/papers/calibration.icml05.crc.rev3.pdf
 
@@ -2488,7 +2488,9 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
     dplyr::select(-Accuracy, -Kappa) %>%
     dplyr::arrange(match(Resample, df_avg$Resample)) %>%
     dplyr::select(-Resample) %>%
-    dplyr::bind_cols(df_avg)
+    dplyr::bind_cols(df_avg)  %>%
+    { if ("Resample" %in% colnames(.)) dplyr::select(., -Resample) else . }
+
 
   return(list(Prediction = ml_model$pred, Resamples = ml_model$resample, Results = ml_model$results))
 
