@@ -286,16 +286,7 @@ return the features selected by Boruta. If set to <code>FALSE</code>, it
 returns all features by default.</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span><span class="op">$</span><span class="va">Features</span></span>
-<span><span class="co">#&gt;  [1] "CBSX_CBSX.NSCLC.PBMCs.scRNAseq_B.cells"</span></span>
-<span><span class="co">#&gt;  [2] "DeconRNASeq_LM22_Macrophages.M1"       </span></span>
-<span><span class="co">#&gt;  [3] "DWLS_CCLE.TIL10_Monocytes"             </span></span>
-<span><span class="co">#&gt;  [4] "DeconRNASeq_LM22_NK.activated"         </span></span>
-<span><span class="co">#&gt;  [5] "Epidish_BPRNACanProMet_CD8.cells"      </span></span>
-<span><span class="co">#&gt;  [6] "CBSX_TIL10_Dendritic.cells"            </span></span>
-<span><span class="co">#&gt;  [7] "DeconRNASeq_BPRNACan3DProMet_Cancer"   </span></span>
-<span><span class="co">#&gt;  [8] "Epidish_LM22_Plasma.cells"             </span></span>
-<span><span class="co">#&gt;  [9] "DeconRNASeq_LM22_Mast.activated.cells" </span></span>
-<span><span class="co">#&gt; [10] "CBSX_LM22_Mast.activated.cells"</span></span></code></pre></div>
+<span><span class="co">#&gt; NULL</span></span></code></pre></div>
 <p>To enable parallelization, specify the number of cores via the
 <code>ncores</code> parameter (default is
 <code>detectCores() - 1</code>).</p>
