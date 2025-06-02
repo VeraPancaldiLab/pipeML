@@ -2411,7 +2411,7 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
   if(is.null(hyperparameters) == F){
     ## Integrate average CV metrics across repetitions into resample matrix
     df_avg <- ml_model$pred %>%
-      dplyr::group_by(dplyr::across(dplyr::all_of(hyperparameters))) %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(hyperparameters))) %>% ## here we only group by hyperparameter not resample
       dplyr::summarise(
         Sensitivity = mean(Sensitivity, na.rm = TRUE),
         Specificity = mean(Specificity, na.rm = TRUE),
@@ -2422,26 +2422,17 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
         Recall = mean(Recall, na.rm = TRUE),
         F1 = mean(F1, na.rm = TRUE),
         MCC = mean(MCC, na.rm = TRUE),
-        Sensitivity_SD = sd(Sensitivity, na.rm = TRUE),
-        Specificity_SD = sd(Specificity, na.rm = TRUE),
-        Accuracy_SD = sd(Accuracy, na.rm = TRUE),
-        AUROC_SD = sd(AUROC, na.rm = TRUE),
-        AUPRC_SD = sd(AUPRC, na.rm = TRUE),
-        Precision_SD = sd(Precision, na.rm = TRUE),
-        Recall_SD = sd(Recall, na.rm = TRUE),
-        F1_SD = sd(F1, na.rm = TRUE),
-        MCC_SD = sd(MCC, na.rm = TRUE),
         .groups = "keep"  # Ensures all groups are retained
       ) %>%
       dplyr::ungroup()
 
-    # ml_model$results <- ml_model$results %>%
-    #   dplyr::select(-dplyr::all_of(hyperparameters), -Accuracy, -Kappa, -AccuracySD, -KappaSD) %>%
-    #   dplyr::bind_cols(df_avg)
+    ml_model$results <- ml_model$results %>%
+      dplyr::select(-dplyr::all_of(hyperparameters), -Accuracy, -Kappa, -AccuracySD, -KappaSD) %>%
+      dplyr::bind_cols(df_avg)
 
-    ml_model$results <- df_avg
+    ##### Hyperparameter tuning
 
-    tune = which.max(ml_model$results[,metric])  #Tuning parameter (select combination with top AUROC or AUPRC)
+    tune = which.max(data.frame(ml_model$results)[,metric])  #Tuning parameter (select combination with top AUROC or AUPRC)
 
     ml_model$bestTune = ml_model$results %>%
       dplyr::slice(tune) %>%  # Extract only the row with the tuned value
@@ -2471,12 +2462,9 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
       ) %>%
       dplyr::ungroup()
 
-
-
   }else{
     ## Integrate average CV metrics across repetitions into resample matrix
     df_avg <- ml_model$pred %>%
-      dplyr::group_by(Resample) %>%
       dplyr::summarise(
         Sensitivity = mean(Sensitivity, na.rm = TRUE),
         Specificity = mean(Specificity, na.rm = TRUE),
@@ -2486,9 +2474,14 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
         Precision = mean(Precision, na.rm = TRUE),
         Recall = mean(Recall, na.rm = TRUE),
         F1 = mean(F1, na.rm = TRUE),
-        MCC = mean(MCC, na.rm = TRUE)
+        MCC = mean(MCC, na.rm = TRUE),
+        .groups = "keep"  # Ensures all groups are retained
       ) %>%
       dplyr::ungroup()
+
+    ml_model$results <- ml_model$results %>%
+      dplyr::select(-dplyr::all_of(hyperparameters), -Accuracy, -Kappa, -AccuracySD, -KappaSD) %>%
+      dplyr::bind_cols(df_avg)
   }
 
   ml_model$resample = ml_model$resample %>%
@@ -2496,31 +2489,6 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
     dplyr::arrange(match(Resample, df_avg$Resample)) %>%
     dplyr::select(-Resample) %>%
     dplyr::bind_cols(df_avg)
-
-  if(is.null(hyperparameters) == T){
-    ## Integrate average CV metrics into results
-    ml_model$results = ml_model$results %>%
-      dplyr::select(-Accuracy, -AccuracySD, -Kappa, -KappaSD) %>%
-      dplyr::mutate(Sensitivity = mean(ml_model$resample$Sensitivity, na.rm = TRUE),
-                    Specificity = mean(ml_model$resample$Specificity, na.rm = TRUE),
-                    Accuracy = mean(ml_model$resample$Accuracy, na.rm = TRUE),
-                    AUROC = mean(ml_model$resample$AUROC, na.rm = TRUE),
-                    AUPRC = mean(ml_model$resample$AUPRC, na.rm = TRUE),
-                    Precision = mean(ml_model$resample$Precision, na.rm = TRUE),
-                    Recall = mean(ml_model$resample$Recall, na.rm = TRUE),
-                    F1 = mean(ml_model$resample$F1, na.rm = TRUE),
-                    MCC = mean(ml_model$resample$MCC, na.rm = TRUE),
-                    Sensitivity_SD = sd(ml_model$resample$Sensitivity, na.rm = TRUE),
-                    Specificity_SD = sd(ml_model$resample$Specificity, na.rm = TRUE),
-                    Accuracy_SD = sd(ml_model$resample$Accuracy, na.rm = TRUE),
-                    AUROC_SD = sd(AUROC, na.rm = TRUE),
-                    AUPRC_SD = sd(AUPRC, na.rm = TRUE),
-                    Precision_SD = sd(ml_model$resample$Precision, na.rm = TRUE),
-                    Recall_SD = sd(ml_model$resample$Recall, na.rm = TRUE),
-                    F1_SD = sd(ml_model$resample$F1, na.rm = TRUE),
-                    MCC_SD = sd(ml_model$resample$MCC, na.rm = TRUE))
-  }
-
 
   return(list(Prediction = ml_model$pred, Resamples = ml_model$resample, Results = ml_model$results))
 
