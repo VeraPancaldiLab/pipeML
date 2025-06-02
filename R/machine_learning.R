@@ -244,6 +244,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
                              tentative = FALSE, boruta_threshold = NULL, file_name = NULL, LODO = FALSE, ncores = NULL, return = FALSE,
                              fold_construction_fun = NULL, k_fold_training_fun = NULL, fold_construction_args = list(), k_fold_training_args = list()){
 
+  custom_output = NULL
   if(!(metric %in% c("AUROC", "AUPRC","Accuracy"))){
     stop("The metric assigned is not supported. Choose either accuracy or AUC.")
   }
@@ -381,6 +382,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     x <- do.call(fold_construction_fun, c(list(data = train_data, folds = multifolds), fold_construction_args))
     fold_data = x[[1]] # extract processed folds
     training_set_complete = x[[2]] # extract complete training set
+    custom_output = x[[3]] #custom output from function to be returned after all complete training
 
     # Custom CV validation and hyperparameter tuning
     fit.rf <- do.call(k_fold_training_fun, c(list(processed_folds = fold_data, ml_method = "rf",
@@ -995,10 +997,13 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     meta_learner <- caret::train(true_label ~ ., data = meta_features, method = "glmnet", trControl = trainControl) #Staking based on simple logistic regression
 
-    output = list("Features" = features, "Meta_learner" = meta_learner, "Base_models" = base_models$Base_models, "ML_models" = ensembleResults)
+    output = list("Meta_learner" = meta_learner, "Base_models" = base_models$Base_models, "ML_models" = ensembleResults)
+
+    if(is.null(custom_output) == F){
+      output[[length(output)+1]] = custom_output
+    }
 
   }else{
-    features = colnames(train_data)[colnames(train_data) != "target"] #Extract features used for model training
 
     #Top model with best accuracy or AUC
     if(metric == "Accuracy"){
@@ -1015,7 +1020,12 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     cat("Returning model trained\n")
 
-    output = list("Features" = features, "Model" = model, "ML_Models" = ensembleResults)
+    output = list("Model" = model, "ML_Models" = ensembleResults)
+
+    if(is.null(custom_output) == F){
+      output[[length(output)+1]] = custom_output
+    }
+
   }
 
 
