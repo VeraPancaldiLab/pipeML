@@ -292,11 +292,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   cat("Training machine learning model...............................................................\n\n")
 
   ######### Machine Learning models
-  if(is.null(ncores) == TRUE){
-    ncores = parallel::detectCores() - 2
-  }
-  cl <- parallel::makeCluster(ncores)
-  doParallel::registerDoParallel(cl)
 
   ######### Stratify K fold cross-validation
   if(LODO == T){
@@ -308,6 +303,12 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
   if(is.null(fold_construction_fun) || is.null(k_fold_training_fun)){ #No custom function provided, using normal CV
 
+    if(is.null(ncores) == TRUE){
+      ncores = parallel::detectCores() - 2
+    }
+    cl <- parallel::makeCluster(ncores)
+    doParallel::registerDoParallel(cl)
+    
     trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = T, classProbs = TRUE, savePredictions=T)
 
     ##################################################### ML models
@@ -2384,6 +2385,12 @@ construct_stratified_cohort_folds = function(train_data, batch_id, target_id, k_
 
   multifolds <- unlist(folds_list, recursive = FALSE)
 
+  # Name folds like "Fold1.Rep1", "Fold2.Rep1", ..., "FoldK.RepN"
+  fold_names <- unlist(lapply(1:n_rep, function(rep) {
+    paste0("Fold", 1:k_folds, ".Rep", rep)
+  }))
+  names(multifolds) <- fold_names
+  
   return(multifolds)
 }
 
