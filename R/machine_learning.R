@@ -1001,6 +1001,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     if(is.null(custom_output) == F){
       output[[length(output)+1]] = custom_output
+      names(output)[length(output)] = "Custom_output"
     }
 
   }else{
@@ -1024,6 +1025,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     if(is.null(custom_output) == F){
       output[[length(output)+1]] = custom_output
+      names(output)[length(output)] = "Custom_output"
     }
 
   }
