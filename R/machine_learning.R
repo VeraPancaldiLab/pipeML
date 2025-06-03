@@ -384,48 +384,46 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     custom_output = x[[3]] #custom output from function to be returned after all complete training
 
     # Custom CV validation and hyperparameter tuning
-    fit.rf <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "rf",
-                                                  training_set_all = training_set_complete), k_fold_training_args))
+    fit.rf <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "rf",
+                                                training_set_all = training_set_complete))
 
-    fit.treebag <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "treebag",
-                                                       training_set_all = training_set_complete), k_fold_training_args))
+    fit.treebag <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "treebag",
+                                                       training_set_all = training_set_complete))
 
-    fit.c50 <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "C5.0",
-                                                   training_set_all = training_set_complete), k_fold_training_args))
+    fit.c50 <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "C5.0",
+                                                   training_set_all = training_set_complete))
 
-    fit.glm <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "glm",
-                                                   training_set_all = training_set_complete), k_fold_training_args))
+    fit.glm <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "glm",
+                                                   training_set_all = training_set_complete))
 
-    fit.lda <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "lda",
-                                                   training_set_all = training_set_complete), k_fold_training_args))
+    fit.lda <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "lda",
+                                                   training_set_all = training_set_complete))
 
-    fit.glmnet <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "glmnet",
-                                                      training_set_all = training_set_complete), k_fold_training_args))
+    fit.glmnet <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "glmnet",
+                                                      training_set_all = training_set_complete))
 
-    fit.knn <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "knn",
-                                                   training_set_all = training_set_complete), k_fold_training_args))
+    fit.knn <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "knn",
+                                                   training_set_all = training_set_complete))
 
-    fit.cart <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "rpart",
-                                                    training_set_all = training_set_complete), k_fold_training_args))
+    fit.cart <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "rpart",
+                                                    training_set_all = training_set_complete))
 
-    fit.lasso <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "glmnet",
+    fit.lasso <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "glmnet",
                                                      tuneGrid = expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 20)),
-                                                     training_set_all = training_set_complete),
-                                                k_fold_training_args))
+                                                     training_set_all = training_set_complete))
 
-    fit.ridge <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "glmnet",
+    fit.ridge <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "glmnet",
                                                      tuneGrid = expand.grid(alpha = 0, lambda = seq(0.001, 1, length = 20)),
-                                                     training_set_all = training_set_complete),
-                                                k_fold_training_args))
+                                                     training_set_all = training_set_complete))
 
-    fit.svm_radial <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "svmRadial",
-                                                          training_set_all = training_set_complete), k_fold_training_args))
+    fit.svm_radial <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "svmRadial",
+                                                          training_set_all = training_set_complete))
 
-    fit.svm_linear <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "svmLinear",
-                                                          training_set_all = training_set_complete), k_fold_training_args))
+    fit.svm_linear <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "svmLinear",
+                                                          training_set_all = training_set_complete))
 
-    fit.xgbTree <- do.call(compute_custom_k_fold_CV, c(list(processed_folds = fold_data, ml_method = "xgbTree",
-                                                       training_set_all = training_set_complete), k_fold_training_args))
+    fit.xgbTree <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "xgbTree",
+                                                       training_set_all = training_set_complete))
 
   }
   ####### Optimized based on metric (only AUC or Accuracy available)
