@@ -22,9 +22,7 @@ compute_features.training.ML(
   ncores = NULL,
   return = FALSE,
   fold_construction_fun = NULL,
-  k_fold_training_fun = NULL,
-  fold_construction_args = list(),
-  k_fold_training_args = list()
+  fold_construction_args = list()
 )
 }
 \arguments{
@@ -62,11 +60,7 @@ compute_features.training.ML(
 
 \item{fold_construction_fun}{Function. A custom function used to construct the cross-validation folds. It should return a list of training indices for each fold.}
 
-\item{k_fold_training_fun}{Function. A custom function used to train models within each fold.}
-
 \item{fold_construction_args}{List. Named list of additional arguments to pass to \code{fold_construction_fun}.}
-
-\item{k_fold_training_args}{List. Named list of additional arguments to pass to \code{k_fold_training_fun}.}
 }
 \value{
 A list containing:
