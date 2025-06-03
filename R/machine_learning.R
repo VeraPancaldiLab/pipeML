@@ -308,7 +308,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     }
     cl <- parallel::makeCluster(ncores)
     doParallel::registerDoParallel(cl)
-    
+
     trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = T, classProbs = TRUE, savePredictions=T)
 
     ##################################################### ML models
@@ -1034,6 +1034,143 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
   return(output)
 
+}
+
+#' Train and evaluate machine learning models on previously constructed k folds
+#'
+#' This function performs k-fold cross-validation using custom folds created from custom functions to be used for cohort-dependent algorithms (see vignette for more information about this).
+#' It supports hyperparameter tuning over a grid and returns a model object that mimicks the caret's training output, including performance metrics and predictions.
+#'
+#' @param processed_folds A list of folds. Each fold contains processed training and test data with features.
+#' @param ml_method A character string indicating the machine learning model to use, as supported by the `caret` package (e.g., `"rf"`, `"svmRadial"`, `"glmnet"`).
+#' @param tuneGrid Optional. A data frame specifying the grid of hyperparameters to evaluate. If `NULL`, a default grid of length 3 is generated using caret's `getModelInfo()`.
+#' @param training_set_all A data frame containing the full training set (i.e., all folds combined) with features and a `target` column.
+#'
+#' @return A list (caret-style object) with the following components:
+#' \itemize{
+#'   \item \code{fit.train}: The final model trained on the full training set using the best hyperparameters.
+#'   \item \code{results}: A data frame summarizing average cross-validated Accuracy, Kappa, and their standard deviations for each hyperparameter combination.
+#'   \item \code{pred}: A data frame of predictions from each fold, including class probabilities, observed and predicted labels, and hyperparameter values.
+#'   \item \code{resample}: A data frame summarizing Accuracy and Kappa per fold for the best-tuned model.
+#' }
+#'
+#' @details
+#' This function performs the following:
+#' \enumerate{
+#'   \item Trains models for each fold and hyperparameter combination.
+#'   \item Predicts on the held-out test data of each fold.
+#'   \item Aggregates prediction results and evaluates Accuracy and Kappa for each fold and hyperparameter set.
+#'   \item Selects the best-performing hyperparameter set based on mean Accuracy across folds.
+#'   \item Trains the final model on the full dataset using the selected hyperparameters.
+#' }
+#'
+#' @importFrom dplyr tibble bind_cols group_by summarise rename ungroup select desc slice_max arrange all_of across
+#' @importFrom tidyr unnest_wider
+#' @importFrom caret train trainControl getModelInfo
+#' @importFrom stats predict
+#' @export
+#'
+compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL, training_set_all) {
+
+  all_preds <- list()
+
+  ## Train once to get grid
+  if (!is.null(tuneGrid)) {
+    grid <- tuneGrid
+  } else {
+    grid_func <- caret::getModelInfo(ml_method)[[ml_method]]$grid
+    grid <- grid_func(
+      x = processed_folds[[1]]$train_data[, -which(names(processed_folds[[1]]$train_data) == "target")],
+      y = processed_folds[[1]]$train_data$target,
+      len = 3
+    )
+  }
+
+  for (grid_row in seq_len(nrow(grid))) {
+    hp <- grid[grid_row, , drop = FALSE]
+    hp_string <- paste(names(hp), hp, sep = "=", collapse = "; ")
+
+    for (i in seq_along(processed_folds)) {
+      fold <- processed_folds[[i]]
+      cat("Running fold", i, "with", hp_string, "\n")
+
+      ## Train model
+      model <- caret::train(
+        target ~ .,
+        data = fold$train_data,
+        method = ml_method,
+        trControl = caret::trainControl(method = "none", classProbs = TRUE),
+        tuneGrid = hp,
+        metric = "Accuracy"
+      )
+
+      ## Predict
+      fold$test_data = fold$test_data[,colnames(fold$test_data)%in%model$coefnames] #Use only those features selected by model
+      probs <- stats::predict(model, newdata = fold$test_data, type = "prob")
+      preds <- stats::predict(model, newdata = fold$test_data)
+
+      pred_df <- dplyr::tibble(
+        rowIndex = fold$rowIndex,
+        Resample = fold$fold_name,
+        obs = fold$obs_test,
+        pred = preds
+      ) %>%
+        dplyr::bind_cols(hp) %>%
+        dplyr::bind_cols(probs)
+
+      all_preds[[length(all_preds) + 1]] <- pred_df
+    }
+  }
+
+  ## Combine predictions
+  pred_df_all <- dplyr::bind_rows(all_preds)
+  rownames(pred_df_all) <- NULL
+  hp_cols <- names(grid)
+
+  ## Evaluate metrics
+  results_matrix <- pred_df_all %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols)), Resample) %>%
+    dplyr::summarise(metrics = list(calculate_accuracy_kappa_resample(obs, pred)), .groups = "drop") %>%
+    tidyr::unnest_wider(metrics) %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols))) %>%
+    dplyr::summarise(
+      Accuracy = mean(Accuracy_resample),
+      Kappa = mean(Kappa_resample),
+      AccuracySD = sd(Accuracy_resample),
+      KappaSD = sd(Kappa_resample)
+    )
+
+  ## Choose best
+  best_row <- results_matrix %>% dplyr::ungroup() %>% dplyr::arrange(dplyr::desc(Accuracy)) %>% dplyr::slice_max(Accuracy, n = 1, with_ties = FALSE) #Take the top one, if there are ties pick the first one
+  besttune <- best_row %>% dplyr::select(dplyr::all_of(hp_cols))
+
+  ## Resample summary
+  resample_df <- pred_df_all %>%
+    dplyr::inner_join(besttune, by = hp_cols) %>%
+    dplyr::group_by(Resample) %>%
+    dplyr::summarise(metrics = list(calculate_accuracy_kappa_resample(obs, pred)), .groups = "drop") %>%
+    tidyr::unnest_wider(metrics) %>%
+    dplyr::rename(Accuracy = Accuracy_resample, Kappa = Kappa_resample) %>%
+    dplyr::select(Accuracy, Kappa, Resample) %>%
+    dplyr::arrange(Resample)
+
+
+  # Train model with bestTune from CV
+  final_model <- caret::train(
+    target ~ .,
+    data = training_set_all,
+    method = ml_method,
+    trControl = caret::trainControl(method = "none", classProbs = TRUE),
+    tuneGrid = besttune
+  )
+
+  ## Return caret-like object
+  fit.train <- final_model
+  fit.train$results <- results_matrix
+  fit.train$pred <- pred_df_all
+  fit.train$resample <- resample_df
+
+  return(fit.train)
 }
 
 
@@ -2390,7 +2527,7 @@ construct_stratified_cohort_folds = function(train_data, batch_id, target_id, k_
     paste0("Fold", 1:k_folds, ".Rep", rep)
   }))
   names(multifolds) <- fold_names
-  
+
   return(multifolds)
 }
 
