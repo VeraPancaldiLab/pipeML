@@ -2837,10 +2837,12 @@ compute_variable.importance = function(model, stacking = FALSE, n_cores = 2){
     for (i in 1:length(base_models)) {
       importance[[i]] = compute_shap_values(ml_models[[base_models[i]]], train_data, ml_models[[base_models[i]]]$method, n_cores) ## Compute SHAP values
     }
-    if (any(sapply(importance, is.null))) {
+    non_null_importance = Filter(Negate(is.null), importance)
+
+    if (length(non_null_importance) == 0) {
       return(NULL)
-    }else{
-      importance_df <- Reduce(function(x, y) (x + y) / length(importance), importance) #Take the mean importance
+    } else {
+      importance_df <- Reduce(`+`, non_null_importance) / length(non_null_importance)
     }
   }else{
     train_data = model$Model$trainingData %>%
