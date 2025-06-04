@@ -965,7 +965,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   model_predictions = do.call(cbind, model_predictions) #Join as data frame
 
   #Clean memory
-  rm(fit.treebag, fit.rf, fit.c50, fit.glm, fit.lda, fit.knn, fit.cart, fit.glmnet, fit.lasso, fit.ridge, fit.svm_radial, fit.svm_linear, multifolds)
+  rm(fit.treebag, fit.rf, fit.c50, fit.glm, fit.lda, fit.knn, fit.cart, fit.glmnet, fit.lasso, fit.ridge, fit.svm_radial, fit.svm_linear)
   gc()
 
 
