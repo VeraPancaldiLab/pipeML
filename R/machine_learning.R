@@ -992,6 +992,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     meta_features = cbind(features_predictions, "true_label" = train_data$target)
 
+    trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = T, classProbs = TRUE, savePredictions=T)
     meta_learner <- caret::train(true_label ~ ., data = meta_features, method = "glmnet", trControl = trainControl) #Staking based on simple logistic regression
 
     output = list("Meta_learner" = meta_learner, "Base_models" = base_models$Base_models, "ML_models" = ensembleResults)
