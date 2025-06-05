@@ -299,13 +299,14 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     multifolds = caret::createMultiFolds(train_data[,'target'], k = k_folds, times = n_rep) #repeated folds
   }
 
-  if(is.null(fold_construction_fun)){ #No custom function provided, using normal CV
+  ### Implement parallelization
+  if(is.null(ncores) == TRUE){
+    ncores = parallel::detectCores() - 2
+  }
+  cl <- parallel::makeCluster(ncores)
+  doParallel::registerDoParallel(cl)
 
-    if(is.null(ncores) == TRUE){
-      ncores = parallel::detectCores() - 2
-    }
-    cl <- parallel::makeCluster(ncores)
-    doParallel::registerDoParallel(cl)
+  if(is.null(fold_construction_fun)){ #No custom function provided, using normal CV
 
     trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = T, classProbs = TRUE, savePredictions=T)
 
@@ -362,9 +363,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     #   min_child_weight = 1,
     #   subsample = 1
     # )
-
-    parallel::stopCluster(cl)  # stop the cluster after parallel execution
-    unregister_dopar() #Stop Dopar from running in the background
 
     #### Set allowParallel = F
     #Disable parallelization in xgbTree cause the xgboost algorithm has its own internal parallelization, controlled by the nthread parameter — it uses this to speed up tree construction within a single model.
@@ -426,6 +424,10 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
                                                        training_set_all = training_set_complete))
 
   }
+
+  parallel::stopCluster(cl)  # stop the cluster after parallel execution
+  unregister_dopar() #Stop Dopar from running in the background
+
   ####### Optimized based on metric (only AUC or Accuracy available)
   if(metric == "AUROC" || metric == "AUPRC"){
 
@@ -588,6 +590,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
   }else{ # Training data is calculated from custom functions
 
+    cl <- parallel::makeCluster(ncores)
+    doParallel::registerDoParallel(cl)
+
     ######## Bagged CART
 
     # Train model with bestTune from CV
@@ -596,7 +601,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "treebag",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
     )
 
@@ -620,7 +625,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "rf",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
     )
 
@@ -644,7 +649,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "C5.0",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
     )
 
@@ -668,7 +673,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "glm",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
     )
 
@@ -692,7 +697,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "lda",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
     )
 
@@ -717,7 +722,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "glmnet",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
     )
 
@@ -741,7 +746,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "knn",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
     )
 
@@ -765,7 +770,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "rpart",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
     )
 
@@ -789,7 +794,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "glmnet",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
     )
 
@@ -813,7 +818,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "glmnet",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
     )
 
@@ -837,7 +842,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "svmRadial",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
     )
 
@@ -861,7 +866,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "svmLinear",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
     )
 
@@ -885,7 +890,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       target ~ .,
       data = training_set_complete,
       method = "xgbTree",
-      trControl = trainControl(method = "none", classProbs = TRUE),
+      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = FALSE),
       tuneGrid = temp$bestTune
     )
 
@@ -900,6 +905,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(XGboost = yes) #Predictions of model (already ordered)
+
+    parallel::stopCluster(cl)  # stop the cluster after parallel execution
+    unregister_dopar() #Stop Dopar from running in the background
 
   }
   ############################################################## Save models
@@ -992,7 +1000,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     meta_features = cbind(features_predictions, "true_label" = train_data$target)
 
-    trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = T, classProbs = TRUE, savePredictions=T)
+    trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = F, classProbs = TRUE, savePredictions=T)
     meta_learner <- caret::train(true_label ~ ., data = meta_features, method = "glmnet", trControl = trainControl) #Staking based on simple logistic regression
 
     output = list("Meta_learner" = meta_learner, "Base_models" = base_models$Base_models, "ML_models" = ensembleResults)
@@ -1091,15 +1099,27 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
       fold <- processed_folds[[i]]
       cat("Running fold", i, "with", hp_string, "\n")
 
-      ## Train model
-      model <- caret::train(
-        target ~ .,
-        data = fold$train_data,
-        method = ml_method,
-        trControl = caret::trainControl(method = "none", classProbs = TRUE),
-        tuneGrid = hp,
-        metric = "Accuracy"
-      )
+      if(ml_method == "xgbTree"){
+        ## Train model
+        model <- caret::train(
+          target ~ .,
+          data = fold$train_data,
+          method = ml_method,
+          trControl = caret::trainControl(method = "none", classProbs = TRUE, allowParallel = FALSE),
+          tuneGrid = hp,
+          metric = "Accuracy"
+        )
+      }else{
+        ## Train model
+        model <- caret::train(
+          target ~ .,
+          data = fold$train_data,
+          method = ml_method,
+          trControl = caret::trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
+          tuneGrid = hp,
+          metric = "Accuracy"
+        )
+      }
 
       ## Predict
       fold$test_data = fold$test_data[,colnames(fold$test_data)%in%model$coefnames] #Use only those features selected by model
