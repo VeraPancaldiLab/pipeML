@@ -1097,7 +1097,6 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
 
     for (i in seq_along(processed_folds)) {
       fold <- processed_folds[[i]]
-      cat("Running fold", i, "with", hp_string, "\n")
 
       if(ml_method == "xgbTree"){
         ## Train model
