@@ -615,7 +615,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     predictions.bag = predict(fit.treebag, newdata = training_set_complete, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
-      dplyr::rename(RF = yes) #Predictions of model (already ordered)
+      dplyr::rename(BAG = yes) #Predictions of model (already ordered)
 
     ######## RF
 
