@@ -2187,6 +2187,7 @@ compute_prediction = function(model, test_data, target_var, trait.positive, stac
 
   if(stack == FALSE){
     model = model$Model
+    test_data = test_data[,colnames(test_data)%in%model[["coefnames"]]] #Only use features defined in the model
     features <- colnames(test_data)
     method = model$method
     are_equal = dplyr::setequal(model[["coefnames"]], features)
