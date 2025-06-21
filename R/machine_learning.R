@@ -1194,7 +1194,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
 #'
 #' This function trains one or more machine learning models using repeated k-fold cross-validation, with optional model stacking and feature selection using Boruta. It supports stratified cross-validation, including the construction of k-folds stratified by cohorts when this information is available.
 #'
-#' @param features_train A data frame containing the features used for training.
+#' @param features_train A data frame containing the features used for training (samples should be as rows).
 #' @param target_var A vector containing the target variable to predict.
 #' @param trait.positive Value in \code{target_var} to be considered as the positive class.
 #' @param metric Character. Metric used for hyperparameter tuning and model selection. Supported values are \code{"Accuracy"}, \code{"AUROC"}, and \code{"AUPRC"}.
@@ -1204,7 +1204,6 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
 #' @param feature.selection Logical. Whether to apply Boruta feature selection before model training. Default is \code{FALSE}.
 #' @param n_boruta Integer. Number of iterations to run Boruta. Since Boruta involves randomness, repeated runs improve consistency. Default is 100.
 #' @param boruta_fix Logical. Whether to fix Boruta’s internal parameters. See `compute_boruta()` for details.
-#' @param seed Integer. Random seed for reproducibility.
 #' @param LODO Logical. If \code{TRUE}, constructs folds stratified by cohorts (Leave-One-Dataset-Out CV).
 #' @param batch_id A vector indicating the cohort or batch for each sample (required only if \code{LODO = TRUE}).
 #' @param file_name Character. File name used to save plots in the \code{Results/} directory.
@@ -1221,11 +1220,9 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
 #'
 #' @export
 #'
-compute_features.training.ML = function(features_train, target_var, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5, feature.selection = FALSE, seed,
+compute_features.training.ML = function(features_train, target_var, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5, feature.selection = FALSE,
                                         LODO = FALSE, n_boruta = 100, boruta_fix = FALSE, batch_id = NULL, file_name = NULL, ncores = NULL, return = FALSE,
                                         fold_construction_fun = NULL, fold_construction_args = list()){
-
-  set.seed(seed)
 
   #Set training set
   train_data = features_train %>%
@@ -1264,7 +1261,7 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
 #'
 #' This function trains machine learning models using cross-validation on training data and evaluates them on test data. It supports feature selection with Boruta, model stacking, cohort-based (LODO) validation, and allows for optimizing predictions by maximizing a specified performance metric.
 #'
-#' @param features_train A data frame of features used for training the models.
+#' @param features_train A data frame of features used for training the models (samples should be as rows).
 #' @param features_test A data frame of features used for testing the models.
 #' @param clinical A data frame containing clinical information, including the target variable and optionally a batch ID. Row names must match the sample identifiers in \code{features_train} and \code{features_test}.
 #' @param trait Character. The name of the column in \code{clinical} corresponding to the target variable.
@@ -1274,7 +1271,6 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
 #' @param k_folds Integer. Number of folds for cross-validation.
 #' @param n_rep Integer. Number of cross-validation repetitions.
 #' @param feature.selection Logical. Whether to apply Boruta feature selection before training. Default is \code{FALSE}.
-#' @param seed Integer. Random seed for reproducibility.
 #' @param LODO Logical. If \code{TRUE}, folds are constructed in a Leave-One-Dataset-Out (LODO) manner based on cohorts.
 #' @param n_boruta Integer. Number of iterations to run Boruta. Since Boruta involves randomness, repeated runs improve consistency. Default is 100.
 #' @param boruta_fix Logical. Whether to fix Boruta’s internal parameters. See `compute_boruta()` for details.
@@ -1300,7 +1296,7 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
 #'
 #' @export
 #'
-compute_features.ML = function(features_train, features_test, clinical, trait, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5, feature.selection = FALSE, seed,
+compute_features.ML = function(features_train, features_test, clinical, trait, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5, feature.selection = FALSE,
                                LODO = FALSE, n_boruta = 100, boruta_fix = FALSE, batch_id = NULL, file_name = NULL, ncores = NULL, maximize = "Accuracy", return = FALSE,
                                fold_construction_fun = NULL, fold_construction_args = list()){
 
@@ -1326,7 +1322,6 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
       dplyr::mutate(dataset = traitData_train[,batch_id])
   }
 
-  set.seed(seed)
 
   #Cross-validation training (5 k-folds and 100 repetitions)
   training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack,

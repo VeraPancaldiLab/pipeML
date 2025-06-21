@@ -369,3 +369,95 @@ knitr::include_graphics("figures/ROC.png")
 ```{r fig4, fig.cap="Figure 4. PR curves.", fig.align='center', out.width='80%'}
 knitr::include_graphics("figures/PR.png")
 ```
+
+## **Custom k-fold cross validation**
+
+In certain use cases it is essential to carefully design how the training and test splits are created to prevent data leakage. `pipeML` supports the use of custom fold construction functions via the `fold_construction_fun` argument in the `compute_features.training.ML()` function. This allows you to preprocess your features within each fold, ensuring that information from the test set is never used during training.
+
+#### Why use custom folds?
+
+By default, cross-validation splits are performed directly on the feature matrix. However, if your features are generated through a process that uses correlations (e.g., clustering, dimensionality reduction, aggregation), gene set enrichment or other features that are sample-dependent, applying that process to the full dataset before splitting can leak test-set information into the training set, biasing the models.
+
+Using a custom fold construction function ensures that:
+- Test samples are projected onto the learned space without influencing it.
+- Fold-level processing mimics how the model would behave on truly unseen data.
+
+Below you can find an example of a custom fold function created to compute TF activity in samples using the viper algorithm. This approach is based on a TF-target set enrichment analysis similar to GSEA and thus, the scores will be sample-dependent. It needs normalized counts as input.
+
+```{r, eval = FALSE}
+prepare_TFs_folds <- function(data, folds) {
+  
+  processed_folds <- list()
+  
+  for (i in seq_along(folds)) {
+    
+    train_idx <- folds[[i]]
+    test_idx <- setdiff(seq_len(nrow(data)), train_idx)
+    
+    ## Subset data
+    train_data <- data[train_idx, , drop = FALSE]
+    obs_train <- train_data$target
+    train_data$target <- NULL
+    
+    ## Run TFs once
+    train_processed <- compute_TF_activity(RNA_tpm = t(train_data)) ##################################################### User can change this part
+    colnames(train_processed) <- gsub("[- +]", ".", colnames(train_processed)) ## Just to change special characters (ignore in other cases)
+    
+    train_cell_data <- train_processed %>%
+      dplyr::mutate(target = obs_train)
+    
+    ## Prepare test data using trained info
+    obs_test <- data$target[test_idx]
+    test_data <- data[test_idx, , drop = FALSE]
+    test_data$target <- NULL
+    test_data <- compute_TF_activity(RNA_tpm = t(test_data)) ##################################################### User can change this part
+    colnames(test_data) <- gsub("[- +]", ".", colnames(test_data)) ## Just to change special characters (ignore in other cases)
+    
+    processed_folds[[i]] <- list(
+      train_data = train_cell_data,
+      test_data = test_data,
+      obs_test = obs_test,
+      rowIndex = test_idx,
+      fold_name = names(folds)[i]
+    )
+  }
+  
+  # Run TFs on the full training set
+  obs_train = data$target
+  data$target = NULL
+  
+  train_processed_final <- compute_TF_activity(RNA_tpm = t(data)) ##################################################### User can change this part
+  colnames(train_processed_final) <- gsub("[- +]", ".", colnames(train_processed_final)) ## Just to change special characters (ignore in other cases)
+  
+  # Get features
+  train_cell_data_final <- train_processed_final %>%
+    dplyr::mutate(target = obs_train)
+  
+  custom_output = train_processed_final
+  
+  return(list(processed_folds, train_cell_data_final, custom_output))
+}
+```
+
+In order to create your own custom fold function, user can follow the same structure defined above and change the part highlighted in the code. Once the function is ready you can provide it into the main `compute_features.training.ML()` function via the `fold_construction_fun` argument.
+
+```{r, eval=FALSE}
+## counts_train: Normalized counts to compute the features from the training samples
+## traitData_train: Target variable from the training samples
+
+res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), traitData_train$Response, trait.positive = "R", 
+                                           metric = "AUROC", stack = F, k_folds = 5, n_rep = 10, feature.selection = F, 
+                                           seed = 123, LODO = F, ncores = 3, return = F, fold_construction_fun = prepare_TFs_folds)
+```
+
+In order to predict, user needs to calculate the same type of features on the test set
+```{r, eval = FALSE}
+## counts_test: Normalized counts to compute the features from the testing samples
+
+tf_activities_test <- compute_TF_activity(RNA_tpm = counts_test)
+
+# Predict in TFs
+pred = compute_prediction(res, tf_activities_test, traitData_test$Response, trait.positive = "R", 
+                          stack = FALSE, maximize = "Accuracy", return = F)
+```
+

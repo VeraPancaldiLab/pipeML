@@ -13,7 +13,6 @@ compute_features.training.ML(
   k_folds = 10,
   n_rep = 5,
   feature.selection = FALSE,
-  seed,
   LODO = FALSE,
   n_boruta = 100,
   boruta_fix = FALSE,
@@ -26,7 +25,7 @@ compute_features.training.ML(
 )
 }
 \arguments{
-\item{features_train}{A data frame containing the features used for training.}
+\item{features_train}{A data frame containing the features used for training (samples should be as rows).}
 
 \item{target_var}{A vector containing the target variable to predict.}
 
@@ -41,8 +40,6 @@ compute_features.training.ML(
 \item{n_rep}{Integer. Number of repetitions of the cross-validation.}
 
 \item{feature.selection}{Logical. Whether to apply Boruta feature selection before model training. Default is \code{FALSE}.}
-
-\item{seed}{Integer. Random seed for reproducibility.}
 
 \item{LODO}{Logical. If \code{TRUE}, constructs folds stratified by cohorts (Leave-One-Dataset-Out CV).}
 
