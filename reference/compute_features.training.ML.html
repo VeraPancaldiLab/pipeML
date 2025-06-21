@@ -47,7 +47,6 @@
 <span>  k_folds <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  n_rep <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  feature.selection <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  <span class="va">seed</span>,</span>
 <span>  LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  n_boruta <span class="op">=</span> <span class="fl">100</span>,</span>
 <span>  boruta_fix <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -65,7 +64,7 @@
 
 
 <dl><dt id="arg-features-train">features_train<a class="anchor" aria-label="anchor" href="#arg-features-train"></a></dt>
-<dd><p>A data frame containing the features used for training.</p></dd>
+<dd><p>A data frame containing the features used for training (samples should be as rows).</p></dd>
 
 
 <dt id="arg-target-var">target_var<a class="anchor" aria-label="anchor" href="#arg-target-var"></a></dt>
@@ -94,10 +93,6 @@
 
 <dt id="arg-feature-selection">feature.selection<a class="anchor" aria-label="anchor" href="#arg-feature-selection"></a></dt>
 <dd><p>Logical. Whether to apply Boruta feature selection before model training. Default is <code>FALSE</code>.</p></dd>
-
-
-<dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
-<dd><p>Integer. Random seed for reproducibility.</p></dd>
 
 
 <dt id="arg-lodo">LODO<a class="anchor" aria-label="anchor" href="#arg-lodo"></a></dt>

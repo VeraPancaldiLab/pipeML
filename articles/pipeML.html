@@ -161,7 +161,6 @@ cross-validation:</p>
 <span>                                    k_folds <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                    n_rep <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                    feature.selection <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>                                    seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>                                    LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>                                    batch_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
@@ -170,7 +169,7 @@ cross-validation:</p>
 <span><span class="co">#&gt; Training machine learning model...............................................................</span></span>
 <span><span class="co">#&gt; Warning: glm.fit: algorithm did not converge</span></span>
 <span><span class="co">#&gt; Warning in lda.default(x, grouping, ...): variables are collinear</span></span>
-<span><span class="co">#&gt; Best ML model found:  C50 </span></span>
+<span><span class="co">#&gt; Best ML model found:  RF </span></span>
 <span><span class="co">#&gt; Returning model trained</span></span></code></pre></div>
 <p>Access the best-trained model:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
@@ -195,7 +194,6 @@ Figure 1. Models training performance.
 <span>                                    k_folds <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                    n_rep <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                    feature.selection <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>                                    seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>                                    LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>                                    batch_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
@@ -203,10 +201,12 @@ Figure 1. Models training performance.
 <span>                                    return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Training machine learning model...............................................................</span></span>
 <span><span class="co">#&gt; Warning: glm.fit: algorithm did not converge</span></span>
+<span><span class="co">#&gt; Warning in nominalTrainWorkflow(x = x, y = y, wts = weights, info = trainInfo,</span></span>
+<span><span class="co">#&gt; : There were missing values in resampled performance measures.</span></span>
 <span><span class="co">#&gt; Warning in lda.default(x, grouping, ...): variables are collinear</span></span>
 <span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Models chosen are: C50, GLMNET, SVM_radial </span></span>
+<span><span class="co">#&gt; Models chosen are: GLMNET, RF, SVM_radial </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Meta-learners ML model based on GLM</span></span></code></pre></div>
 <p>Inspect the base models used in stacking:</p>
@@ -261,7 +261,6 @@ details).</p>
 <span>                                    feature.selection <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>                                    n_boruta <span class="op">=</span> <span class="fl">2</span>, </span>
 <span>                                    boruta_fix <span class="op">=</span> <span class="cn">TRUE</span>, </span>
-<span>                                    seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>                                    LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>                                    batch_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
@@ -276,7 +275,7 @@ details).</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Training machine learning model...............................................................</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
+<span><span class="co">#&gt; maximum number of iterations reached 0.0008488881 0.0008455173Choosing base models for stacking.......................................</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Models chosen are: GLMNET, SVM_radial, XGboost </span></span>
 <span><span class="co">#&gt; </span></span>
@@ -299,7 +298,6 @@ returns all features by default.</p>
 <span>                                    k_folds <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                                    n_rep <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                                    feature.selection <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>                                    seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>                                    LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>                                    batch_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
@@ -331,7 +329,6 @@ Precision.</p>
 <span>                           k_folds <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                           n_rep <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                           feature.selection <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>                           seed <span class="op">=</span> <span class="fl">123</span>,</span>
 <span>                           LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>                           batch_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>                           file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
@@ -418,7 +415,6 @@ datasets:</p>
 <span>                                             k_folds <span class="op">=</span> <span class="fl">2</span>, </span>
 <span>                                             n_rep <span class="op">=</span> <span class="fl">3</span>, </span>
 <span>                                             feature.selection <span class="op">=</span> <span class="cn">F</span>, </span>
-<span>                                             seed <span class="op">=</span> <span class="fl">123</span>, </span>
 <span>                                             LODO <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>                                             batch_id <span class="op">=</span> <span class="va">traitData_train</span><span class="op">$</span><span class="va">Cohort</span>, </span>
 <span>                                             ncores <span class="op">=</span> <span class="fl">3</span>, </span>
@@ -448,9 +444,12 @@ datasets:</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Models chosen are: C50, KNN, LDA </span></span>
+<span><span class="co">#&gt; Models chosen are: GLM, KNN, RF </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Meta-learners ML model based on GLM</span></span>
+<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
+<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
 <span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
 <span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
 <span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
@@ -460,21 +459,16 @@ datasets:</p>
 <span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
 <span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
 <span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): Trivial</span></span>
-<span><span class="co">#&gt; predictions were found in some resamples. SHAP values cannot be calculated</span></span>
-<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
-<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
 <span><span class="co">#&gt; Predicting target variable using provided ML model.................................................</span></span>
 <span><span class="co">#&gt; Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................</span></span>
-<span><span class="co">#&gt; Best threshold:  0.8514192 </span></span>
-<span><span class="co">#&gt; Accuracy:  60 </span></span>
-<span><span class="co">#&gt; Sensitivity:  64.706 </span></span>
-<span><span class="co">#&gt; Specificity:  53.846 </span></span>
-<span><span class="co">#&gt; F1 score:  64.706 </span></span>
-<span><span class="co">#&gt; MCC score:  18.552 </span></span>
-<span><span class="co">#&gt; Recall:  64.706 </span></span>
-<span><span class="co">#&gt; Precision:  64.706 </span></span>
+<span><span class="co">#&gt; Best threshold:  0.7421809 </span></span>
+<span><span class="co">#&gt; Accuracy:  70 </span></span>
+<span><span class="co">#&gt; Sensitivity:  52.941 </span></span>
+<span><span class="co">#&gt; Specificity:  92.308 </span></span>
+<span><span class="co">#&gt; F1 score:  66.667 </span></span>
+<span><span class="co">#&gt; MCC score:  47.565 </span></span>
+<span><span class="co">#&gt; Recall:  52.941 </span></span>
+<span><span class="co">#&gt; Precision:  90 </span></span>
 <span><span class="co">#&gt; Training machine learning model...............................................................</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
@@ -493,19 +487,19 @@ datasets:</p>
 <span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
 <span><span class="co">#&gt; Predicting target variable using provided ML model.................................................</span></span>
 <span><span class="co">#&gt; Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................</span></span>
-<span><span class="co">#&gt; Best threshold:  0.1471158 </span></span>
-<span><span class="co">#&gt; Accuracy:  63.333 </span></span>
-<span><span class="co">#&gt; Sensitivity:  84.211 </span></span>
-<span><span class="co">#&gt; Specificity:  27.273 </span></span>
-<span><span class="co">#&gt; F1 score:  74.419 </span></span>
-<span><span class="co">#&gt; MCC score:  13.834 </span></span>
-<span><span class="co">#&gt; Recall:  84.211 </span></span>
-<span><span class="co">#&gt; Precision:  66.667 </span></span>
+<span><span class="co">#&gt; Best threshold:  0.2342613 </span></span>
+<span><span class="co">#&gt; Accuracy:  66.667 </span></span>
+<span><span class="co">#&gt; Sensitivity:  78.947 </span></span>
+<span><span class="co">#&gt; Specificity:  45.455 </span></span>
+<span><span class="co">#&gt; F1 score:  75 </span></span>
+<span><span class="co">#&gt; MCC score:  25.661 </span></span>
+<span><span class="co">#&gt; Recall:  78.947 </span></span>
+<span><span class="co">#&gt; Precision:  71.429 </span></span>
 <span><span class="co">#&gt; Training machine learning model...............................................................</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Models chosen are: LDA, SVM_linear, XGboost </span></span>
+<span><span class="co">#&gt; Models chosen are: GLMNET, KNN, XGboost </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Meta-learners ML model based on GLM</span></span>
 <span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
@@ -514,19 +508,21 @@ datasets:</p>
 <span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
 <span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
 <span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): Trivial</span></span>
+<span><span class="co">#&gt; predictions were found in some resamples. SHAP values cannot be calculated</span></span>
 <span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
 <span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
 <span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
 <span><span class="co">#&gt; Predicting target variable using provided ML model.................................................</span></span>
 <span><span class="co">#&gt; Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................</span></span>
-<span><span class="co">#&gt; Best threshold:  0.08846727 </span></span>
-<span><span class="co">#&gt; Accuracy:  56.667 </span></span>
-<span><span class="co">#&gt; Sensitivity:  100 </span></span>
-<span><span class="co">#&gt; Specificity:  7.143 </span></span>
-<span><span class="co">#&gt; F1 score:  71.111 </span></span>
-<span><span class="co">#&gt; MCC score:  19.852 </span></span>
-<span><span class="co">#&gt; Recall:  100 </span></span>
-<span><span class="co">#&gt; Precision:  55.172</span></span></code></pre></div>
+<span><span class="co">#&gt; Best threshold:  0.4913142 </span></span>
+<span><span class="co">#&gt; Accuracy:  60 </span></span>
+<span><span class="co">#&gt; Sensitivity:  81.25 </span></span>
+<span><span class="co">#&gt; Specificity:  35.714 </span></span>
+<span><span class="co">#&gt; F1 score:  68.421 </span></span>
+<span><span class="co">#&gt; MCC score:  19.138 </span></span>
+<span><span class="co">#&gt; Recall:  81.25 </span></span>
+<span><span class="co">#&gt; Precision:  59.091</span></span></code></pre></div>
 <p>For plotting we will make use of our <code>get_curves</code> function
 adapted in a case for multiple cohorts.</p>
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
@@ -561,6 +557,113 @@ Figure 3. RO curves.
 <img src="figures/PR.png" alt="Figure 4. PR curves." width="80%"><p class="caption">
 Figure 4. PR curves.
 </p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="custom-k-fold-cross-validation">
+<strong>Custom k-fold cross validation</strong><a class="anchor" aria-label="anchor" href="#custom-k-fold-cross-validation"></a>
+</h2>
+<p>In certain use cases it is essential to carefully design how the
+training and test splits are created to prevent data leakage.
+<code>pipeML</code> supports the use of custom fold construction
+functions via the <code>fold_construction_fun</code> argument in the
+<code><a href="../reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> function. This allows you to
+preprocess your features within each fold, ensuring that information
+from the test set is never used during training.</p>
+<div class="section level4">
+<h4 id="why-use-custom-folds">Why use custom folds?<a class="anchor" aria-label="anchor" href="#why-use-custom-folds"></a>
+</h4>
+<p>By default, cross-validation splits are performed directly on the
+feature matrix. However, if your features are generated through a
+process that uses correlations (e.g., clustering, dimensionality
+reduction, aggregation), gene set enrichment or other features that are
+sample-dependent, applying that process to the full dataset before
+splitting can leak test-set information into the training set, biasing
+the models.</p>
+<p>Using a custom fold construction function ensures that: - Test
+samples are projected onto the learned space without influencing it. -
+Fold-level processing mimics how the model would behave on truly unseen
+data.</p>
+<p>Below you can find an example of a custom fold function created to
+compute TF activity in samples using the viper algorithm. This approach
+is based on a TF-target set enrichment analysis similar to GSEA and
+thus, the scores will be sample-dependent. It needs normalized counts as
+input.</p>
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">prepare_TFs_folds</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">data</span>, <span class="va">folds</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  </span>
+<span>  <span class="va">processed_folds</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  </span>
+<span>  <span class="kw">for</span> <span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_along</a></span><span class="op">(</span><span class="va">folds</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    </span>
+<span>    <span class="va">train_idx</span> <span class="op">&lt;-</span> <span class="va">folds</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span></span>
+<span>    <span class="va">test_idx</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span><span class="op">)</span>, <span class="va">train_idx</span><span class="op">)</span></span>
+<span>    </span>
+<span>    <span class="co">## Subset data</span></span>
+<span>    <span class="va">train_data</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span><span class="va">train_idx</span>, , drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span></span>
+<span>    <span class="va">obs_train</span> <span class="op">&lt;-</span> <span class="va">train_data</span><span class="op">$</span><span class="va">target</span></span>
+<span>    <span class="va">train_data</span><span class="op">$</span><span class="va">target</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
+<span>    </span>
+<span>    <span class="co">## Run TFs once</span></span>
+<span>    <span class="va">train_processed</span> <span class="op">&lt;-</span> <span class="fu">compute_TF_activity</span><span class="op">(</span>RNA_tpm <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">train_data</span><span class="op">)</span><span class="op">)</span> <span class="co">##################################################### User can change this part</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">train_processed</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span><span class="st">"[- +]"</span>, <span class="st">"."</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">train_processed</span><span class="op">)</span><span class="op">)</span> <span class="co">## Just to change special characters (ignore in other cases)</span></span>
+<span>    </span>
+<span>    <span class="va">train_cell_data</span> <span class="op">&lt;-</span> <span class="va">train_processed</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>      <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>target <span class="op">=</span> <span class="va">obs_train</span><span class="op">)</span></span>
+<span>    </span>
+<span>    <span class="co">## Prepare test data using trained info</span></span>
+<span>    <span class="va">obs_test</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">target</span><span class="op">[</span><span class="va">test_idx</span><span class="op">]</span></span>
+<span>    <span class="va">test_data</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span><span class="va">test_idx</span>, , drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span></span>
+<span>    <span class="va">test_data</span><span class="op">$</span><span class="va">target</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
+<span>    <span class="va">test_data</span> <span class="op">&lt;-</span> <span class="fu">compute_TF_activity</span><span class="op">(</span>RNA_tpm <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">test_data</span><span class="op">)</span><span class="op">)</span> <span class="co">##################################################### User can change this part</span></span>
+<span>    <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">test_data</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span><span class="st">"[- +]"</span>, <span class="st">"."</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">test_data</span><span class="op">)</span><span class="op">)</span> <span class="co">## Just to change special characters (ignore in other cases)</span></span>
+<span>    </span>
+<span>    <span class="va">processed_folds</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>      train_data <span class="op">=</span> <span class="va">train_cell_data</span>,</span>
+<span>      test_data <span class="op">=</span> <span class="va">test_data</span>,</span>
+<span>      obs_test <span class="op">=</span> <span class="va">obs_test</span>,</span>
+<span>      rowIndex <span class="op">=</span> <span class="va">test_idx</span>,</span>
+<span>      fold_name <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">folds</span><span class="op">)</span><span class="op">[</span><span class="va">i</span><span class="op">]</span></span>
+<span>    <span class="op">)</span></span>
+<span>  <span class="op">}</span></span>
+<span>  </span>
+<span>  <span class="co"># Run TFs on the full training set</span></span>
+<span>  <span class="va">obs_train</span> <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">target</span></span>
+<span>  <span class="va">data</span><span class="op">$</span><span class="va">target</span> <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  </span>
+<span>  <span class="va">train_processed_final</span> <span class="op">&lt;-</span> <span class="fu">compute_TF_activity</span><span class="op">(</span>RNA_tpm <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span><span class="op">)</span> <span class="co">##################################################### User can change this part</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">train_processed_final</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">gsub</a></span><span class="op">(</span><span class="st">"[- +]"</span>, <span class="st">"."</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">train_processed_final</span><span class="op">)</span><span class="op">)</span> <span class="co">## Just to change special characters (ignore in other cases)</span></span>
+<span>  </span>
+<span>  <span class="co"># Get features</span></span>
+<span>  <span class="va">train_cell_data_final</span> <span class="op">&lt;-</span> <span class="va">train_processed_final</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span></span>
+<span>    <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>target <span class="op">=</span> <span class="va">obs_train</span><span class="op">)</span></span>
+<span>  </span>
+<span>  <span class="va">custom_output</span> <span class="op">=</span> <span class="va">train_processed_final</span></span>
+<span>  </span>
+<span>  <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">processed_folds</span>, <span class="va">train_cell_data_final</span>, <span class="va">custom_output</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="op">}</span></span></code></pre></div>
+<p>In order to create your own custom fold function, user can follow the
+same structure defined above and change the part highlighted in the
+code. Once the function is ready you can provide it into the main
+<code><a href="../reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> function via the
+<code>fold_construction_fun</code> argument.</p>
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co">## counts_train: Normalized counts to compute the features from the training samples</span></span>
+<span><span class="co">## traitData_train: Target variable from the training samples</span></span>
+<span></span>
+<span><span class="va">res</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">counts_train</span><span class="op">)</span><span class="op">)</span>, <span class="va">traitData_train</span><span class="op">$</span><span class="va">Response</span>, trait.positive <span class="op">=</span> <span class="st">"R"</span>, </span>
+<span>                                           metric <span class="op">=</span> <span class="st">"AUROC"</span>, stack <span class="op">=</span> <span class="cn">F</span>, k_folds <span class="op">=</span> <span class="fl">5</span>, n_rep <span class="op">=</span> <span class="fl">10</span>, feature.selection <span class="op">=</span> <span class="cn">F</span>, </span>
+<span>                                           LODO <span class="op">=</span> <span class="cn">F</span>, ncores <span class="op">=</span> <span class="fl">3</span>, return <span class="op">=</span> <span class="cn">F</span>, fold_construction_fun <span class="op">=</span> <span class="va">prepare_TFs_folds</span><span class="op">)</span></span></code></pre></div>
+<p>In order to predict, user needs to calculate the same type of
+features on the test set</p>
+<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co">## counts_test: Normalized counts to compute the features from the testing samples</span></span>
+<span></span>
+<span><span class="va">tf_activities_test</span> <span class="op">&lt;-</span> <span class="fu">compute_TF_activity</span><span class="op">(</span>RNA_tpm <span class="op">=</span> <span class="va">counts_test</span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># Predict in TFs</span></span>
+<span><span class="va">pred</span> <span class="op">=</span> <span class="fu"><a href="../reference/compute_prediction.html">compute_prediction</a></span><span class="op">(</span><span class="va">res</span>, <span class="va">tf_activities_test</span>, <span class="va">traitData_test</span><span class="op">$</span><span class="va">Response</span>, trait.positive <span class="op">=</span> <span class="st">"R"</span>, </span>
+<span>                          stack <span class="op">=</span> <span class="cn">FALSE</span>, maximize <span class="op">=</span> <span class="st">"Accuracy"</span>, return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
