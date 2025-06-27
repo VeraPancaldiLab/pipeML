@@ -1125,6 +1125,10 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
       probs <- stats::predict(model, newdata = fold$test_data, type = "prob")
       preds <- stats::predict(model, newdata = fold$test_data)
 
+      # To be able to bind object
+      rownames(hp) = NULL
+      hp = hp %>% tibble::as_tibble()
+      
       pred_df <- dplyr::tibble(
         rowIndex = fold$rowIndex,
         Resample = fold$fold_name,
