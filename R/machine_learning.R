@@ -220,7 +220,7 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
         dplyr::mutate(target = data$target)
     }
   }
-  
+
   return(train_data)
 
 }
@@ -270,7 +270,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     stop("The metric assigned is not supported. Choose either accuracy or AUC.")
   }
 
-  ######### Feature selection 
+  ######### Feature selection
   if(boruta == T && is.null(fold_construction_fun)){ ### If fold_construction_fun exists, feature.selection will be run across folds (need to be updated to do this always)
     cat("Feature selection using Boruta...............................................................\n\n")
     # Feature selection using Boruta
@@ -382,21 +382,21 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     # Custom fold construction
     x <- do.call(fold_construction_fun, c(list(data = train_data, folds = multifolds), fold_construction_args))
-    
+
     fold_data = x[[1]] # extract processed folds
     training_set_complete = x[[2]] # extract complete training set
     custom_output = x[[3]] #custom output from function to be returned after all complete training
-    
+
     if(boruta == T){
-      
+
+      cat("Feature selection using Boruta across CV folds...............................................................\n\n")
+
       for(fold_i in seq_along(fold_data)){
-        
-        cat("Feature selection using Boruta across CV folds...............................................................\n\n")
-        
+
         model = fold_data[[fold_i]][["train_data"]]
-        
+
         ### Feature selection
-        
+
         train_data <- feature.selection.boruta(
           data = model,
           iterations = boruta_iterations,
@@ -408,18 +408,18 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
           tentative = tentative,
           return = return
         )
-        
+
         if(is.null(train_data)==F){
-          ## Assign result 
+          ## Assign result
           fold_data[[fold_i]][["train_data"]] = train_data
           features = setdiff(colnames(train_data), 'target')
           fold_data[[fold_i]][["test_data"]] = fold_data[[fold_i]][["test_data"]][,features]
         }else{
           warning("No features found as predictive in one fold during the CV. Leaving all features")
         }
-        
+
       }
-     
+
       ## Running feature selection in complete set
       x <- feature.selection.boruta(
         data = training_set_complete,
@@ -432,16 +432,16 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
         tentative = tentative,
         return = return
       )
-      
+
       if(is.null(x)==F){
         training_set_complete = x
       }else{
         warning("No features found as predictive during training. Leaving all features")
       }
     }
-    
+
     ###################
-    
+
     # Custom CV validation and hyperparameter tuning
     fit.rf <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "rf",
                                                 training_set_all = training_set_complete))
@@ -1150,10 +1150,10 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
       y = processed_folds[[1]]$train_data$target,
       len = 3
     )
-    
+
     # Filter and adjust numeric hyperparameters (avoid higher hyper than number of features)
     n_features <- ncol(processed_folds[[1]]$train_data[, -which(names(processed_folds[[1]]$train_data) == "target")])
-    
+
     # Replace only values greater than n_features
     for (param in names(grid)) {
       if (is.numeric(grid[[param]])) {
@@ -1162,11 +1162,11 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
           # Identify the pattern in the original values
           original_values <- unique(grid[[param]])
           pattern_length <- length(original_values)
-          
+
           # Build a replacement range within valid limits (50% - 90%)
           replacements <- unique(round(seq(n_features * 0.5, n_features * 0.9, length.out = length(invalid_idx))))
-          
-          # Replace values in hyperparam df 
+
+          # Replace values in hyperparam df
           for(k in seq_along(invalid_idx)){ # If there are more than one value to replace
               old_value <- grid[[param]][invalid_idx[k]]
               new_value <- replacements[k]
@@ -1214,7 +1214,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
       # To be able to bind object
       rownames(hp) = NULL
       hp = hp %>% tibble::as_tibble()
-      
+
       pred_df <- dplyr::tibble(
         rowIndex = fold$rowIndex,
         Resample = fold$fold_name,
@@ -1332,7 +1332,7 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
 
   #Cross-validation training (5 k-folds and 100 repetitions)
   training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack, boruta = feature.selection,
-                               boruta_iterations = n_boruta, fix_boruta = boruta_fix, tentative = tentative, boruta_threshold = boruta_threshold, 
+                               boruta_iterations = n_boruta, fix_boruta = boruta_fix, tentative = tentative, boruta_threshold = boruta_threshold,
                                file_name = file_name, LODO = LODO, ncores = ncores, return= return, fold_construction_fun = fold_construction_fun,
                                fold_construction_args = fold_construction_args)
 
@@ -1419,8 +1419,8 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
 
   #Cross-validation training (5 k-folds and 100 repetitions)
   training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack,
-                               boruta = feature.selection, boruta_iterations = n_boruta, fix_boruta = boruta_fix, 
-                               tentative = tentative, boruta_threshold = boruta_threshold,  
+                               boruta = feature.selection, boruta_iterations = n_boruta, fix_boruta = boruta_fix,
+                               tentative = tentative, boruta_threshold = boruta_threshold,
                                file_name = file_name, LODO = LODO, ncores = ncores, return= return,
                                fold_construction_fun = fold_construction_fun, fold_construction_args = fold_construction_args)
 
@@ -2981,7 +2981,7 @@ model_boruta_selection <- function(model,
                                    boruta_threshold = 0.8,
                                    tentative = FALSE) {
   cat("Feature selection using Boruta...............................................................\n\n")
-  
+
   # Run Boruta
   res_boruta <- feature.selection.boruta(
     model = model,
@@ -2993,7 +2993,7 @@ model_boruta_selection <- function(model,
     threshold = boruta_threshold,
     return = FALSE
   )
-  
+
   # Decide which features to keep
   if (!tentative) {
     if (length(res_boruta$Confirmed) <= 1) {
@@ -3016,6 +3016,6 @@ model_boruta_selection <- function(model,
         dplyr::mutate(target = model$target)
     }
   }
-  
+
   return(selected_model)
 }
