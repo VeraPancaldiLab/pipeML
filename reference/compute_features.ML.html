@@ -52,6 +52,8 @@
 <span>  LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  n_boruta <span class="op">=</span> <span class="fl">100</span>,</span>
 <span>  boruta_fix <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  tentative <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  boruta_threshold <span class="op">=</span> <span class="fl">0.8</span>,</span>
 <span>  batch_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  file_name <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  ncores <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -116,6 +118,14 @@
 
 <dt id="arg-boruta-fix">boruta_fix<a class="anchor" aria-label="anchor" href="#arg-boruta-fix"></a></dt>
 <dd><p>Logical. Whether to fix Boruta’s internal parameters. See <code><a href="compute_boruta.html">compute_boruta()</a></code> for details.</p></dd>
+
+
+<dt id="arg-tentative">tentative<a class="anchor" aria-label="anchor" href="#arg-tentative"></a></dt>
+<dd><p>Logical. Whether to include tentative features as confirmed in the training dataset (Only valid if boruta_fix = FALSE).</p></dd>
+
+
+<dt id="arg-boruta-threshold">boruta_threshold<a class="anchor" aria-label="anchor" href="#arg-boruta-threshold"></a></dt>
+<dd><p>Numeric. Threshold for confirming features after multiple Boruta iterations. For example, 0.8 means features must be confirmed in at least 80% of iterations. Default is 0.8.</p></dd>
 
 
 <dt id="arg-batch-id">batch_id<a class="anchor" aria-label="anchor" href="#arg-batch-id"></a></dt>
