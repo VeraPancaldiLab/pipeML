@@ -1089,6 +1089,21 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
       y = processed_folds[[1]]$train_data$target,
       len = 3
     )
+    
+    # Filter and adjust numeric hyperparameters (avoid higher hyper than number of features)
+    n_features <- ncol(processed_folds[[1]]$train_data[, -which(names(processed_folds[[1]]$train_data) == "target")])
+    
+    # Replace only values greater than n_features
+    for (param in names(grid)) {
+      if (is.numeric(grid[[param]])) {
+        invalid_idx <- which(grid[[param]] >= n_features)
+        if (length(invalid_idx) > 0) {
+          # Replace with evenly spaced values within range
+          replacements <- n_features - 10 # hard coded, a value close to the max 
+          grid[[param]][invalid_idx] <- replacements
+        }
+      }
+    }
   }
 
   for (grid_row in seq_len(nrow(grid))) {
@@ -1208,6 +1223,8 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
 #' @param feature.selection Logical. Whether to apply Boruta feature selection before model training. Default is \code{FALSE}.
 #' @param n_boruta Integer. Number of iterations to run Boruta. Since Boruta involves randomness, repeated runs improve consistency. Default is 100.
 #' @param boruta_fix Logical. Whether to fix Boruta’s internal parameters. See `compute_boruta()` for details.
+#' @param tentative Logical. Whether to include tentative features as confirmed in the training dataset (Only valid if boruta_fix = FALSE).
+#' @param boruta_threshold Numeric. Threshold for confirming features after multiple Boruta iterations. For example, 0.8 means features must be confirmed in at least 80% of iterations. Default is 0.8.
 #' @param LODO Logical. If \code{TRUE}, constructs folds stratified by cohorts (Leave-One-Dataset-Out CV).
 #' @param batch_id A vector indicating the cohort or batch for each sample (required only if \code{LODO = TRUE}).
 #' @param file_name Character. File name used to save plots in the \code{Results/} directory.
@@ -1225,7 +1242,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
 #' @export
 #'
 compute_features.training.ML = function(features_train, target_var, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5, feature.selection = FALSE,
-                                        LODO = FALSE, n_boruta = 100, boruta_fix = FALSE, batch_id = NULL, file_name = NULL, ncores = NULL, return = FALSE,
+                                        LODO = FALSE, n_boruta = 100, boruta_fix = FALSE, tentative = FALSE, boruta_threshold = 0.8, batch_id = NULL, file_name = NULL, ncores = NULL, return = FALSE,
                                         fold_construction_fun = NULL, fold_construction_args = list()){
 
   #Set training set
@@ -1244,8 +1261,8 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
 
   #Cross-validation training (5 k-folds and 100 repetitions)
   training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack, boruta = feature.selection,
-                               boruta_iterations = n_boruta, fix_boruta = boruta_fix, boruta_threshold = 0.8, file_name = file_name,
-                               LODO = LODO, ncores = ncores, return= return, fold_construction_fun = fold_construction_fun,
+                               boruta_iterations = n_boruta, fix_boruta = boruta_fix, tentative = tentative, boruta_threshold = boruta_threshold, 
+                               file_name = file_name, LODO = LODO, ncores = ncores, return= return, fold_construction_fun = fold_construction_fun,
                                fold_construction_args = fold_construction_args)
 
   ####################################################Predicting
@@ -1278,6 +1295,8 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
 #' @param LODO Logical. If \code{TRUE}, folds are constructed in a Leave-One-Dataset-Out (LODO) manner based on cohorts.
 #' @param n_boruta Integer. Number of iterations to run Boruta. Since Boruta involves randomness, repeated runs improve consistency. Default is 100.
 #' @param boruta_fix Logical. Whether to fix Boruta’s internal parameters. See `compute_boruta()` for details.
+#' @param tentative Logical. Whether to include tentative features as confirmed in the training dataset (Only valid if boruta_fix = FALSE).
+#' @param boruta_threshold Numeric. Threshold for confirming features after multiple Boruta iterations. For example, 0.8 means features must be confirmed in at least 80% of iterations. Default is 0.8.
 #' @param batch_id A vector indicating the cohort/batch for each sample (only required if \code{LODO = TRUE}).
 #' @param file_name Character. Base name used to save plots in the \code{Results/} directory.
 #' @param ncores Integer. Number of cores to use for parallelization. If not given, detectCores() - 1 will be used.
@@ -1301,7 +1320,7 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
 #' @export
 #'
 compute_features.ML = function(features_train, features_test, clinical, trait, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5, feature.selection = FALSE,
-                               LODO = FALSE, n_boruta = 100, boruta_fix = FALSE, batch_id = NULL, file_name = NULL, ncores = NULL, maximize = "Accuracy", return = FALSE,
+                               LODO = FALSE, n_boruta = 100, boruta_fix = FALSE, tentative = FALSE, boruta_threshold = 0.8, batch_id = NULL, file_name = NULL, ncores = NULL, maximize = "Accuracy", return = FALSE,
                                fold_construction_fun = NULL, fold_construction_args = list()){
 
   # Train cohort
@@ -1329,8 +1348,9 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
 
   #Cross-validation training (5 k-folds and 100 repetitions)
   training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack,
-                               boruta = feature.selection, boruta_iterations = n_boruta, fix_boruta = boruta_fix,
-                               boruta_threshold = 0.8, file_name = file_name, LODO = LODO, ncores = ncores, return= return,
+                               boruta = feature.selection, boruta_iterations = n_boruta, fix_boruta = boruta_fix, 
+                               tentative = tentative, boruta_threshold = boruta_threshold,  
+                               file_name = file_name, LODO = LODO, ncores = ncores, return= return,
                                fold_construction_fun = fold_construction_fun, fold_construction_args = fold_construction_args)
 
   ####################################################Predicting

@@ -16,6 +16,8 @@ compute_features.training.ML(
   LODO = FALSE,
   n_boruta = 100,
   boruta_fix = FALSE,
+  tentative = FALSE,
+  boruta_threshold = 0.8,
   batch_id = NULL,
   file_name = NULL,
   ncores = NULL,
@@ -46,6 +48,10 @@ compute_features.training.ML(
 \item{n_boruta}{Integer. Number of iterations to run Boruta. Since Boruta involves randomness, repeated runs improve consistency. Default is 100.}
 
 \item{boruta_fix}{Logical. Whether to fix Boruta’s internal parameters. See \code{compute_boruta()} for details.}
+
+\item{tentative}{Logical. Whether to include tentative features as confirmed in the training dataset (Only valid if boruta_fix = FALSE).}
+
+\item{boruta_threshold}{Numeric. Threshold for confirming features after multiple Boruta iterations. For example, 0.8 means features must be confirmed in at least 80\% of iterations. Default is 0.8.}
 
 \item{batch_id}{A vector indicating the cohort or batch for each sample (required only if \code{LODO = TRUE}).}
 
