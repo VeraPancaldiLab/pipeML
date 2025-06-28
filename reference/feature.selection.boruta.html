@@ -41,7 +41,8 @@
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">feature.selection.boruta</span><span class="op">(</span></span>
 <span>  <span class="va">data</span>,</span>
 <span>  iterations <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  <span class="va">fix</span>,</span>
+<span>  fix <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  tentative <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  doParallel <span class="op">=</span> <span class="cn">F</span>,</span>
 <span>  workers <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  file_name <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -64,6 +65,10 @@
 
 <dt id="arg-fix">fix<a class="anchor" aria-label="anchor" href="#arg-fix"></a></dt>
 <dd><p>Logical. If TRUE, applies TentativeRoughFix() to resolve tentative features after each iteration.</p></dd>
+
+
+<dt id="arg-tentative">tentative<a class="anchor" aria-label="anchor" href="#arg-tentative"></a></dt>
+<dd><p>Logical. Whether to include tentative features as confirmed in the training dataset.</p></dd>
 
 
 <dt id="arg-doparallel">doParallel<a class="anchor" aria-label="anchor" href="#arg-doparallel"></a></dt>

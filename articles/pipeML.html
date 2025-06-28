@@ -97,27 +97,20 @@ for visualization.</p>
 <span>  file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
 <span>  return <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt; Running 5 iterations of the Boruta algorithm</span></span></code></pre></div>
+<span><span class="co">#&gt; Running 5 iterations of the Boruta algorithm</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; Keeping only features confirmed in more than 0.8 of the times for training...............................................................</span></span>
+<span><span class="co">#&gt; If you want to consider also tentative features, please specify tentative = TRUE in the parameters.</span></span></code></pre></div>
 <p>Inspect the results:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">res_boruta</span><span class="op">$</span><span class="va">Matrix_Importance</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 6 × 7</span></span></span>
-<span><span class="co">#&gt;   Variable                     meanImp medianImp minImp maxImp normHits Decision</span></span>
-<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>                          <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>  <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;chr&gt;</span>   </span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> CBSX_BPRNACan3DProMet_B.cel…  0.324    0.404   -<span style="color: #BB0000;">1.32</span>    1.48    0     Rejected</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> CBSX_BPRNACan3DProMet_CD4.c…  0.037<span style="text-decoration: underline;">4</span>   0.006<span style="text-decoration: underline;">86</span> -<span style="color: #BB0000;">1.36</span>    1.42    0     Rejected</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> CBSX_BPRNACan3DProMet_CD8.c…  2.24     2.32    -<span style="color: #BB0000;">0.163</span>   4.06    0.333 Rejected</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">4</span> CBSX_BPRNACan3DProMet_Cancer  0.593    0.824   -<span style="color: #BB0000;">1.18</span>    1.96    0     Rejected</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">5</span> CBSX_BPRNACan3DProMet_Macro… -<span style="color: #BB0000;">0.012</span><span style="color: #BB0000; text-decoration: underline;">2</span>   0       -<span style="color: #BB0000;">1.30</span>    1.41    0     Rejected</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">6</span> CBSX_BPRNACan3DProMet_Macro…  0.426    0.681   -<span style="color: #BB0000;">1.34</span>    1.68    0     Rejected</span></span>
+<span><span class="co">#&gt; NULL</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Confirmed features:\n"</span>, <span class="va">res_boruta</span><span class="op">$</span><span class="va">Confirmed</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Confirmed features:</span></span>
-<span><span class="co">#&gt;  CBSX_LM22_Mast.activated.cells CBSX_TIL10_Dendritic.cells DeconRNASeq_BPRNACan3DProMet_Cancer DeconRNASeq_LM22_Mast.activated.cells DeconRNASeq_LM22_NK.activated DeconRNASeq_TIL10_T.cells.regulatory</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="st">"Tentative features:\n"</span>, <span class="va">res_boruta</span><span class="op">$</span><span class="va">Tentative</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Tentative features:</span></span>
-<span><span class="co">#&gt;  DeconRNASeq_TIL10_Macrophages.M2 Epidish_BPRNACanProMet_CD8.cells Quantiseq_Neutrophils</span></span></code></pre></div>
+<span><span class="co">#&gt; Tentative features:</span></span></code></pre></div>
 <p>To further assess tentative features, set <code>fix = TRUE</code> to
 rerun the selection and confirm or reject them:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
@@ -269,9 +262,8 @@ details).</p>
 <span><span class="co">#&gt; Feature selection using Boruta...............................................................</span></span>
 <span><span class="co">#&gt; Running 2 iterations of the Boruta algorithm</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Keeping only features confirmed in more than 80% of the times for training...............................................................</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; If you want to consider also tentative features, please specify tentative = TRUEin the parameters.</span></span>
+<span><span class="co">#&gt; Keeping only features confirmed in more than 0.8 of the times for training...............................................................</span></span>
+<span><span class="co">#&gt; If you want to consider also tentative features, please specify tentative = TRUE in the parameters.</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Training machine learning model...............................................................</span></span>
 <span><span class="co">#&gt; </span></span>
