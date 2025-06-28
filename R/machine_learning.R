@@ -119,6 +119,7 @@ merge_boruta_results = function(importance_values, decisions, file_name, iterati
 #' @param data A data frame with the column "target" (factor) as the response and other columns as features.
 #' @param iterations Integer. The number of Boruta iterations to perform.
 #' @param fix Logical. If TRUE, applies TentativeRoughFix() to resolve tentative features after each iteration.
+#' @param tentative Logical. Whether to include tentative features as confirmed in the training dataset.
 #' @param doParallel Logical. Whether to use parallel processing.
 #' @param workers Integer. Number of CPU cores to use for parallel execution. If NULL, uses all available cores minus one.
 #' @param file_name A string for naming output plots and CSV files saved in the "Results/" directory.
@@ -134,7 +135,7 @@ merge_boruta_results = function(importance_values, decisions, file_name, iterati
 #'
 #' @export
 #'
-feature.selection.boruta <- function(data, iterations = NULL, fix, doParallel = F, workers=NULL, file_name = NULL, threshold = NULL, return) {
+feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tentative = FALSE, doParallel = F, workers=NULL, file_name = NULL, threshold = NULL, return) {
   if(doParallel){
     if(is.null(iterations) == T){
       stop("No iterations specified for running in parallel, please set a number. If you want to run feature selection once consider setting doParallel = F")
@@ -198,7 +199,29 @@ feature.selection.boruta <- function(data, iterations = NULL, fix, doParallel = 
 
   }
 
-  return(res)
+  if(tentative == F){
+    if(length(res$Confirmed) <= 1){ #No enough features selected for training model
+      message("No enough features selected for training a model")
+      return(NULL)
+    }else{
+      message("\nKeeping only features confirmed in more than ", threshold," of the times for training...............................................................\n\n")
+      cat("If you want to consider also tentative features, please specify tentative = TRUE in the parameters.\n\n")
+      train_data = data[,colnames(data)%in%res$Confirmed, drop = F] %>%
+        dplyr::mutate(target = data$target)
+    }
+  }else{
+    sum_features = length(res$Confirmed) + length(res$Tentative)
+    if(sum_features <= 1){
+      message("No enough features selected for training a model")
+      return(NULL)
+    }else{
+      cat("Keeping features confirmed and tentative in more than 80% of the times for training...............................................................\n\n")
+      train_data = data[,colnames(data)%in%c(res$Confirmed, res$Tentative), drop = F] %>%
+        dplyr::mutate(target = data$target)
+    }
+  }
+  
+  return(train_data)
 
 }
 
@@ -247,39 +270,21 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     stop("The metric assigned is not supported. Choose either accuracy or AUC.")
   }
 
-  ######### Feature selection across folds
-  if(boruta == T){
+  ######### Feature selection 
+  if(boruta == T && is.null(fold_construction_fun)){ ### If fold_construction_fun exists, feature.selection will be run across folds (need to be updated to do this always)
     cat("Feature selection using Boruta...............................................................\n\n")
     # Feature selection using Boruta
-    res_boruta = feature.selection.boruta(model, iterations = boruta_iterations, fix = fix_boruta, file_name = file_name, doParallel = F, workers=NULL, threshold = boruta_threshold, return = return)
-
-    if(tentative == F){
-      if(length(res_boruta$Confirmed) <= 1){ #No enough features selected for training model
-        message("No enough features selected for training a model")
-        results = list()
-        return(results)
-      }else{
-        cat("\nKeeping only features confirmed in more than 80% of the times for training...............................................................\n\n")
-        cat("If you want to consider also tentative features, please specify tentative = TRUEin the parameters.\n\n")
-        train_data = model[,colnames(model)%in%res_boruta$Confirmed, drop = F] %>%
-          dplyr::mutate(target = model$target)
-      }
-    }else{
-      sum_features = length(res_boruta$Confirmed) + length(res_boruta$Tentative)
-      if(sum_features <= 1){
-        message("No enough features selected for training a model")
-        results = list()
-        return(results)
-      }else{
-        cat("Keeping features confirmed and tentative in more than 80% of the times for training...............................................................\n\n")
-        train_data = model[,colnames(model)%in%c(res_boruta$Confirmed, res_boruta$Tentative), drop = F] %>%
-          dplyr::mutate(target = model$target)
-      }
-    }
-
-    rm(res_boruta) #Clean memory
-    gc()
-
+    train_data <- feature.selection.boruta(
+      data = model,
+      iterations = boruta_iterations,
+      fix = fix_boruta,
+      doParallel = F,
+      workers = NULL,
+      file_name = file_name,
+      threshold = boruta_threshold,
+      tentative = tentative,
+      return = return
+    )
   }else{
     train_data = model
   }
@@ -377,10 +382,64 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     # Custom fold construction
     x <- do.call(fold_construction_fun, c(list(data = train_data, folds = multifolds), fold_construction_args))
+    
     fold_data = x[[1]] # extract processed folds
     training_set_complete = x[[2]] # extract complete training set
     custom_output = x[[3]] #custom output from function to be returned after all complete training
-
+    
+    if(boruta == T){
+      
+      for(fold_i in seq_along(fold_data)){
+        
+        cat("Feature selection using Boruta across CV folds...............................................................\n\n")
+        
+        model = fold_data[[fold_i]][["train_data"]]
+        
+        ### Feature selection
+        
+        train_data <- feature.selection.boruta(
+          data = model,
+          iterations = boruta_iterations,
+          fix = fix_boruta,
+          doParallel = F,
+          workers = NULL,
+          file_name = file_name,
+          threshold = boruta_threshold,
+          tentative = tentative,
+          return = return
+        )
+        
+        if(is.null(train_data)){
+          stop("No features found as predictive in one fold during the CV. Try being less strict in the parameters for feature selection or try feature.selection = F")
+        }
+        
+        ## Assign result 
+        fold_data[[fold_i]][["train_data"]] = train_data
+        features = setdiff(colnames(train_data), 'target')
+        fold_data[[fold_i]][["test_data"]] = fold_data[[fold_i]][["test_data"]][,features]
+        
+      }
+     
+      ## Running feature selection in complete set
+      training_set_complete <- feature.selection.boruta(
+        data = training_set_complete,
+        iterations = boruta_iterations,
+        fix = fix_boruta,
+        doParallel = F,
+        workers = NULL,
+        file_name = file_name,
+        threshold = boruta_threshold,
+        tentative = tentative,
+        return = return
+      )
+      
+      if(is.null(training_set_complete)){
+        stop("No features found as predictive during training after feature selection. Try being less strict in the parameters or try feature.selection = F")
+      }
+    }
+    
+    ###################
+    
     # Custom CV validation and hyperparameter tuning
     fit.rf <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "rf",
                                                 training_set_all = training_set_complete))
@@ -1096,11 +1155,21 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
     # Replace only values greater than n_features
     for (param in names(grid)) {
       if (is.numeric(grid[[param]])) {
-        invalid_idx <- which(grid[[param]] >= n_features)
+        invalid_idx <- which(unique(grid[[param]]) >= n_features)
         if (length(invalid_idx) > 0) {
-          # Replace with evenly spaced values within range
-          replacements <- n_features - 10 # hard coded, a value close to the max 
-          grid[[param]][invalid_idx] <- replacements
+          # Identify the pattern in the original values
+          original_values <- unique(grid[[param]])
+          pattern_length <- length(original_values)
+          
+          # Build a replacement range within valid limits (50% - 90%)
+          replacements <- unique(round(seq(n_features * 0.5, n_features * 0.9, length.out = length(invalid_idx))))
+          
+          # Replace values in hyperparam df 
+          for(k in seq_along(invalid_idx)){ # If there are more than one value to replace
+              old_value <- grid[[param]][invalid_idx[k]]
+              new_value <- replacements[k]
+              grid[[param]][grid[[param]] == old_value] <- new_value
+          }
         }
       }
     }
@@ -2901,4 +2970,50 @@ unregister_dopar <- function() {
     foreach::registerDoSEQ()
     gc()
   }
+}
+
+model_boruta_selection <- function(model,
+                                   boruta_iterations = 100,
+                                   fix_boruta = TRUE,
+                                   file_name = NULL,
+                                   boruta_threshold = 0.8,
+                                   tentative = FALSE) {
+  cat("Feature selection using Boruta...............................................................\n\n")
+  
+  # Run Boruta
+  res_boruta <- feature.selection.boruta(
+    model = model,
+    iterations = boruta_iterations,
+    fix = fix_boruta,
+    file_name = file_name,
+    doParallel = FALSE,
+    workers = NULL,
+    threshold = boruta_threshold,
+    return = FALSE
+  )
+  
+  # Decide which features to keep
+  if (!tentative) {
+    if (length(res_boruta$Confirmed) <= 1) {
+      message("Not enough features selected for training a model")
+      return(NULL)
+    } else {
+      cat("\nKeeping only features confirmed in more than 80% of the times for training...............................................................\n\n")
+      cat("If you want to consider also tentative features, please specify tentative = TRUE in the parameters.\n\n")
+      selected_model <- model[, colnames(model) %in% res_boruta$Confirmed, drop = FALSE] %>%
+        dplyr::mutate(target = model$target)
+    }
+  } else {
+    total_features <- length(res_boruta$Confirmed) + length(res_boruta$Tentative)
+    if (total_features <= 1) {
+      message("Not enough features selected for training a model")
+      return(NULL)
+    } else {
+      cat("Keeping features confirmed and tentative in more than 80% of the times for training...............................................................\n\n")
+      selected_model <- model[, colnames(model) %in% c(res_boruta$Confirmed, res_boruta$Tentative), drop = FALSE] %>%
+        dplyr::mutate(target = model$target)
+    }
+  }
+  
+  return(selected_model)
 }

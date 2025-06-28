@@ -7,7 +7,8 @@
 feature.selection.boruta(
   data,
   iterations = NULL,
-  fix,
+  fix = FALSE,
+  tentative = FALSE,
   doParallel = F,
   workers = NULL,
   file_name = NULL,
@@ -21,6 +22,8 @@ feature.selection.boruta(
 \item{iterations}{Integer. The number of Boruta iterations to perform.}
 
 \item{fix}{Logical. If TRUE, applies TentativeRoughFix() to resolve tentative features after each iteration.}
+
+\item{tentative}{Logical. Whether to include tentative features as confirmed in the training dataset.}
 
 \item{doParallel}{Logical. Whether to use parallel processing.}
 
