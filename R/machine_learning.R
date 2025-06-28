@@ -409,19 +409,19 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
           return = return
         )
         
-        if(is.null(train_data)){
-          stop("No features found as predictive in one fold during the CV. Try being less strict in the parameters for feature selection or try feature.selection = F")
+        if(is.null(train_data)==F){
+          ## Assign result 
+          fold_data[[fold_i]][["train_data"]] = train_data
+          features = setdiff(colnames(train_data), 'target')
+          fold_data[[fold_i]][["test_data"]] = fold_data[[fold_i]][["test_data"]][,features]
+        }else{
+          warning("No features found as predictive in one fold during the CV. Leaving all features")
         }
-        
-        ## Assign result 
-        fold_data[[fold_i]][["train_data"]] = train_data
-        features = setdiff(colnames(train_data), 'target')
-        fold_data[[fold_i]][["test_data"]] = fold_data[[fold_i]][["test_data"]][,features]
         
       }
      
       ## Running feature selection in complete set
-      training_set_complete <- feature.selection.boruta(
+      x <- feature.selection.boruta(
         data = training_set_complete,
         iterations = boruta_iterations,
         fix = fix_boruta,
@@ -433,8 +433,10 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
         return = return
       )
       
-      if(is.null(training_set_complete)){
-        stop("No features found as predictive during training after feature selection. Try being less strict in the parameters or try feature.selection = F")
+      if(is.null(x)==F){
+        training_set_complete = x
+      }else{
+        warning("No features found as predictive during training. Leaving all features")
       }
     }
     
