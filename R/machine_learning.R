@@ -1163,8 +1163,8 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
           original_values <- unique(grid[[param]])
           pattern_length <- length(original_values)
 
-          # Build a replacement range within valid limits (50% - 90%)
-          replacements <- unique(round(seq(n_features * 0.5, n_features * 0.9, length.out = length(invalid_idx))))
+          # Build a replacement range within valid limits (20% - 90%)
+          replacements <- unique(round(seq(n_features * 0.2, n_features * 0.9, length.out = length(invalid_idx))))
 
           # Replace values in hyperparam df
           for(k in seq_along(invalid_idx)){ # If there are more than one value to replace
