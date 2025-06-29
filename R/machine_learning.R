@@ -1164,26 +1164,28 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
       len = 3
     )
 
-    # Filter and adjust numeric hyperparameters (avoid higher hyper than number of features)
-    n_features <- ncol(processed_folds[[1]]$train_data[, -which(names(processed_folds[[1]]$train_data) == "target")])
+    if(ml_method == "rf"){ ## only this method needs to be within the range of number of features
+      # Filter and adjust numeric hyperparameters (avoid higher hyper than number of features)
+      n_features <- ncol(processed_folds[[1]]$train_data[, -which(names(processed_folds[[1]]$train_data) == "target")])
 
-    # Replace only values greater than n_features
-    for (param in names(grid)) {
-      if (is.numeric(grid[[param]])) {
-        invalid_idx <- which(unique(grid[[param]]) >= n_features)
-        if (length(invalid_idx) > 0) {
-          # Identify the pattern in the original values
-          original_values <- unique(grid[[param]])
-          pattern_length <- length(original_values)
+      # Replace only values greater than n_features
+      for (param in names(grid)) {
+        if (is.numeric(grid[[param]])) {
+          invalid_idx <- which(unique(grid[[param]]) >= n_features)
+          if (length(invalid_idx) > 0) {
+            # Identify the pattern in the original values
+            original_values <- unique(grid[[param]])
+            pattern_length <- length(original_values)
 
-          # Build a replacement range within valid limits (20% - 90%)
-          replacements <- unique(round(seq(n_features * 0.2, n_features * 0.9, length.out = length(invalid_idx))))
+            # Build a replacement range within valid limits (20% - 90%)
+            replacements <- unique(round(seq(n_features * 0.2, n_features * 0.9, length.out = length(invalid_idx))))
 
-          # Replace values in hyperparam df
-          for(k in seq_along(invalid_idx)){ # If there are more than one value to replace
+            # Replace values in hyperparam df
+            for(k in seq_along(invalid_idx)){ # If there are more than one value to replace
               old_value <- grid[[param]][invalid_idx[k]]
               new_value <- replacements[k]
               grid[[param]][grid[[param]] == old_value] <- new_value
+            }
           }
         }
       }
