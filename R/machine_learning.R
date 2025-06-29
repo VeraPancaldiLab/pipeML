@@ -125,6 +125,7 @@ merge_boruta_results = function(importance_values, decisions, file_name, iterati
 #' @param file_name A string for naming output plots and CSV files saved in the "Results/" directory.
 #' @param threshold A numeric value between 0 and 1. A feature must be confirmed in more than \code{threshold * iterations} to be finally labeled as confirmed.
 #' @param return Logical. Whether to save the resulting plots in the "Results/" directory.
+#' @param verbose Boolen value to whether print or no the function messages
 #'
 #' @return A list containing:
 #' \itemize{
@@ -135,7 +136,7 @@ merge_boruta_results = function(importance_values, decisions, file_name, iterati
 #'
 #' @export
 #'
-feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tentative = FALSE, doParallel = F, workers=NULL, file_name = NULL, threshold = NULL, return) {
+feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tentative = FALSE, doParallel = F, workers=NULL, file_name = NULL, threshold = NULL, return, verbose = T) {
   if(doParallel){
     if(is.null(iterations) == T){
       stop("No iterations specified for running in parallel, please set a number. If you want to run feature selection once consider setting doParallel = F")
@@ -149,7 +150,9 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
       cl = parallel::makeCluster(num_cores) #Forking just copy the R session in its current state. - makeCluster() all must be exported (copied) to the clusters, which can add some overhead
       doParallel::registerDoParallel(cl)
 
-      message("Running ", iterations, " iterations of the Boruta algorithm using ", num_cores, " cores")
+      if(verbose){
+        message("Running ", iterations, " iterations of the Boruta algorithm using ", num_cores, " cores")
+      }
 
       res <- foreach::foreach(seed = sample.int(100000, iterations)) %dopar% {
 
@@ -182,7 +185,9 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
     if(is.null(iterations) == T){
       stop("No iterations specified for running Boruta algorithm for feature selection")
     }else{
-      message("Running ", iterations, " iterations of the Boruta algorithm")
+      if(verbose){
+        message("Running ", iterations, " iterations of the Boruta algorithm")
+      }
       res = list()
       for (i in 1:iterations) {
         res[[i]] = compute_boruta(data, seed = sample.int(100000, 1), fix)
@@ -201,21 +206,29 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
 
   if(tentative == F){
     if(length(res$Confirmed) <= 1){ #No enough features selected for training model
-      message("No enough features selected for training a model")
+      if(verbose){
+        message("No enough features selected for training a model")
+      }
       return(NULL)
     }else{
-      message("\nKeeping only features confirmed in more than ", threshold," of the times for training...............................................................\n\n")
-      cat("If you want to consider also tentative features, please specify tentative = TRUE in the parameters.\n\n")
+      if(verbose){
+        message("\nKeeping only features confirmed in more than ", threshold," of the times for training...............................................................\n\n")
+        cat("If you want to consider also tentative features, please specify tentative = TRUE in the parameters.\n\n")
+      }
       train_data = data[,colnames(data)%in%res$Confirmed, drop = F] %>%
         dplyr::mutate(target = data$target)
     }
   }else{
     sum_features = length(res$Confirmed) + length(res$Tentative)
     if(sum_features <= 1){
-      message("No enough features selected for training a model")
+      if(verbose){
+        message("No enough features selected for training a model")
+      }
       return(NULL)
     }else{
-      cat("Keeping features confirmed and tentative in more than 80% of the times for training...............................................................\n\n")
+      if(verbose){
+        cat("Keeping features confirmed and tentative in more than 80% of the times for training...............................................................\n\n")
+      }
       train_data = data[,colnames(data)%in%c(res$Confirmed, res$Tentative), drop = F] %>%
         dplyr::mutate(target = data$target)
     }
@@ -389,9 +402,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     if(boruta == T){
 
-      cat("Feature selection using Boruta across CV folds...............................................................\n\n")
-
       for(fold_i in seq_along(fold_data)){
+
+        cat("Feature selection using Boruta across CV folds...............................................................\n\n")
 
         model = fold_data[[fold_i]][["train_data"]]
 
@@ -406,7 +419,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
           file_name = file_name,
           threshold = boruta_threshold,
           tentative = tentative,
-          return = return
+          return = return,
+          verbose = F
         )
 
         if(is.null(train_data)==F){
