@@ -418,7 +418,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
           file_name = file_name,
           threshold = boruta_threshold,
           tentative = tentative,
-          return = return,
+          return = F,
           verbose = F
         )
 
