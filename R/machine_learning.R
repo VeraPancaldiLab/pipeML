@@ -401,10 +401,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     custom_output = x[[3]] #custom output from function to be returned after all complete training
 
     if(boruta == T){
+      cat("Feature selection using Boruta across CV folds...............................................................\n\n")
 
       for(fold_i in seq_along(fold_data)){
-
-        cat("Feature selection using Boruta across CV folds...............................................................\n\n")
 
         model = fold_data[[fold_i]][["train_data"]]
 
