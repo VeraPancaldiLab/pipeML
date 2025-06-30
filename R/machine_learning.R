@@ -407,45 +407,59 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
         model = fold_data[[fold_i]][["train_data"]]
 
-        ### Feature selection
-
-        train_data <- feature.selection.boruta(
-          data = model,
-          iterations = boruta_iterations,
-          fix = fix_boruta,
-          doParallel = F,
-          workers = NULL,
-          file_name = file_name,
-          threshold = boruta_threshold,
-          tentative = tentative,
-          return = F,
-          verbose = F
-        )
-
-        if(is.null(train_data)==F){
-          ## Assign result
-          fold_data[[fold_i]][["train_data"]] = train_data
-          features = setdiff(colnames(train_data), 'target')
-          fold_data[[fold_i]][["test_data"]] = fold_data[[fold_i]][["test_data"]][,features]
-        }else{
-          warning("No features found as predictive in one fold during the CV. Leaving all features")
-        }
-
+        target = model$target
+        
+        train_data = preprocess_features(model, var_thresh = 0.0, cor_thresh = 0.9) %>%
+          dplyr::mutate(target = target)
+        
+        fold_data[[fold_i]][["train_data"]] = train_data
+        features = setdiff(colnames(train_data), 'target')
+        fold_data[[fold_i]][["test_data"]] = fold_data[[fold_i]][["test_data"]][,features]
+        
+      #   ### Feature selection
+      # 
+      #   train_data <- feature.selection.boruta(
+      #     data = model,
+      #     iterations = boruta_iterations,
+      #     fix = fix_boruta,
+      #     doParallel = F,
+      #     workers = NULL,
+      #     file_name = file_name,
+      #     threshold = boruta_threshold,
+      #     tentative = tentative,
+      #     return = F,
+      #     verbose = F
+      #   )
+      # 
+      #   if(is.null(train_data)==F){
+      #     ## Assign result
+      #     fold_data[[fold_i]][["train_data"]] = train_data
+      #     features = setdiff(colnames(train_data), 'target')
+      #     fold_data[[fold_i]][["test_data"]] = fold_data[[fold_i]][["test_data"]][,features]
+      #   }else{
+      #     warning("No features found as predictive in one fold during the CV. Leaving all features")
+      #   }
+      # 
       }
-
+      # 
       ## Running feature selection in complete set
-      x <- feature.selection.boruta(
-        data = training_set_complete,
-        iterations = boruta_iterations,
-        fix = fix_boruta,
-        doParallel = F,
-        workers = NULL,
-        file_name = file_name,
-        threshold = boruta_threshold,
-        tentative = tentative,
-        return = return
-      )
+      # x <- feature.selection.boruta(
+      #   data = training_set_complete,
+      #   iterations = boruta_iterations,
+      #   fix = fix_boruta,
+      #   doParallel = F,
+      #   workers = NULL,
+      #   file_name = file_name,
+      #   threshold = boruta_threshold,
+      #   tentative = tentative,
+      #   return = return
+      # )
 
+      target = training_set_complete$target
+    
+      x = preprocess_features(training_set_complete, var_thresh = 0.0, cor_thresh = 0.9) %>%
+        dplyr::mutate(target = target)
+      
       if(is.null(x)==F){
         training_set_complete = x
       }else{
@@ -3033,4 +3047,24 @@ model_boruta_selection <- function(model,
   }
 
   return(selected_model)
+}
+
+preprocess_features <- function(data, var_thresh = 0.0, cor_thresh = 0.9) {
+  data = data %>%
+    dplyr::select(-target)
+  # Remove near-zero variance features
+  nzv <- nearZeroVar(data, saveMetrics = TRUE)
+  if(length(nzv)>0){
+    data <- data[, !nzv$nzv]
+  }
+  
+  # Remove highly correlated features
+  cor_matrix <- cor(data, use = "pairwise.complete.obs")
+  high_cor <- findCorrelation(cor_matrix, cutoff = cor_thresh)
+  
+  if(length(high_cor)>0){
+    data <- data[, -high_cor]
+  }
+  
+  return(data)
 }
