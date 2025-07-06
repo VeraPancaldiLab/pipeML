@@ -277,7 +277,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     stop("The metric assigned is not supported. Choose either accuracy or AUC.")
   }
 
-  train_data = preprocess_features(model, cor_thresh = 0.9)
+  if(is.null(fold_construction_fun)){
+    train_data = preprocess_features(model, cor_thresh = 0.9)
+  }
 
   #train_data = model
 
