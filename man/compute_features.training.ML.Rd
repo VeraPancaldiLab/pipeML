@@ -12,12 +12,6 @@ compute_features.training.ML(
   stack,
   k_folds = 10,
   n_rep = 5,
-  feature.selection = FALSE,
-  LODO = FALSE,
-  n_boruta = 100,
-  boruta_fix = FALSE,
-  tentative = FALSE,
-  boruta_threshold = 0.8,
   batch_id = NULL,
   file_name = NULL,
   ncores = NULL,
@@ -41,18 +35,6 @@ compute_features.training.ML(
 
 \item{n_rep}{Integer. Number of repetitions of the cross-validation.}
 
-\item{feature.selection}{Logical. Whether to apply Boruta feature selection before model training. Default is \code{FALSE}.}
-
-\item{LODO}{Logical. If \code{TRUE}, constructs folds stratified by cohorts (Leave-One-Dataset-Out CV).}
-
-\item{n_boruta}{Integer. Number of iterations to run Boruta. Since Boruta involves randomness, repeated runs improve consistency. Default is 100.}
-
-\item{boruta_fix}{Logical. Whether to fix Boruta’s internal parameters. See \code{compute_boruta()} for details.}
-
-\item{tentative}{Logical. Whether to include tentative features as confirmed in the training dataset (Only valid if boruta_fix = FALSE).}
-
-\item{boruta_threshold}{Numeric. Threshold for confirming features after multiple Boruta iterations. For example, 0.8 means features must be confirmed in at least 80\% of iterations. Default is 0.8.}
-
 \item{batch_id}{A vector indicating the cohort or batch for each sample (required only if \code{LODO = TRUE}).}
 
 \item{file_name}{Character. File name used to save plots in the \code{Results/} directory.}
@@ -64,6 +46,8 @@ compute_features.training.ML(
 \item{fold_construction_fun}{Function. A custom function used to construct the cross-validation folds. It should return a list of training indices for each fold.}
 
 \item{fold_construction_args}{List. Named list of additional arguments to pass to \code{fold_construction_fun}.}
+
+\item{LODO}{Logical. If \code{TRUE}, constructs folds stratified by cohorts (Leave-One-Dataset-Out CV).}
 }
 \value{
 A list containing:

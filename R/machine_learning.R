@@ -247,11 +247,6 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
 #' @param n_rep Integer. Number of repetitions of the k-fold cross-validation. Default is 100.
 #' @param stacking Logical. Whether to perform model stacking. Default is FALSE.
 #' @param metric Character. Metric used for hyperparameter tuning and model evaluation. Supported values are "Accuracy", "AUROC", and "AUPRC".
-#' @param boruta Logical. Whether to apply Boruta for feature selection before model training. Note that many ML models handle feature importance internally, so prior selection is optional unless multicollinearity is a concern. Default is FALSE.
-#' @param boruta_iterations Integer. Number of iterations to run Boruta. Since Boruta involves randomness, repeated runs improve consistency. Default is 100.
-#' @param fix_boruta Logical. Whether to fix Boruta’s internal parameters. See `compute_boruta()` for details.
-#' @param tentative Logical. Whether to include tentative features as confirmed in the training dataset.
-#' @param boruta_threshold Numeric. Threshold for confirming features after multiple Boruta iterations. For example, 0.8 means features must be confirmed in at least 80% of iterations. Default is 0.8.
 #' @param file_name Character. File name used for saving output plots in the `Results/` directory.
 #' @param LODO Logical. If TRUE, performs Leave-One-Dataset-Out (LODO) cross-validation by stratifying folds based on cohort membership.
 #' @param ncores Integer. Number of cores to use for parallelization. If not given, detectCores() - 1 will be used.
@@ -274,38 +269,18 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
 #' }
 #'
 #'
-compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "Accuracy", boruta, boruta_iterations = NULL, fix_boruta = NULL,
-                             tentative = FALSE, boruta_threshold = NULL, file_name = NULL, LODO = FALSE, ncores = NULL, return = FALSE,
-                             fold_construction_fun = NULL, fold_construction_args = list()){
+compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "Accuracy", file_name = NULL, LODO = FALSE,
+                             ncores = NULL, return = FALSE, fold_construction_fun = NULL, fold_construction_args = list()){
 
   custom_output = NULL
   if(!(metric %in% c("AUROC", "AUPRC","Accuracy"))){
     stop("The metric assigned is not supported. Choose either accuracy or AUC.")
   }
 
-  # ######### Feature selection
-  # if(boruta == T && is.null(fold_construction_fun)){ ### If fold_construction_fun exists, feature.selection will be run across folds (need to be updated to do this always)
-  #   cat("Feature selection using Boruta...............................................................\n\n")
-  #   # Feature selection using Boruta
-  #   train_data <- feature.selection.boruta(
-  #     data = model,
-  #     iterations = boruta_iterations,
-  #     fix = fix_boruta,
-  #     doParallel = F,
-  #     workers = NULL,
-  #     file_name = file_name,
-  #     threshold = boruta_threshold,
-  #     tentative = tentative,
-  #     return = return
-  #   )
-  # }else{
-  #   train_data = model
-  # }
+  train_data = preprocess_features(model, cor_thresh = 0.9)
 
-  train_data = preprocess_features(model, cor_thresh = 0.9) 
-  
   #train_data = model
-  
+
   rm(model) #Clean memory
   gc()
 
@@ -402,71 +377,25 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     training_set_complete = x[[2]] # extract complete training set
     custom_output = x[[3]] #custom output from function to be returned after all complete training
 
-    if(boruta == T){
 
-      for(fold_i in seq_along(fold_data)){
+    for(fold_i in seq_along(fold_data)){
 
-        model = fold_data[[fold_i]][["train_data"]]
+      model = fold_data[[fold_i]][["train_data"]]
 
-        target = model$target
-        
-        train_data = preprocess_features(model, cor_thresh = 0.9) %>%
-          dplyr::mutate(target = target)
-        
-        fold_data[[fold_i]][["train_data"]] = train_data
-        features = setdiff(colnames(train_data), 'target')
-        fold_data[[fold_i]][["test_data"]] = fold_data[[fold_i]][["test_data"]][,features]
-        
-      #   ### Feature selection
-      # 
-      #   train_data <- feature.selection.boruta(
-      #     data = model,
-      #     iterations = boruta_iterations,
-      #     fix = fix_boruta,
-      #     doParallel = F,
-      #     workers = NULL,
-      #     file_name = file_name,
-      #     threshold = boruta_threshold,
-      #     tentative = tentative,
-      #     return = F,
-      #     verbose = F
-      #   )
-      # 
-      #   if(is.null(train_data)==F){
-      #     ## Assign result
-      #     fold_data[[fold_i]][["train_data"]] = train_data
-      #     features = setdiff(colnames(train_data), 'target')
-      #     fold_data[[fold_i]][["test_data"]] = fold_data[[fold_i]][["test_data"]][,features]
-      #   }else{
-      #     warning("No features found as predictive in one fold during the CV. Leaving all features")
-      #   }
-      # 
-      }
-      # 
-      ## Running feature selection in complete set
-      # x <- feature.selection.boruta(
-      #   data = training_set_complete,
-      #   iterations = boruta_iterations,
-      #   fix = fix_boruta,
-      #   doParallel = F,
-      #   workers = NULL,
-      #   file_name = file_name,
-      #   threshold = boruta_threshold,
-      #   tentative = tentative,
-      #   return = return
-      # )
+      target = model$target
 
-      target = training_set_complete$target
-    
-      x = preprocess_features(training_set_complete, cor_thresh = 0.9) %>%
+      train_data = preprocess_features(model, cor_thresh = 0.9) %>%
         dplyr::mutate(target = target)
-      
-      if(is.null(x)==F){
-        training_set_complete = x
-      }else{
-        warning("No features found as predictive during training. Leaving all features")
-      }
+
+      fold_data[[fold_i]][["train_data"]] = train_data
+      features = setdiff(colnames(train_data), 'target')
+      fold_data[[fold_i]][["test_data"]] = fold_data[[fold_i]][["test_data"]][,features]
     }
+
+    target = training_set_complete$target
+
+    training_set_complete = preprocess_features(training_set_complete, cor_thresh = 0.9) %>%
+      dplyr::mutate(target = target)
 
     ###################
 
@@ -765,13 +694,13 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     #   trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
     #   tuneGrid = temp$bestTune
     # )
-    # 
+    #
     # # Return caret-like object
     # fit.glm$results = temp$results
     # fit.glm$pred = temp$pred
     # fit.glm$resample = temp$resample
     # fit.glm$bestTune = temp$bestTune
-    # 
+    #
     # # Predictions in trained model
     # predictions.glm = predict(fit.glm, newdata = training_set_complete, type = "prob") %>%
     #   data.frame() %>%
@@ -795,7 +724,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     # fit.lda$pred = temp$pred
     # fit.lda$resample = temp$resample
     # fit.lda$bestTune = temp$bestTune
-    # 
+    #
     # # Predictions in trained model
     # predictions.lda = predict(fit.lda, newdata = training_set_complete, type = "prob") %>%
     #   data.frame() %>%
@@ -1274,7 +1203,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
       Kappa = median(Kappa_resample),
       AccuracySD = mad(Accuracy_resample),
       KappaSD = mad(Kappa_resample),
-      .groups = "keep" 
+      .groups = "keep"
     )
 
   ## Choose best
@@ -1322,11 +1251,6 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
 #' @param stack Logical. Whether to perform model stacking. Default is \code{FALSE}.
 #' @param k_folds Integer. Number of folds to use in cross-validation.
 #' @param n_rep Integer. Number of repetitions of the cross-validation.
-#' @param feature.selection Logical. Whether to apply Boruta feature selection before model training. Default is \code{FALSE}.
-#' @param n_boruta Integer. Number of iterations to run Boruta. Since Boruta involves randomness, repeated runs improve consistency. Default is 100.
-#' @param boruta_fix Logical. Whether to fix Boruta’s internal parameters. See `compute_boruta()` for details.
-#' @param tentative Logical. Whether to include tentative features as confirmed in the training dataset (Only valid if boruta_fix = FALSE).
-#' @param boruta_threshold Numeric. Threshold for confirming features after multiple Boruta iterations. For example, 0.8 means features must be confirmed in at least 80% of iterations. Default is 0.8.
 #' @param LODO Logical. If \code{TRUE}, constructs folds stratified by cohorts (Leave-One-Dataset-Out CV).
 #' @param batch_id A vector indicating the cohort or batch for each sample (required only if \code{LODO = TRUE}).
 #' @param file_name Character. File name used to save plots in the \code{Results/} directory.
@@ -1343,8 +1267,8 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
 #'
 #' @export
 #'
-compute_features.training.ML = function(features_train, target_var, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5, feature.selection = FALSE,
-                                        LODO = FALSE, n_boruta = 100, boruta_fix = FALSE, tentative = FALSE, boruta_threshold = 0.8, batch_id = NULL, file_name = NULL, ncores = NULL, return = FALSE,
+compute_features.training.ML = function(features_train, target_var, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5,
+                                        batch_id = NULL, file_name = NULL, ncores = NULL, return = FALSE,
                                         fold_construction_fun = NULL, fold_construction_args = list()){
 
   #Set training set
@@ -1362,10 +1286,9 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
   }
 
   #Cross-validation training (5 k-folds and 100 repetitions)
-  training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack, boruta = feature.selection,
-                               boruta_iterations = n_boruta, fix_boruta = boruta_fix, tentative = tentative, boruta_threshold = boruta_threshold,
-                               file_name = file_name, LODO = LODO, ncores = ncores, return= return, fold_construction_fun = fold_construction_fun,
-                               fold_construction_args = fold_construction_args)
+  training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack,
+                               file_name = file_name, LODO = LODO, ncores = ncores, return= return,
+                               fold_construction_fun = fold_construction_fun, fold_construction_args = fold_construction_args)
 
   ####################################################Predicting
   if(length(training)!=0){
@@ -1450,8 +1373,6 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
 
   #Cross-validation training (5 k-folds and 100 repetitions)
   training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack,
-                               boruta = feature.selection, boruta_iterations = n_boruta, fix_boruta = boruta_fix,
-                               tentative = tentative, boruta_threshold = boruta_threshold,
                                file_name = file_name, LODO = LODO, ncores = ncores, return= return,
                                fold_construction_fun = fold_construction_fun, fold_construction_args = fold_construction_args)
 
@@ -2674,7 +2595,7 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 
   ## Calculate AUCs and integrate into prediction matrix
   ml_model$pred = ml_model$pred %>%
-    dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) %>% ## Group by resample and parameters 
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) %>% ## Group by resample and parameters
     dplyr::mutate(AUROC = calculate_auc_roc_resample(obs, yes), # Calculate AUC-ROC if metric is "AUROC"
                   AUPRC = calculate_auc_prc_resample(obs, yes) # Calculate AUC-PRC if metric is "AUPRC"
     ) %>%
@@ -3037,11 +2958,11 @@ preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
   # Separate target
   target <- data[[target_col]]
   data <- data %>% dplyr::select(-all_of(target_col))
-  
+
   # 1. Remove near-zero variance features
   nzv <- caret::nearZeroVar(data, saveMetrics = TRUE)
   data <- data[, !nzv$nzv, drop = FALSE]
-  
+
   # 2. Remove highly correlated features
   if (ncol(data) > 1) {
     cor_matrix <- cor(data, use = "pairwise.complete.obs")
@@ -3050,28 +2971,28 @@ preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
       data <- data[, -high_cor, drop = FALSE]
     }
   }
-  
+
   constant_features <- c()
   # 3. Remove features that are constant within any class
   for (i in seq_along(colnames(data))) {
     col_values <- data[[i]]
-    
+
     # Loop through each class
     for (cl in unique(target)) {
       class_vals <- col_values[target == cl]
       nzv_info <- nearZeroVar(class_vals, saveMetrics = TRUE)
-      
+
       if (nzv_info$nzv) {
         constant_features <- c(constant_features, colnames(data)[i])
         break  # no need to check other classes for this feature
       }
     }
   }
-  
+
   if(!is.null(constant_features)){
     data <- data[, !colnames(data)%in%constant_features, drop = FALSE]
   }
-  
+
   # Add target back
   data[[target_col]] <- target
   return(data)

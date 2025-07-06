@@ -82,8 +82,7 @@ performance.
 ``` r
 res_ml = compute_features.training.ML(features_train, clinical$Response, "CR", 
                                       metric = "AUROC", stack = F, k_folds = 5, 
-                                      n_rep = 10, feature.selection = F, seed = 123, 
-                                      file_name = "Test", ncores = 2, return = T)
+                                      n_rep = 10, file_name = "Test", ncores = 2, return = T)
 ```
 
 After training, predictions on new data can be computed using the
@@ -107,8 +106,7 @@ testing set provided. It includes both previous functions.
 res = compute_features.ML(tme_features_train[[i]], tme_features_test[[i]], 
                           clinical = traitData, trait = "Response", 
                           trait.positive = "R", metric = "AUROC", stack = F, 
-                          k_folds = 2, n_rep = 1, feature.selection = F, 
-                          seed = 123, LODO = T, batch_id = "Cohort", 
+                          k_folds = 2, n_rep = 1, LODO = T, batch_id = "Cohort", 
                           ncores = 2, maximize = "Accuracy", return = F)
 ```
 

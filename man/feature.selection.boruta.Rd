@@ -13,7 +13,8 @@ feature.selection.boruta(
   workers = NULL,
   file_name = NULL,
   threshold = NULL,
-  return
+  return,
+  verbose = T
 )
 }
 \arguments{
@@ -34,6 +35,8 @@ feature.selection.boruta(
 \item{threshold}{A numeric value between 0 and 1. A feature must be confirmed in more than \code{threshold * iterations} to be finally labeled as confirmed.}
 
 \item{return}{Logical. Whether to save the resulting plots in the "Results/" directory.}
+
+\item{verbose}{Boolen value to whether print or no the function messages}
 }
 \value{
 A list containing:

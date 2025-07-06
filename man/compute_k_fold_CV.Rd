@@ -10,11 +10,6 @@ compute_k_fold_CV(
   n_rep,
   stacking = FALSE,
   metric = "Accuracy",
-  boruta,
-  boruta_iterations = NULL,
-  fix_boruta = NULL,
-  tentative = FALSE,
-  boruta_threshold = NULL,
   file_name = NULL,
   LODO = FALSE,
   ncores = NULL,
@@ -33,16 +28,6 @@ compute_k_fold_CV(
 \item{stacking}{Logical. Whether to perform model stacking. Default is FALSE.}
 
 \item{metric}{Character. Metric used for hyperparameter tuning and model evaluation. Supported values are "Accuracy", "AUROC", and "AUPRC".}
-
-\item{boruta}{Logical. Whether to apply Boruta for feature selection before model training. Note that many ML models handle feature importance internally, so prior selection is optional unless multicollinearity is a concern. Default is FALSE.}
-
-\item{boruta_iterations}{Integer. Number of iterations to run Boruta. Since Boruta involves randomness, repeated runs improve consistency. Default is 100.}
-
-\item{fix_boruta}{Logical. Whether to fix Boruta’s internal parameters. See \code{compute_boruta()} for details.}
-
-\item{tentative}{Logical. Whether to include tentative features as confirmed in the training dataset.}
-
-\item{boruta_threshold}{Numeric. Threshold for confirming features after multiple Boruta iterations. For example, 0.8 means features must be confirmed in at least 80\% of iterations. Default is 0.8.}
 
 \item{file_name}{Character. File name used for saving output plots in the \verb{Results/} directory.}
 
