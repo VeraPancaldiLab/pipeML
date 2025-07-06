@@ -1268,7 +1268,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
 #' @export
 #'
 compute_features.training.ML = function(features_train, target_var, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5,
-                                        batch_id = NULL, file_name = NULL, ncores = NULL, return = FALSE,
+                                        LODO = FALSE, batch_id = NULL, file_name = NULL, ncores = NULL, return = FALSE,
                                         fold_construction_fun = NULL, fold_construction_args = list()){
 
   #Set training set
