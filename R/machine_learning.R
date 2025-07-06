@@ -283,29 +283,31 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     stop("The metric assigned is not supported. Choose either accuracy or AUC.")
   }
 
-  ######### Feature selection
-  if(boruta == T && is.null(fold_construction_fun)){ ### If fold_construction_fun exists, feature.selection will be run across folds (need to be updated to do this always)
-    cat("Feature selection using Boruta...............................................................\n\n")
-    # Feature selection using Boruta
-    train_data <- feature.selection.boruta(
-      data = model,
-      iterations = boruta_iterations,
-      fix = fix_boruta,
-      doParallel = F,
-      workers = NULL,
-      file_name = file_name,
-      threshold = boruta_threshold,
-      tentative = tentative,
-      return = return
-    )
-  }else{
-    train_data = model
-  }
+  # ######### Feature selection
+  # if(boruta == T && is.null(fold_construction_fun)){ ### If fold_construction_fun exists, feature.selection will be run across folds (need to be updated to do this always)
+  #   cat("Feature selection using Boruta...............................................................\n\n")
+  #   # Feature selection using Boruta
+  #   train_data <- feature.selection.boruta(
+  #     data = model,
+  #     iterations = boruta_iterations,
+  #     fix = fix_boruta,
+  #     doParallel = F,
+  #     workers = NULL,
+  #     file_name = file_name,
+  #     threshold = boruta_threshold,
+  #     tentative = tentative,
+  #     return = return
+  #   )
+  # }else{
+  #   train_data = model
+  # }
 
+  train_data = preprocess_features(model, cor_thresh = 0.9) 
+  
+  #train_data = model
+  
   rm(model) #Clean memory
   gc()
-
-  cat("Training machine learning model...............................................................\n\n")
 
   ######### Machine Learning models
 
@@ -344,7 +346,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.glm <- caret::train(target~., data = train_data, method="glm", metric="Accuracy",trControl=trainControl)
 
     ################## LDA - Linear Discriminate Analysis
-    fit.lda <- caret::train(target~., data = train_data, method="lda", metric="Accuracy",trControl=trainControl)
+    #fit.lda <- caret::train(target~., data = train_data, method="lda", metric="Accuracy",trControl=trainControl)
 
     ################## GLMNET - Regularized Logistic Regression (Elastic net)
     fit.glmnet <- caret::train(target~., data = train_data, method="glmnet", metric="Accuracy",trControl=trainControl)
@@ -401,7 +403,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     custom_output = x[[3]] #custom output from function to be returned after all complete training
 
     if(boruta == T){
-      cat("Feature selection using Boruta across CV folds...............................................................\n\n")
 
       for(fold_i in seq_along(fold_data)){
 
@@ -409,7 +410,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
         target = model$target
         
-        train_data = preprocess_features(model, var_thresh = 0.0, cor_thresh = 0.9) %>%
+        train_data = preprocess_features(model, cor_thresh = 0.9) %>%
           dplyr::mutate(target = target)
         
         fold_data[[fold_i]][["train_data"]] = train_data
@@ -457,7 +458,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
       target = training_set_complete$target
     
-      x = preprocess_features(training_set_complete, var_thresh = 0.0, cor_thresh = 0.9) %>%
+      x = preprocess_features(training_set_complete, cor_thresh = 0.9) %>%
         dplyr::mutate(target = target)
       
       if(is.null(x)==F){
@@ -479,11 +480,11 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.c50 <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "C5.0",
                                                    training_set_all = training_set_complete))
 
-    fit.glm <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "glm",
-                                                   training_set_all = training_set_complete))
+    # fit.glm <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "glm",
+    #                                                training_set_all = training_set_complete))
 
-    fit.lda <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "lda",
-                                                   training_set_all = training_set_complete))
+    # fit.lda <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "lda",
+    #                                                training_set_all = training_set_complete))
 
     fit.glmnet <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "glmnet",
                                                       training_set_all = training_set_complete))
@@ -524,8 +525,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       BAG = fit.treebag,
       RF = fit.rf,
       C50 = fit.c50,
-      GLM = fit.glm,
-      LDA = fit.lda,
+      #GLM = fit.glm,
+      #LDA = fit.lda,
       GLMNET = fit.glmnet,
       KNN = fit.knn,
       CART = fit.cart,
@@ -541,8 +542,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       BAG = NULL,
       RF = "mtry",
       C50 = c("trials", "model", "winnow"),
-      GLM = NULL,
-      LDA = NULL,
+      #GLM = NULL,
+      #LDA = NULL,
       GLMNET = c("alpha", "lambda"),
       KNN = "k",
       CART = "cp",
@@ -570,8 +571,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.treebag <- models$BAG
     fit.rf <- models$RF
     fit.c50 <- models$C50
-    fit.glm <- models$GLM
-    fit.lda <- models$LDA
+    #fit.glm <- models$GLM
+    #fit.lda <- models$LDA
     fit.glmnet <- models$GLMNET
     fit.knn <- models$KNN
     fit.cart <- models$CART
@@ -608,17 +609,17 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     ### LG
 
-    predictions.glm = stats::predict(fit.glm, newdata = train_data, type = "prob") %>%
-      data.frame() %>%
-      dplyr::select(yes) %>%
-      dplyr::rename(GLM = yes)  #Predictions of model (already ordered)
+    # predictions.glm = stats::predict(fit.glm, newdata = train_data, type = "prob") %>%
+    #   data.frame() %>%
+    #   dplyr::select(yes) %>%
+    #   dplyr::rename(GLM = yes)  #Predictions of model (already ordered)
 
     ### LDA
 
-    predictions.lda = stats::predict(fit.lda, newdata = train_data, type = "prob") %>%
-      data.frame() %>%
-      dplyr::select(yes) %>%
-      dplyr::rename(LDA = yes)  #Predictions of model (already ordered)
+    # predictions.lda = stats::predict(fit.lda, newdata = train_data, type = "prob") %>%
+    #   data.frame() %>%
+    #   dplyr::select(yes) %>%
+    #   dplyr::rename(LDA = yes)  #Predictions of model (already ordered)
 
     ### GLMNET
 
@@ -755,51 +756,51 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     ######## LG
 
-    # Train model with bestTune from CV
-    temp = fit.glm
-    fit.glm <- caret::train(
-      target ~ .,
-      data = training_set_complete,
-      method = "glm",
-      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
-      tuneGrid = temp$bestTune
-    )
-
-    # Return caret-like object
-    fit.glm$results = temp$results
-    fit.glm$pred = temp$pred
-    fit.glm$resample = temp$resample
-    fit.glm$bestTune = temp$bestTune
-
-    # Predictions in trained model
-    predictions.glm = predict(fit.glm, newdata = training_set_complete, type = "prob") %>%
-      data.frame() %>%
-      dplyr::select(yes) %>%
-      dplyr::rename(GLM = yes) #Predictions of model (already ordered)
+    # # Train model with bestTune from CV
+    # temp = fit.glm
+    # fit.glm <- caret::train(
+    #   target ~ .,
+    #   data = training_set_complete,
+    #   method = "glm",
+    #   trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
+    #   tuneGrid = temp$bestTune
+    # )
+    # 
+    # # Return caret-like object
+    # fit.glm$results = temp$results
+    # fit.glm$pred = temp$pred
+    # fit.glm$resample = temp$resample
+    # fit.glm$bestTune = temp$bestTune
+    # 
+    # # Predictions in trained model
+    # predictions.glm = predict(fit.glm, newdata = training_set_complete, type = "prob") %>%
+    #   data.frame() %>%
+    #   dplyr::select(yes) %>%
+    #   dplyr::rename(GLM = yes) #Predictions of model (already ordered)
 
     ######## LDA
 
     # Train model with bestTune from CV
-    temp = fit.lda
-    fit.lda <- caret::train(
-      target ~ .,
-      data = training_set_complete,
-      method = "lda",
-      trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
-      tuneGrid = temp$bestTune
-    )
+    # temp = fit.lda
+    # fit.lda <- caret::train(
+    #   target ~ .,
+    #   data = training_set_complete,
+    #   method = "lda",
+    #   trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
+    #   tuneGrid = temp$bestTune
+    # )
 
-    # Return caret-like object
-    fit.lda$results = temp$results
-    fit.lda$pred = temp$pred
-    fit.lda$resample = temp$resample
-    fit.lda$bestTune = temp$bestTune
-
-    # Predictions in trained model
-    predictions.lda = predict(fit.lda, newdata = training_set_complete, type = "prob") %>%
-      data.frame() %>%
-      dplyr::select(yes) %>%
-      dplyr::rename(LDA = yes) #Predictions of model (already ordered)
+    # # Return caret-like object
+    # fit.lda$results = temp$results
+    # fit.lda$pred = temp$pred
+    # fit.lda$resample = temp$resample
+    # fit.lda$bestTune = temp$bestTune
+    # 
+    # # Predictions in trained model
+    # predictions.lda = predict(fit.lda, newdata = training_set_complete, type = "prob") %>%
+    #   data.frame() %>%
+    #   dplyr::select(yes) %>%
+    #   dplyr::rename(LDA = yes) #Predictions of model (already ordered)
 
 
     ### GLMNET
@@ -1003,8 +1004,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   ensembleResults <- list(BAG = fit.treebag,
                           RF = fit.rf,
                           C50 = fit.c50,
-                          GLM = fit.glm,
-                          LDA = fit.lda,
+                          #GLM = fit.glm,
+                          #LDA = fit.lda,
                           KNN = fit.knn,
                           CART = fit.cart,
                           GLMNET = fit.glmnet,
@@ -1017,8 +1018,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   ml_methods = list(BAG = "treebag",
                     RF = "rf",
                     C50 = "C5.0",
-                    GLM = "glm",
-                    LDA = "lda",
+                    #GLM = "glm",
+                    #LDA = "lda",
                     KNN = "knn",
                     CART = "rpart",
                     GLMNET = "glmnet",
@@ -1032,8 +1033,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   model_predictions = list(BAG = predictions.bag,
                            RF = predictions.rf,
                            C50 = predictions.c50,
-                           GLM = predictions.glm,
-                           LDA = predictions.lda,
+                           #GLM = predictions.glm,
+                           #LDA = predictions.lda,
                            KNN = predictions.knn,
                            CART = predictions.cart,
                            GLMNET = predictions.glmnet,
@@ -1061,7 +1062,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   model_predictions = do.call(cbind, model_predictions) #Join as data frame
 
   #Clean memory
-  rm(fit.treebag, fit.rf, fit.c50, fit.glm, fit.lda, fit.knn, fit.cart, fit.glmnet, fit.lasso, fit.ridge, fit.svm_radial, fit.svm_linear)
+  rm(fit.treebag, fit.rf, fit.c50, fit.knn, fit.cart, fit.glmnet, fit.lasso, fit.ridge, fit.svm_radial, fit.svm_linear)
   gc()
 
 
@@ -1269,10 +1270,11 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
     tidyr::unnest_wider(metrics) %>%
     dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols))) %>%
     dplyr::summarise(
-      Accuracy = mean(Accuracy_resample),
-      Kappa = mean(Kappa_resample),
-      AccuracySD = sd(Accuracy_resample),
-      KappaSD = sd(Kappa_resample)
+      Accuracy = median(Accuracy_resample),
+      Kappa = median(Kappa_resample),
+      AccuracySD = mad(Accuracy_resample),
+      KappaSD = mad(Kappa_resample),
+      .groups = "keep" 
     )
 
   ## Choose best
@@ -1718,7 +1720,7 @@ compute_cv_accuracy = function(models, file_name = NULL, base_models = FALSE, re
     dplyr::group_by(model) %>%
     dplyr::summarise(
       Mean_Accuracy = median(Accuracy),
-      SD_Accuracy = sd(Accuracy)
+      MAD_Accuracy = mad(Accuracy)
     ) %>%
     dplyr::arrange(desc(Mean_Accuracy))
 
@@ -1731,7 +1733,7 @@ compute_cv_accuracy = function(models, file_name = NULL, base_models = FALSE, re
 
     plot(ggplot2::ggplot(res_accuracy, ggplot2::aes(x = model, y = Mean_Accuracy, fill = model)) +
       ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6) +
-      ggplot2::geom_errorbar(ggplot2::aes(ymin = Mean_Accuracy - SD_Accuracy, ymax = Mean_Accuracy + SD_Accuracy),
+      ggplot2::geom_errorbar(ggplot2::aes(ymin = Mean_Accuracy - MAD_Accuracy, ymax = Mean_Accuracy + MAD_Accuracy),
                     width = 0.2, position = position_dodge(0.6)) +
       ggplot2::labs(title = "Performance of Models",
            x = "Model",
@@ -1799,7 +1801,7 @@ compute_cv_AUC = function(models, file_name = NULL, base_models = FALSE, AUC_typ
       dplyr::mutate(model = names(models)[i])
     names(auroc)[i] = names(models)[i]
   }
-  auroc_data = do.call(rbind, auroc)
+  auroc_data = do.call(rbind, unname(auroc))
 
   #Bind AUPRC values from each model
   auprc = list()
@@ -1814,7 +1816,7 @@ compute_cv_AUC = function(models, file_name = NULL, base_models = FALSE, AUC_typ
     dplyr::group_by(model) %>%
     dplyr::summarise(
       Mean_AUROC = median(AUROC),
-      SD_AUROC = sd(AUROC)
+      MAD_AUROC = mad(AUROC)
     ) %>%
     dplyr::arrange(desc(Mean_AUROC))
 
@@ -1822,7 +1824,7 @@ compute_cv_AUC = function(models, file_name = NULL, base_models = FALSE, AUC_typ
     dplyr::group_by(model) %>%
     dplyr::summarise(
       Mean_AUPRC = median(AUPRC),
-      SD_AUPRC = sd(AUPRC)
+      MAD_AUPRC = mad(AUPRC)
     ) %>%
     dplyr::arrange(desc(Mean_AUPRC))
 
@@ -1831,7 +1833,7 @@ compute_cv_AUC = function(models, file_name = NULL, base_models = FALSE, AUC_typ
     grDevices::pdf(paste0("Results/AUROC_CV_methods_", file_name, ".pdf"), width = 10)
     plot(ggplot2::ggplot(res_auroc, ggplot2::aes(x = model, y = Mean_AUROC, fill = model)) +
            ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6) +
-           ggplot2::geom_errorbar(aes(ymin = Mean_AUROC - SD_AUROC, ymax = Mean_AUROC + SD_AUROC),
+           ggplot2::geom_errorbar(aes(ymin = Mean_AUROC - MAD_AUROC, ymax = Mean_AUROC + MAD_AUROC),
                          width = 0.2, position = position_dodge(0.6)) +
            ggplot2::labs(title = "Performance of Models",
                 x = "Model",
@@ -1844,7 +1846,7 @@ compute_cv_AUC = function(models, file_name = NULL, base_models = FALSE, AUC_typ
     grDevices::pdf(paste0("Results/AUPRC_CV_methods_", file_name, ".pdf"), width = 10)
     plot(ggplot2::ggplot(res_auprc, ggplot2::aes(x = model, y = Mean_AUPRC, fill = model)) +
            ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6) +
-           ggplot2::geom_errorbar(aes(ymin = Mean_AUPRC - SD_AUPRC, ymax = Mean_AUPRC + SD_AUPRC),
+           ggplot2::geom_errorbar(aes(ymin = Mean_AUPRC - MAD_AUPRC, ymax = Mean_AUPRC + MAD_AUPRC),
                          width = 0.2, position = ggplot2::position_dodge(0.6)) +
            ggplot2::labs(title = "Performance of Models",
                 x = "Model",
@@ -2672,7 +2674,7 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 
   ## Calculate AUCs and integrate into prediction matrix
   ml_model$pred = ml_model$pred %>%
-    dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) %>% ## Group by resample and parameters 
     dplyr::mutate(AUROC = calculate_auc_roc_resample(obs, yes), # Calculate AUC-ROC if metric is "AUROC"
                   AUPRC = calculate_auc_prc_resample(obs, yes) # Calculate AUC-PRC if metric is "AUPRC"
     ) %>%
@@ -2697,17 +2699,11 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
   if(is.null(hyperparameters) == F){
     ## Integrate average CV metrics across repetitions into resample matrix
     df_avg <- ml_model$pred %>%
-      dplyr::group_by(dplyr::across(dplyr::all_of(hyperparameters))) %>% ## here we only group by hyperparameter not resample
+      dplyr::group_by(dplyr::across(dplyr::all_of(hyperparameters))) %>% ## here we only group by hyperparameter not resample (to choose best hyperparams combination)
       dplyr::summarise(
-        Sensitivity = mean(Sensitivity, na.rm = TRUE),
-        Specificity = mean(Specificity, na.rm = TRUE),
-        Accuracy = mean(Accuracy, na.rm = TRUE),
-        AUROC = mean(AUROC, na.rm = TRUE),
-        AUPRC = mean(AUPRC, na.rm = TRUE),
-        Precision = mean(Precision, na.rm = TRUE),
-        Recall = mean(Recall, na.rm = TRUE),
-        F1 = mean(F1, na.rm = TRUE),
-        MCC = mean(MCC, na.rm = TRUE),
+        AUROC = median(AUROC, na.rm = TRUE),
+        AUPRC = median(AUPRC, na.rm = TRUE),
+        Accuracy = median(Accuracy, na.rm = TRUE),
         .groups = "keep"  # Ensures all groups are retained
       ) %>%
       dplyr::ungroup()
@@ -2734,15 +2730,9 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
     df_avg = df_filtered %>%
       dplyr::group_by(Resample) %>%
       dplyr::summarise(
-        Sensitivity = mean(Sensitivity, na.rm = TRUE),
-        Specificity = mean(Specificity, na.rm = TRUE),
-        Accuracy = mean(Accuracy, na.rm = TRUE),
-        AUROC = mean(AUROC, na.rm = TRUE),
-        AUPRC = mean(AUPRC, na.rm = TRUE),
-        Precision = mean(Precision, na.rm = TRUE),
-        Recall = mean(Recall, na.rm = TRUE),
-        F1 = mean(F1, na.rm = TRUE),
-        MCC = mean(MCC, na.rm = TRUE)
+        AUROC = median(AUROC, na.rm = TRUE),
+        AUPRC = median(AUPRC, na.rm = TRUE),
+        Accuracy = median(Accuracy, na.rm = TRUE)
       ) %>%
       dplyr::ungroup()
 
@@ -2750,15 +2740,9 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
     ## Integrate average CV metrics across repetitions into resample matrix
     df_avg <- ml_model$pred %>%
       dplyr::summarise(
-        Sensitivity = mean(Sensitivity, na.rm = TRUE),
-        Specificity = mean(Specificity, na.rm = TRUE),
-        Accuracy = mean(Accuracy, na.rm = TRUE),
-        AUROC = mean(AUROC, na.rm = TRUE),
-        AUPRC = mean(AUPRC, na.rm = TRUE),
-        Precision = mean(Precision, na.rm = TRUE),
-        Recall = mean(Recall, na.rm = TRUE),
-        F1 = mean(F1, na.rm = TRUE),
-        MCC = mean(MCC, na.rm = TRUE),
+        AUROC = median(AUROC, na.rm = TRUE),
+        AUPRC = median(AUPRC, na.rm = TRUE),
+        Accuracy = median(Accuracy, na.rm = TRUE),
         .groups = "keep"  # Ensures all groups are retained
       ) %>%
       dplyr::ungroup()
@@ -3049,22 +3033,46 @@ model_boruta_selection <- function(model,
   return(selected_model)
 }
 
-preprocess_features <- function(data, var_thresh = 0.0, cor_thresh = 0.9) {
-  data = data %>%
-    dplyr::select(-target)
-  # Remove near-zero variance features
-  nzv <- nearZeroVar(data, saveMetrics = TRUE)
-  if(length(nzv)>0){
-    data <- data[, !nzv$nzv]
+preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
+  # Separate target
+  target <- data[[target_col]]
+  data <- data %>% dplyr::select(-all_of(target_col))
+  
+  # 1. Remove near-zero variance features
+  nzv <- caret::nearZeroVar(data, saveMetrics = TRUE)
+  data <- data[, !nzv$nzv, drop = FALSE]
+  
+  # 2. Remove highly correlated features
+  if (ncol(data) > 1) {
+    cor_matrix <- cor(data, use = "pairwise.complete.obs")
+    high_cor <- caret::findCorrelation(cor_matrix, cutoff = cor_thresh)
+    if (length(high_cor) > 0) {
+      data <- data[, -high_cor, drop = FALSE]
+    }
   }
   
-  # Remove highly correlated features
-  cor_matrix <- cor(data, use = "pairwise.complete.obs")
-  high_cor <- findCorrelation(cor_matrix, cutoff = cor_thresh)
-  
-  if(length(high_cor)>0){
-    data <- data[, -high_cor]
+  constant_features <- c()
+  # 3. Remove features that are constant within any class
+  for (i in seq_along(colnames(data))) {
+    col_values <- data[[i]]
+    
+    # Loop through each class
+    for (cl in unique(target)) {
+      class_vals <- col_values[target == cl]
+      nzv_info <- nearZeroVar(class_vals, saveMetrics = TRUE)
+      
+      if (nzv_info$nzv) {
+        constant_features <- c(constant_features, colnames(data)[i])
+        break  # no need to check other classes for this feature
+      }
+    }
   }
   
+  if(!is.null(constant_features)){
+    data <- data[, !colnames(data)%in%constant_features, drop = FALSE]
+  }
+  
+  # Add target back
+  data[[target_col]] <- target
   return(data)
 }
