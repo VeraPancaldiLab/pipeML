@@ -1042,6 +1042,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     }
 
     top_model = metrics[["Top_model"]]
+    AUROC_median = metrics[["AUROC"]]
+    AUPRC_median = metrics[["AUPRC"]]
 
     model = ensembleResults[[top_model]]
 
@@ -1049,7 +1051,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     cat("Returning model trained\n")
 
-    output = list("Model" = model, "ML_Models" = ensembleResults)
+    output = list("Model" = model, "ML_Models" = ensembleResults, "AUROC_median" = AUROC_median, "AUPRC_median" = AUPRC_median)
 
     if(is.null(custom_output) == F){
       output[[length(output)+1]] = custom_output

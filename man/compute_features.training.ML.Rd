@@ -12,6 +12,7 @@ compute_features.training.ML(
   stack,
   k_folds = 10,
   n_rep = 5,
+  LODO = FALSE,
   batch_id = NULL,
   file_name = NULL,
   ncores = NULL,
@@ -35,6 +36,8 @@ compute_features.training.ML(
 
 \item{n_rep}{Integer. Number of repetitions of the cross-validation.}
 
+\item{LODO}{Logical. If \code{TRUE}, constructs folds stratified by cohorts (Leave-One-Dataset-Out CV).}
+
 \item{batch_id}{A vector indicating the cohort or batch for each sample (required only if \code{LODO = TRUE}).}
 
 \item{file_name}{Character. File name used to save plots in the \code{Results/} directory.}
@@ -46,8 +49,6 @@ compute_features.training.ML(
 \item{fold_construction_fun}{Function. A custom function used to construct the cross-validation folds. It should return a list of training indices for each fold.}
 
 \item{fold_construction_args}{List. Named list of additional arguments to pass to \code{fold_construction_fun}.}
-
-\item{LODO}{Logical. If \code{TRUE}, constructs folds stratified by cohorts (Leave-One-Dataset-Out CV).}
 }
 \value{
 A list containing:
