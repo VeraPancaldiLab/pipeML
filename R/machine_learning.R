@@ -495,7 +495,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       model$pred <- res$Prediction
       model$resample <- res$Resamples
       model$results <- res$Results
-
+      model$bestTune = res$bestTune
       return(model)
     })
 
@@ -2677,6 +2677,8 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
     ml_model$results <- ml_model$results %>%
       dplyr::select(-dplyr::all_of(hyperparameters), -Accuracy, -Kappa, -AccuracySD, -KappaSD) %>%
       dplyr::bind_cols(df_avg)
+    
+    ml_model$bestTune = NULL
   }
 
   ml_model$resample = ml_model$resample %>%
@@ -2687,7 +2689,7 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
     { if ("Resample" %in% colnames(.)) dplyr::select(., -Resample) else . }
 
 
-  return(list(Prediction = ml_model$pred, Resamples = ml_model$resample, Results = ml_model$results))
+  return(list(Prediction = ml_model$pred, Resamples = ml_model$resample, Results = ml_model$results, bestTune = ml_model$bestTune))
 
 
 }
