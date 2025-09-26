@@ -39,52 +39,52 @@ pipeline. </i>
 
 ## Key Features
 
-\*Stratified data partitioning to preserve class balance in both
-training and testing sets.
+- Stratified data partitioning to preserve class balance in both
+  training and testing sets.
 
-\*Iterative Boruta algorithm for robust feature selection.
+- Iterative Boruta algorithm for robust feature selection.
 
-\*Customizable cross-validation with repeated k-fold CV or stratified
-CV.
+- Customizable cross-validation with repeated k-fold CV or stratified
+  CV.
 
-\*Hyperparameter tuning driven by AUROC, AUPRC, or Accuracy.
+- Hyperparameter tuning driven by AUROC, AUPRC, or Accuracy.
 
-\*Parallelization support for faster cross-validation and model training
-across multiple cores.
+- Parallelization support for faster cross-validation and model training
+  across multiple cores.
 
-\*Custom fold construction functions: users can inject their own
-fold-building logic.
+- Custom fold construction functions: users can inject their own
+  fold-building logic.
 
 These functions can also accept a bestune argument, which is
 automatically passed after hyperparameter optimization, allowing
 seamless retraining on the full training set with the best parameters.
 
-\*Preprocessing utilities for feature filtering (e.g., correlation
-pruning).
+- Preprocessing utilities for feature filtering (e.g., correlation
+  pruning).
 
-\*Model interpretation via SHAP values for feature importance.
+- Model interpretation via SHAP values for feature importance.
 
-\*Model stacking based on GLM for ensemble learning.
+- Model stacking based on GLM for ensemble learning.
 
-\*Visualization functions for ROC and PR curves, plus performance
-summaries.
+- Visualization functions for ROC and PR curves, plus performance
+  summaries.
 
-\*Support for 13 machine learning methods, including:
+- Support for 13 machine learning methods, including:
 
-- Bagged CART
-- Random Forest (RF)
-- C50
-- Logistic regression (LG)
-- CART
-- Naive Bayes (NB)
-- Regularized Lasso
-- Ridge regression
-- Linear Discriminant Analysis (LDA)
-- Regularized Logistic Regression (Elastic net)
-- K-nearest neighbors (KNN)
-- Support vector machine with radial kernel (SVMr)
-- Support vector machine with linear kernel (SVMl)
-- Extreme Gradient Boosting (XGboost)
+  - Bagged CART
+  - Random Forest (RF)
+  - C50
+  - Logistic regression (LG)
+  - CART
+  - Naive Bayes (NB)
+  - Regularized Lasso
+  - Ridge regression
+  - Linear Discriminant Analysis (LDA)
+  - Regularized Logistic Regression (Elastic net)
+  - K-nearest neighbors (KNN)
+  - Support vector machine with radial kernel (SVMr)
+  - Support vector machine with linear kernel (SVMl)
+  - Extreme Gradient Boosting (XGboost)
 
 ## General usage
 

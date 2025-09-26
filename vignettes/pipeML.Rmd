@@ -414,9 +414,14 @@ In order to create your own custom fold function, user can follow the same struc
 ## counts_train: Normalized counts to compute the features from the training samples
 ## traitData_train: Target variable from the training samples
 
-res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), traitData_train$Response, trait.positive = "R", 
-                                           metric = "AUROC", stack = F, k_folds = 5, n_rep = 10, LODO = F, 
-                                           ncores = 2, return = F, fold_construction_fun = prepare_TFs_folds)
+res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), 
+                                           traitData_train$Response, 
+                                           trait.positive = "R", 
+                                           metric = "AUROC", 
+                                           stack = F, k_folds = 5, 
+                                           n_rep = 10, LODO = F, 
+                                           ncores = 2, return = F, 
+                                           fold_construction_fun = prepare_TFs_folds)
 ```
 
 In order to predict, user needs to calculate the same type of features on the test set
@@ -509,10 +514,17 @@ prepare_TFs_folds <- function(data, folds, TF.collection = "CollecTRI", min_targ
 
 When calling `compute_features.training.ML()`, these fixed arguments are passed via `fold_construction_args_fixed`:
 ```{r, eval=FALSE}
-res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), traitData_train$Response, trait.positive = "R", 
-                                           metric = "AUROC", stack = F, k_folds = 5, n_rep = 10, LODO = F, 
-                                           ncores = 2, return = F, fold_construction_fun = prepare_TFs_folds,
-                                           fold_construction_args_fixed = list(TF.collection = "CollecTRI", min_targets_size = 5, tfs.pruned = FALSE))
+res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), 
+                                           traitData_train$Response, 
+                                           trait.positive = "R", 
+                                           metric = "AUROC", 
+                                           stack = F, k_folds = 5, 
+                                           n_rep = 10, LODO = F, 
+                                           ncores = 2, return = F, 
+                                           fold_construction_fun = prepare_TFs_folds,
+                                           fold_construction_args_fixed = list(TF.collection = "CollecTRI", 
+                                                                               min_targets_size = 5, 
+                                                                               tfs.pruned = FALSE))
 ```
 
 #### Tunable hyperparameters during custom function
@@ -520,9 +532,14 @@ res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), trait
 There will be cases when user will have parameters that can change value and thus, affect the performance during training. pipeML implements a custom hyperparameter tuning for these type of cases where the goal is to find which value of a certain parameter maximizes the performance of the model. Briefly, it takes a grid of values propose by the user and compute custom k-folds for each combination of values, testing the performance across different ML models and their corresponding hyperparameters. It then returns the optimized parameters that return the best performance across a certain number of iterations defined by the user. For this, user needs to defined the parameter `fold_construction_args_tunable` with the different values that should be test. Here we want to test the performance using 5, 10, 15, 20 as different values for this parameter.
 
 ```{r, eval = FALSE}
-res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), traitData_train$Response, trait.positive = "R", 
-                                           metric = "AUROC", stack = F, k_folds = 5, n_rep = 10, LODO = F, 
-                                           ncores = 2, return = F, fold_construction_fun = prepare_TFs_folds,
+res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), 
+                                           traitData_train$Response, 
+                                           trait.positive = "R", 
+                                           metric = "AUROC", 
+                                           stack = F, k_folds = 5, 
+                                           n_rep = 10, LODO = F, 
+                                           ncores = 2, return = F, 
+                                           fold_construction_fun = prepare_TFs_folds,
                                            fold_construction_args_fixed = list(TF.collection = "CollecTRI", tfs.pruned = FALSE), 
                                            fold_construction_args_tunable = list(min_targets_size = c(5, 10, 15, 20)))
 ```
