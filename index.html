@@ -77,18 +77,26 @@
 <div class="section level2">
 <h2 id="key-features">Key Features<a class="anchor" aria-label="anchor" href="#key-features"></a>
 </h2>
-<p>*Stratified data partitioning to preserve class balance in both training and testing sets.</p>
-<p>*Iterative Boruta algorithm for robust feature selection.</p>
-<p>*Customizable cross-validation with repeated k-fold CV or stratified CV.</p>
-<p>*Hyperparameter tuning driven by AUROC, AUPRC, or Accuracy.</p>
-<p>*Parallelization support for faster cross-validation and model training across multiple cores.</p>
-<p>*Custom fold construction functions: users can inject their own fold-building logic.</p>
+<ul>
+<li><p>Stratified data partitioning to preserve class balance in both training and testing sets.</p></li>
+<li><p>Iterative Boruta algorithm for robust feature selection.</p></li>
+<li>
+<p>Customizable cross-validation with repeated k-fold CV or stratified</p>
+<ol start="105" style="list-style-type: upper-roman"><li>
+</li></ol>
+</li>
+<li><p>Hyperparameter tuning driven by AUROC, AUPRC, or Accuracy.</p></li>
+<li><p>Parallelization support for faster cross-validation and model training across multiple cores.</p></li>
+<li><p>Custom fold construction functions: users can inject their own fold-building logic.</p></li>
+</ul>
 <p>These functions can also accept a bestune argument, which is automatically passed after hyperparameter optimization, allowing seamless retraining on the full training set with the best parameters.</p>
-<p>*Preprocessing utilities for feature filtering (e.g., correlation pruning).</p>
-<p>*Model interpretation via SHAP values for feature importance.</p>
-<p>*Model stacking based on GLM for ensemble learning.</p>
-<p>*Visualization functions for ROC and PR curves, plus performance summaries.</p>
-<p>*Support for 13 machine learning methods, including:</p>
+<ul>
+<li><p>Preprocessing utilities for feature filtering (e.g., correlation pruning).</p></li>
+<li><p>Model interpretation via SHAP values for feature importance.</p></li>
+<li><p>Model stacking based on GLM for ensemble learning.</p></li>
+<li><p>Visualization functions for ROC and PR curves, plus performance summaries.</p></li>
+<li>
+<p>Support for 13 machine learning methods, including:</p>
 <ul>
 <li>Bagged CART</li>
 <li>Random Forest (RF)</li>
@@ -104,6 +112,8 @@
 <li>Support vector machine with radial kernel (SVMr)</li>
 <li>Support vector machine with linear kernel (SVMl)</li>
 <li>Extreme Gradient Boosting (XGboost)</li>
+</ul>
+</li>
 </ul>
 </div>
 <div class="section level2">
