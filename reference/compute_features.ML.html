@@ -48,19 +48,15 @@
 <span>  <span class="va">stack</span>,</span>
 <span>  k_folds <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  n_rep <span class="op">=</span> <span class="fl">5</span>,</span>
-<span>  feature.selection <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  n_boruta <span class="op">=</span> <span class="fl">100</span>,</span>
-<span>  boruta_fix <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  tentative <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  boruta_threshold <span class="op">=</span> <span class="fl">0.8</span>,</span>
 <span>  batch_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  file_name <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  ncores <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  maximize <span class="op">=</span> <span class="st">"Accuracy"</span>,</span>
 <span>  return <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  fold_construction_fun <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  fold_construction_args <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  fold_construction_args_fixed <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  fold_construction_args_tunable <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -104,28 +100,8 @@
 <dd><p>Integer. Number of cross-validation repetitions.</p></dd>
 
 
-<dt id="arg-feature-selection">feature.selection<a class="anchor" aria-label="anchor" href="#arg-feature-selection"></a></dt>
-<dd><p>Logical. Whether to apply Boruta feature selection before training. Default is <code>FALSE</code>.</p></dd>
-
-
 <dt id="arg-lodo">LODO<a class="anchor" aria-label="anchor" href="#arg-lodo"></a></dt>
 <dd><p>Logical. If <code>TRUE</code>, folds are constructed in a Leave-One-Dataset-Out (LODO) manner based on cohorts.</p></dd>
-
-
-<dt id="arg-n-boruta">n_boruta<a class="anchor" aria-label="anchor" href="#arg-n-boruta"></a></dt>
-<dd><p>Integer. Number of iterations to run Boruta. Since Boruta involves randomness, repeated runs improve consistency. Default is 100.</p></dd>
-
-
-<dt id="arg-boruta-fix">boruta_fix<a class="anchor" aria-label="anchor" href="#arg-boruta-fix"></a></dt>
-<dd><p>Logical. Whether to fix Boruta’s internal parameters. See <code><a href="compute_boruta.html">compute_boruta()</a></code> for details.</p></dd>
-
-
-<dt id="arg-tentative">tentative<a class="anchor" aria-label="anchor" href="#arg-tentative"></a></dt>
-<dd><p>Logical. Whether to include tentative features as confirmed in the training dataset (Only valid if boruta_fix = FALSE).</p></dd>
-
-
-<dt id="arg-boruta-threshold">boruta_threshold<a class="anchor" aria-label="anchor" href="#arg-boruta-threshold"></a></dt>
-<dd><p>Numeric. Threshold for confirming features after multiple Boruta iterations. For example, 0.8 means features must be confirmed in at least 80% of iterations. Default is 0.8.</p></dd>
 
 
 <dt id="arg-batch-id">batch_id<a class="anchor" aria-label="anchor" href="#arg-batch-id"></a></dt>
@@ -151,11 +127,22 @@ threshold for the confusion matrix. Options include "Accuracy", "Precision",
 
 
 <dt id="arg-fold-construction-fun">fold_construction_fun<a class="anchor" aria-label="anchor" href="#arg-fold-construction-fun"></a></dt>
-<dd><p>Function. A custom function used to construct the cross-validation folds. It should return a list of training indices for each fold.</p></dd>
+<dd><p>Function. A custom function used to construct the cross-validation folds.
+This function must accept a <code>bestune</code> argument, which is used internally to inject optimized parameters
+after hyperparameter tuning. If <code>bestune = NULL</code>, the function will explore a parameter grid across folds
+(parallelized with <code>foreach</code>); if <code>bestune</code> is provided, the optimized parameters will be applied
+to rebuild the features on the full training data.</p></dd>
 
 
-<dt id="arg-fold-construction-args">fold_construction_args<a class="anchor" aria-label="anchor" href="#arg-fold-construction-args"></a></dt>
-<dd><p>List. Named list of additional arguments to pass to <code>fold_construction_fun</code>.</p></dd>
+<dt id="arg-fold-construction-args-fixed">fold_construction_args_fixed<a class="anchor" aria-label="anchor" href="#arg-fold-construction-args-fixed"></a></dt>
+<dd><p>List. A list of arguments passed to <code>fold_construction_fun</code>
+that remain fixed during both cross-validation and final training.</p></dd>
+
+
+<dt id="arg-fold-construction-args-tunable">fold_construction_args_tunable<a class="anchor" aria-label="anchor" href="#arg-fold-construction-args-tunable"></a></dt>
+<dd><p>List. A list of arguments passed to <code>fold_construction_fun</code>
+that define the hyperparameters to be tuned during cross-validation. Each element should contain
+candidate values for tuning.</p></dd>
 
 </dl></div>
     <div class="section level2">

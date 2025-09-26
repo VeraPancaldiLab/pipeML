@@ -67,26 +67,28 @@
 <div class="section level2">
 <h2 id="description">Description<a class="anchor" aria-label="anchor" href="#description"></a>
 </h2>
-<p>pipeML is a robust R-based pipeline designed to streamline the training and testing of machine learning models for classification tasks. It is developed for fast, user-friendly deployment while maintaining the flexibility and complexity needed for rigorous, reliable implementation at every stage of the pipeline (Figure 1).</p>
+<p><code>pipeML</code> is a robust R-based pipeline for building, evaluating, and interpreting machine learning models in classification tasks. It is designed for fast, user-friendly deployment while maintaining the flexibility and rigor required for research-grade analyses. The pipeline integrates all essential steps — from preprocessing to feature selection, cross-validation, hyperparameter tuning, and model interpretation — into a single, consistent framework (Figure 1).</p>
 <p align="center">
 <img src="reference/figures/MLpipeline.png?raw=true"></p>
 <p align="center">
-<i> Figure 1. Machine learning pipeline. </i>
+<i> Figure 1. General structure of the <code>pipeML</code> machine learning pipeline. </i>
 </p>
 </div>
 <div class="section level2">
-<h2 id="key-features">Key features<a class="anchor" aria-label="anchor" href="#key-features"></a>
+<h2 id="key-features">Key Features<a class="anchor" aria-label="anchor" href="#key-features"></a>
 </h2>
-<ul>
-<li>Stratified data split</li>
-<li>Iterative Boruta algorithm for feature selection</li>
-<li>Repeated k-fold cross validation (kCV)</li>
-<li>Hyperparameter tuning based on AUROC, AUPRC or Accuracy</li>
-<li>Stratified k-fold construction</li>
-<li>SHAP values implementation for feature importance</li>
-<li>Model stacking implementation based on GLM</li>
-<li>Visualization functions for RO and PR curves</li>
-<li>13 Machine Learning methods implemented
+<p>*Stratified data partitioning to preserve class balance in both training and testing sets.</p>
+<p>*Iterative Boruta algorithm for robust feature selection.</p>
+<p>*Customizable cross-validation with repeated k-fold CV or stratified CV.</p>
+<p>*Hyperparameter tuning driven by AUROC, AUPRC, or Accuracy.</p>
+<p>*Parallelization support for faster cross-validation and model training across multiple cores.</p>
+<p>*Custom fold construction functions: users can inject their own fold-building logic.</p>
+<p>These functions can also accept a bestune argument, which is automatically passed after hyperparameter optimization, allowing seamless retraining on the full training set with the best parameters.</p>
+<p>*Preprocessing utilities for feature filtering (e.g., correlation pruning).</p>
+<p>*Model interpretation via SHAP values for feature importance.</p>
+<p>*Model stacking based on GLM for ensemble learning.</p>
+<p>*Visualization functions for ROC and PR curves, plus performance summaries.</p>
+<p>*Support for 13 machine learning methods, including:</p>
 <ul>
 <li>Bagged CART</li>
 <li>Random Forest (RF)</li>
@@ -103,8 +105,6 @@
 <li>Support vector machine with linear kernel (SVMl)</li>
 <li>Extreme Gradient Boosting (XGboost)</li>
 </ul>
-</li>
-</ul>
 </div>
 <div class="section level2">
 <h2 id="general-usage">General usage<a class="anchor" aria-label="anchor" href="#general-usage"></a>
@@ -116,8 +116,7 @@
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_ml</span> <span class="op">=</span> <span class="fu"><a href="reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span><span class="va">features_train</span>, <span class="va">clinical</span><span class="op">$</span><span class="va">Response</span>, <span class="st">"CR"</span>, </span>
 <span>                                      metric <span class="op">=</span> <span class="st">"AUROC"</span>, stack <span class="op">=</span> <span class="cn">F</span>, k_folds <span class="op">=</span> <span class="fl">5</span>, </span>
-<span>                                      n_rep <span class="op">=</span> <span class="fl">10</span>, feature.selection <span class="op">=</span> <span class="cn">F</span>, seed <span class="op">=</span> <span class="fl">123</span>, </span>
-<span>                                      file_name <span class="op">=</span> <span class="st">"Test"</span>, ncores <span class="op">=</span> <span class="fl">2</span>, return <span class="op">=</span> <span class="cn">T</span><span class="op">)</span></span></code></pre></div>
+<span>                                      n_rep <span class="op">=</span> <span class="fl">10</span>, file_name <span class="op">=</span> <span class="st">"Test"</span>, ncores <span class="op">=</span> <span class="fl">2</span>, return <span class="op">=</span> <span class="cn">T</span><span class="op">)</span></span></code></pre></div>
 <p>After training, predictions on new data can be computed using the <code><a href="reference/compute_prediction.html">compute_prediction()</a></code> function. You can specify which metric to maximize when determining the optimal classification threshold. Supported values for maximize include: “Accuracy”, “Precision”, “Recall”, “Specificity”, “Sensitivity”, “F1”, and “MCC”.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pred</span> <span class="op">=</span> <span class="fu"><a href="reference/compute_prediction.html">compute_prediction</a></span><span class="op">(</span><span class="va">res_ml</span>, <span class="va">features_test</span>, <span class="va">traitData_test</span><span class="op">$</span><span class="va">Response</span>, </span>
@@ -128,8 +127,7 @@
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">=</span> <span class="fu"><a href="reference/compute_features.ML.html">compute_features.ML</a></span><span class="op">(</span><span class="va">tme_features_train</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span>, <span class="va">tme_features_test</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span>, </span>
 <span>                          clinical <span class="op">=</span> <span class="va">traitData</span>, trait <span class="op">=</span> <span class="st">"Response"</span>, </span>
 <span>                          trait.positive <span class="op">=</span> <span class="st">"R"</span>, metric <span class="op">=</span> <span class="st">"AUROC"</span>, stack <span class="op">=</span> <span class="cn">F</span>, </span>
-<span>                          k_folds <span class="op">=</span> <span class="fl">2</span>, n_rep <span class="op">=</span> <span class="fl">1</span>, feature.selection <span class="op">=</span> <span class="cn">F</span>, </span>
-<span>                          seed <span class="op">=</span> <span class="fl">123</span>, LODO <span class="op">=</span> <span class="cn">T</span>, batch_id <span class="op">=</span> <span class="st">"Cohort"</span>, </span>
+<span>                          k_folds <span class="op">=</span> <span class="fl">2</span>, n_rep <span class="op">=</span> <span class="fl">1</span>, LODO <span class="op">=</span> <span class="cn">T</span>, batch_id <span class="op">=</span> <span class="st">"Cohort"</span>, </span>
 <span>                          ncores <span class="op">=</span> <span class="fl">2</span>, maximize <span class="op">=</span> <span class="st">"Accuracy"</span>, return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">

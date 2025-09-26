@@ -45,7 +45,7 @@ It supports hyperparameter tuning over a grid and returns a model object that mi
 <span>  <span class="va">processed_folds</span>,</span>
 <span>  <span class="va">ml_method</span>,</span>
 <span>  tuneGrid <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  <span class="va">training_set_all</span></span>
+<span>  ncores <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -65,16 +65,16 @@ It supports hyperparameter tuning over a grid and returns a model object that mi
 <dd><p>Optional. A data frame specifying the grid of hyperparameters to evaluate. If <code>NULL</code>, a default grid of length 3 is generated using caret's <code>getModelInfo()</code>.</p></dd>
 
 
-<dt id="arg-training-set-all">training_set_all<a class="anchor" aria-label="anchor" href="#arg-training-set-all"></a></dt>
-<dd><p>A data frame containing the full training set (i.e., all folds combined) with features and a <code>target</code> column.</p></dd>
+<dt id="arg-ncores">ncores<a class="anchor" aria-label="anchor" href="#arg-ncores"></a></dt>
+<dd><p>Integer. Number of cores to use for parallelization. If not given, detectCores() - 1 will be used.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A list (caret-style object) with the following components:</p><ul><li><p><code>fit.train</code>: The final model trained on the full training set using the best hyperparameters.</p></li>
-<li><p><code>results</code>: A data frame summarizing average cross-validated Accuracy, Kappa, and their standard deviations for each hyperparameter combination.</p></li>
-<li><p><code>pred</code>: A data frame of predictions from each fold, including class probabilities, observed and predicted labels, and hyperparameter values.</p></li>
-<li><p><code>resample</code>: A data frame summarizing Accuracy and Kappa per fold for the best-tuned model.</p></li>
+    <p>A list with the following components:</p><ul><li><p><code>Results_folds</code>: A data frame summarizing average cross-validated Accuracy, Kappa, and their standard deviations for each hyperparameter combination.</p></li>
+<li><p><code>Prediction_folds</code>: A data frame of predictions from each fold, including class probabilities, observed and predicted labels, and hyperparameter values.</p></li>
+<li><p><code>Resample_matrix</code>: A data frame summarizing Accuracy and Kappa per fold for the best-tuned model.</p></li>
+<li><p><code>Besttune</code>: List of optimized hyperparameters.</p></li>
 </ul></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
