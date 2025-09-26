@@ -164,27 +164,6 @@ get_curves(pred$Metrics, spec = "Specificity",
            file.name = "Test")
 ```
 
-To enable feature selection during model training, set `feature.selection = TRUE`. You must also specify the number of Boruta iterations via the `n_boruta` parameter and whether to resolve tentative features using the `boruta_fix` parameter (refer to `feature.selection.boruta()` for more details).
-```{r}
-res <- compute_features.training.ML(features_train = deconvolution, 
-                                    target_var = traitData$Best.Confirmed.Overall.Response,
-                                    trait.positive = "CR",
-                                    metric = "AUROC",
-                                    stack = TRUE,
-                                    k_folds = 2,
-                                    n_rep = 2,
-                                    LODO = FALSE,
-                                    batch_id = NULL,
-                                    file_name = "Test",
-                                    ncores = 2,
-                                    return = FALSE)
-```
-
-When `feature.selection = TRUE`, the function will also return the features selected by Boruta. If set to `FALSE`, it returns all features by default.
-```{r}
-res$Features
-```
-
 To enable parallelization, specify the number of cores via the `ncores` parameter (default is `detectCores() - 1`).
 ```{r, eval = FALSE}
 res <- compute_features.training.ML(features_train = deconvolution, 
@@ -197,7 +176,7 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     LODO = FALSE,
                                     batch_id = NULL,
                                     file_name = "Test",
-                                    ncores = 3,
+                                    ncores = 2,
                                     return = FALSE)
 ```
 
@@ -294,30 +273,30 @@ for (cohort in unique(traitData$Cohort)) {
   features_train = features_all[rownames(features_all)%in%rownames(traitData_train),]
 
   #### ML Training
-  res = pipeML::compute_features.training.ML(features_train, 
-                                             traitData_train$Response, 
-                                             trait.positive = "R", 
-                                             metric = "AUROC", 
-                                             stack = T, 
-                                             k_folds = 2, 
-                                             n_rep = 3, 
-                                             LODO = TRUE,
-                                             batch_id = traitData_train$Cohort, 
-                                             ncores = 3, 
-                                             return = F)
+  res = compute_features.training.ML(features_train, 
+                                     traitData_train$Response, 
+                                     trait.positive = "R", 
+                                     metric = "AUROC", 
+                                     stack = T, 
+                                     k_folds = 2, 
+                                     n_rep = 3, 
+                                     LODO = TRUE,
+                                     batch_id = traitData_train$Cohort, 
+                                     ncores = 2, 
+                                     return = F)
 
   ## Feature importance
-  importance = pipeML::compute_variable.importance(res, stacking = T, n_cores = 2)
+  importance = compute_variable.importance(res, stacking = T, n_cores = 2)
 
   #### ML predicting
   
   #### Testing
-  pred = pipeML::compute_prediction(model = res, 
-                                    test_data = features_test, 
-                                    target_var = traitData_test$Response, 
-                                    trait.positive = "R", 
-                                    stack = TRUE, 
-                                    return = F)
+  pred = compute_prediction(model = res, 
+                            test_data = features_test, 
+                            target_var = traitData_test$Response, 
+                            trait.positive = "R", 
+                            stack = TRUE, 
+                            return = F)
 
   pred[["Importance"]] = importance
   
@@ -362,7 +341,7 @@ In certain use cases it is essential to carefully design how the training and te
 
 #### Why use custom folds?
 
-By default, cross-validation splits are performed directly on the feature matrix. However, if your features are generated through a process that uses correlations (e.g., clustering, dimensionality reduction, aggregation), gene set enrichment or other features that are sample-dependent, applying that process to the full dataset before splitting can leak test-set information into the training set, biasing the models.
+By default, cross-validation splits are performed directly on the feature matrix. However, if your features are generated through a process that uses correlations (e.g., clustering, dimensionality reduction, aggregation), gene set enrichment or other features that are sample-dependent, applying that process to the full dataset before splitting can leak test-set information into the training set, overfitting the models.
 
 Using a custom fold construction function ensures that:
 - Test samples are projected onto the learned space without influencing it.
@@ -371,6 +350,10 @@ Using a custom fold construction function ensures that:
 Below you can find an example of a custom fold function created to compute TF activity in samples using the viper algorithm. This approach is based on a TF-target set enrichment analysis similar to GSEA and thus, the scores will be sample-dependent. It needs normalized counts as input.
 
 ```{r, eval = FALSE}
+# These parameters are taking care inside pipeML automatically once `fold_construction_fun` is set. Be sure to not change the parameteres names.
+#' @param data Data from which the custom function will be performed 
+#' @param folds A list of integer vectors indicating row indices for the training set in each fold. 
+#' 
 prepare_TFs_folds <- function(data, folds) {
   
   processed_folds <- list()
@@ -433,7 +416,7 @@ In order to create your own custom fold function, user can follow the same struc
 
 res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), traitData_train$Response, trait.positive = "R", 
                                            metric = "AUROC", stack = F, k_folds = 5, n_rep = 10, LODO = F, 
-                                           ncores = 3, return = F, fold_construction_fun = prepare_TFs_folds)
+                                           ncores = 2, return = F, fold_construction_fun = prepare_TFs_folds)
 ```
 
 In order to predict, user needs to calculate the same type of features on the test set
@@ -446,4 +429,222 @@ tf_activities_test <- compute_TF_activity(RNA_tpm = counts_test)
 pred = compute_prediction(res, tf_activities_test, traitData_test$Response, trait.positive = "R", 
                           stack = FALSE, maximize = "Accuracy", return = F)
 ```
+
+#### What if `fold_construction_fun` has multiple parameters?
+
+Sometimes the feature construction function requires additional arguments. For example, `compute_TF_activity()` may need the TF collection, a minimum target size, and whether TFs should be pruned. These can be exposed in your custom function:
+```{r, eval = FALSE}
+tfs = compute.TFs.activity(counts.norm, TF.collection = "CollecTRI", min_targets_size = 5, tfs.pruned = FALSE)
+```
+
+Then the custom function needs to specify these parameters and their values. It will look like this:
+```{r, eval = FALSE}
+prepare_TFs_folds <- function(data, folds, TF.collection = "CollecTRI", min_targets_size = 5, tfs.pruned = FALSE) {
+  
+  processed_folds <- list()
+  
+  for (i in seq_along(folds)) {
+    
+    train_idx <- folds[[i]]
+    test_idx <- setdiff(seq_len(nrow(data)), train_idx)
+    
+    ## Subset data
+    train_data <- data[train_idx, , drop = FALSE]
+    obs_train <- train_data$target
+    train_data$target <- NULL
+    
+    ##################################################### User can change this part 
+    train_processed <- compute_TF_activity(RNA_tpm = t(train_data),  
+                                           TF.collection = "CollecTRI",
+                                           min_targets_size = 5, 
+                                           tfs.pruned = FALSE) 
+    
+    colnames(train_processed) <- gsub("[- +]", ".", colnames(train_processed)) ## Just to change special characters (ignore in other cases)
+    
+    train_cell_data <- train_processed %>%
+      dplyr::mutate(target = obs_train)
+    
+    ## Prepare test data using trained info
+    obs_test <- data$target[test_idx]
+    test_data <- data[test_idx, , drop = FALSE]
+    test_data$target <- NULL
+    ##################################################### User can change this part
+    test_data <- compute_TF_activity(RNA_tpm = t(test_data),
+                                     TF.collection = "CollecTRI",
+                                     min_targets_size = 5, 
+                                     tfs.pruned = FALSE) 
+    
+    colnames(test_data) <- gsub("[- +]", ".", colnames(test_data)) ## Just to change special characters (ignore in other cases)
+    
+    processed_folds[[i]] <- list(
+      train_data = train_cell_data,
+      test_data = test_data,
+      obs_test = obs_test,
+      rowIndex = test_idx,
+      fold_name = names(folds)[i]
+    )
+  }
+  
+  # Run TFs on the full training set
+  obs_train = data$target
+  data$target = NULL
+  
+  ##################################################### User can change this part
+  train_processed_final <- compute_TF_activity(RNA_tpm = t(data),  
+                                           TF.collection = "CollecTRI",
+                                           min_targets_size = 5, 
+                                           tfs.pruned = FALSE)  
+  
+  colnames(train_processed_final) <- gsub("[- +]", ".", colnames(train_processed_final)) ## Just to change special characters (ignore in other cases)
+  
+  # Get features
+  train_cell_data_final <- train_processed_final %>%
+    dplyr::mutate(target = obs_train)
+  
+  custom_output = train_processed_final
+  
+  return(list(processed_folds, train_cell_data_final, custom_output))
+}
+```
+
+When calling `compute_features.training.ML()`, these fixed arguments are passed via `fold_construction_args_fixed`:
+```{r, eval=FALSE}
+res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), traitData_train$Response, trait.positive = "R", 
+                                           metric = "AUROC", stack = F, k_folds = 5, n_rep = 10, LODO = F, 
+                                           ncores = 2, return = F, fold_construction_fun = prepare_TFs_folds,
+                                           fold_construction_args_fixed = list(TF.collection = "CollecTRI", min_targets_size = 5, tfs.pruned = FALSE))
+```
+
+#### Tunable hyperparameters during custom function
+
+There will be cases when user will have parameters that can change value and thus, affect the performance during training. pipeML implements a custom hyperparameter tuning for these type of cases where the goal is to find which value of a certain parameter maximizes the performance of the model. Briefly, it takes a grid of values propose by the user and compute custom k-folds for each combination of values, testing the performance across different ML models and their corresponding hyperparameters. It then returns the optimized parameters that return the best performance across a certain number of iterations defined by the user. For this, user needs to defined the parameter `fold_construction_args_tunable` with the different values that should be test. Here we want to test the performance using 5, 10, 15, 20 as different values for this parameter.
+
+```{r, eval = FALSE}
+res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), traitData_train$Response, trait.positive = "R", 
+                                           metric = "AUROC", stack = F, k_folds = 5, n_rep = 10, LODO = F, 
+                                           ncores = 2, return = F, fold_construction_fun = prepare_TFs_folds,
+                                           fold_construction_args_fixed = list(TF.collection = "CollecTRI", tfs.pruned = FALSE), 
+                                           fold_construction_args_tunable = list(min_targets_size = c(5, 10, 15, 20)))
+```
+
+For this to work, your custom function must accept a `bestune` argument, which is used internally to inject the optimized parameter values found during the tuning step.
+
+When `bestune` is NULL, the function assumes that tuning has not yet been performed. A grid of candidate parameter values (defined in `fold_construction_args_tunable`) is generated. For each fold, the function iterates through all combinations of parameter values and recomputes the features. This exploration step is parallelized across folds using foreach and doParallel, allowing multiple folds to be processed simultaneously. Parallelization reduces runtime considerably when the parameter grid or number of folds is large.
+
+When `bestune` is not NULL, it means the tuning process has already been completed. The optimized parameter values are extracted from the bestune object. Features are then recomputed once on the full training dataset using these tuned parameters. This ensures the final model is trained with the best parameter setting identified during cross-validation.
+
+In summary, the `bestune` argument acts as a control switch:
+
+- NULL → run parameter search with parallelized fold-level evaluation.
+- non-NULL → lock in the tuned parameter values and rebuild the features for final training.
+
+This design allows a single custom fold-construction function to handle both hyperparameter tuning (exploration, parallelized) and final model preparation (exploitation, single optimized run).
+
+```{r, eval = FALSE}
+prepare_TFs_folds <- function(data, folds, TF.collection = "CollecTRI", min_targets_size = 5, tfs.pruned = FALSE, bestune = NULL){
+  
+    if(!is.null(bestune)){
+      
+      obs_train = data$target
+      data$target = NULL
+
+      best_params <- bestune %>%
+        dplyr::select(min_targets_size) ### Here you should put the hyperparameters that you want to tune 
+
+      train_processed_final <- compute_TF_activity(RNA_tpm = t(test_data), 
+                                                   TF.collection = "CollecTRI", 
+                                                   min_targets_size = best_params$min_targets_size, ### Here you replace by the value of the optimized parameter
+                                                   tfs.pruned = FALSE) 
+
+      colnames(train_processed_final) <- gsub("[- +]", ".", colnames(train_processed_final)) ## Just to change special characters (ignore in other cases)
+
+      # Get cell group features
+      train_cell_data_final <- train_processed_final %>%
+        dplyr::mutate(target = obs_train)
+      
+      custom_output = train_processed_final
+
+      res = list(train_cell_data_final, custom_output, best_params)
+    }else{ ### Means best tune need to be find
+
+      #### Here put all the parameters you want to tune
+      custom_grid <- expand.grid(
+        min_targets_size = min_targets_size,
+      )
+
+      ### Implement parallelization
+      if(is.null(ncores) == TRUE){
+        ncores = parallel::detectCores() - 2
+      }
+
+      cl <- parallel::makeCluster(ncores)
+      doParallel::registerDoParallel(cl)
+
+      # Parallelize over folds
+      processed_folds <- foreach::foreach(i = seq_along(folds), .packages = c("dplyr")) %dopar% {
+
+        cat("Starting fold", names(folds)[i], "\n")
+
+        train_idx <- folds[[i]]
+        test_idx <- setdiff(seq_len(nrow(data)), train_idx)
+
+        ## Subset data
+        train_data <- data[train_idx, , drop = FALSE]
+        train_coldata <- coldata[train_idx, , drop = FALSE]
+        obs_train <- train_data$target
+        train_data$target <- NULL
+
+        fold_results <- vector("list", nrow(custom_grid))
+
+        for (j in seq_len(nrow(custom_grid))) {
+
+          ##################################################### User can change this part
+          train_processed <- compute_TF_activity(RNA_tpm = t(train_data), 
+                                                 TF.collection = "CollecTRI", 
+                                                 min_targets_size = custom_grid$min_targets_size[j], ### Here will iterate across params values
+                                                 tfs.pruned = FALSE) 
+
+          colnames(train_processed) <- gsub("[- +]", ".", colnames(train_processed)) ## Just to change special characters (ignore in other cases)
+          
+          train_cell_data <- train_processed %>%
+            dplyr::mutate(target = obs_train)
+
+          ## Prepare test data using trained info
+          obs_test <- data$target[test_idx]
+          test_data <- data[test_idx, , drop = FALSE]
+          test_data$target <- NULL
+          ##################################################### User can change this part
+          test_data <- compute_TF_activity(RNA_tpm = t(test_data), 
+                                           TF.collection = "CollecTRI", 
+                                           min_targets_size = custom_grid$min_targets_size[j], ### Here will iterate across params values
+                                           tfs.pruned = FALSE) 
+          
+          colnames(test_data) <- gsub("[- +]", ".", colnames(test_data)) ## Just to change special characters (ignore in other cases)
+
+          fold_results[[j]] <- list(
+            train_data = train_cell_data,
+            test_data  = test_data,
+            obs_test   = obs_test,
+            rowIndex   = test_idx,
+            fold_name  = names(folds)[i],
+            params     = custom_grid[j, ]
+          )
+        }
+
+        fold_results
+      }
+
+      parallel::stopCluster(cl)  # stop the cluster after parallel execution
+      unregister_dopar() #Stop Dopar from running in the background
+
+      res <- processed_folds
+    }
+
+  return(res)
+  
+}
+```
+
+
+
 

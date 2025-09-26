@@ -25,6 +25,7 @@ Imports:
     kernelshap,
     tibble,
     tidyr,
+    rlang,
     Boruta
 Remotes: 
     VeraPancaldiLab/multideconv,

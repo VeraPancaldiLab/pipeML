@@ -15,7 +15,8 @@ compute_k_fold_CV(
   ncores = NULL,
   return = FALSE,
   fold_construction_fun = NULL,
-  fold_construction_args = list()
+  fold_construction_args_fixed = NULL,
+  fold_construction_args_tunable = NULL
 )
 }
 \arguments{
@@ -37,9 +38,18 @@ compute_k_fold_CV(
 
 \item{return}{Logical. Whether to return the results and generated plots.}
 
-\item{fold_construction_fun}{Function. A custom function used to construct the cross-validation folds. It should return a list of training indices for each fold.}
+\item{fold_construction_fun}{Function. A custom function used to construct the cross-validation folds.
+This function must accept a \code{bestune} argument, which is used internally to inject optimized parameters
+after hyperparameter tuning. If \code{bestune = NULL}, the function will explore a parameter grid across folds
+(parallelized with \code{foreach}); if \code{bestune} is provided, the optimized parameters will be applied
+to rebuild the features on the full training data.}
 
-\item{fold_construction_args}{List. Named list of additional arguments to pass to \code{fold_construction_fun}.}
+\item{fold_construction_args_fixed}{List. A list of arguments passed to \code{fold_construction_fun}
+that remain fixed during both cross-validation and final training.}
+
+\item{fold_construction_args_tunable}{List. A list of arguments passed to \code{fold_construction_fun}
+that define the hyperparameters to be tuned during cross-validation. Each element should contain
+candidate values for tuning.}
 }
 \value{
 A list containing:

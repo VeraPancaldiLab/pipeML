@@ -8,7 +8,13 @@ utils::globalVariables(c(
   "AUC_prc", "Cohort", "medianAUROC", "medianAUPRC", "fpr", ".", "meanImp", "Variable",
   "Value", "Decision", "feature", "shap_value", "mean_shap", "direction", "seed",
   "tp", "fp", "fn", "is_yes", "calibrated_yes", "model", "pred", "no", "Resample", "Sensitivity",
-  "Specificity", "Accuracy", "value"
+  "Specificity", "Accuracy", "value", "job",
+  "metrics",
+  "Accuracy_resample",
+  "Kappa_resample",
+  "MAD_AUROC",
+  "MAD_AUPRC",
+  "MAD_Accuracy"
 ))
 
 #' Compute Boruta algorithm
@@ -251,8 +257,16 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
 #' @param LODO Logical. If TRUE, performs Leave-One-Dataset-Out (LODO) cross-validation by stratifying folds based on cohort membership.
 #' @param ncores Integer. Number of cores to use for parallelization. If not given, detectCores() - 1 will be used.
 #' @param return Logical. Whether to return the results and generated plots.
-#' @param fold_construction_fun Function. A custom function used to construct the cross-validation folds. It should return a list of training indices for each fold.
-#' @param fold_construction_args List. Named list of additional arguments to pass to \code{fold_construction_fun}.
+#' @param fold_construction_fun Function. A custom function used to construct the cross-validation folds.
+#' This function must accept a \code{bestune} argument, which is used internally to inject optimized parameters
+#' after hyperparameter tuning. If \code{bestune = NULL}, the function will explore a parameter grid across folds
+#' (parallelized with \code{foreach}); if \code{bestune} is provided, the optimized parameters will be applied
+#' to rebuild the features on the full training data.
+#' @param fold_construction_args_fixed List. A list of arguments passed to \code{fold_construction_fun}
+#' that remain fixed during both cross-validation and final training.
+#' @param fold_construction_args_tunable List. A list of arguments passed to \code{fold_construction_fun}
+#' that define the hyperparameters to be tuned during cross-validation. Each element should contain
+#' candidate values for tuning.
 #'
 #' @return A list containing:
 #' \itemize{
@@ -270,20 +284,23 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
 #'
 #'
 compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "Accuracy", file_name = NULL, LODO = FALSE,
-                             ncores = NULL, return = FALSE, fold_construction_fun = NULL, fold_construction_args = list()){
+                             ncores = NULL, return = FALSE, fold_construction_fun = NULL, fold_construction_args_fixed = NULL,
+                             fold_construction_args_tunable = NULL){
 
-  custom_output = NULL
   if(!(metric %in% c("AUROC", "AUPRC","Accuracy"))){
     stop("The metric assigned is not supported. Choose either accuracy or AUC.")
   }
 
-  if(is.null(fold_construction_fun)){
-    train_data = preprocess_features(model, cor_thresh = 0.9)
+  if(is.null(fold_construction_fun)){ ### Preprocessing (remove collinear variables and low variance)
+    if(LODO == TRUE){
+      train_data = preprocess_features(model %>% dplyr::select(-dataset), cor_thresh = 0.9) %>%
+        dplyr::mutate(dataset = model$dataset)
+    }else{
+      train_data = preprocess_features(model, cor_thresh = 0.9)
+    }
   }else{
     train_data = model
   }
-
-  #train_data = model
 
   rm(model) #Clean memory
   gc()
@@ -302,6 +319,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   if(is.null(ncores) == TRUE){
     ncores = parallel::detectCores() - 2
   }
+
   cl <- parallel::makeCluster(ncores)
   doParallel::registerDoParallel(cl)
 
@@ -372,83 +390,177 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     invisible(utils::capture.output({fit.xgbTree <- caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)}, type = "output"))
 
+    parallel::stopCluster(cl)  # stop the cluster after parallel execution
+    unregister_dopar() #Stop Dopar from running in the background
+
   }else{
 
     # Custom fold construction
-    x <- do.call(fold_construction_fun, c(list(data = train_data, folds = multifolds), fold_construction_args))
+    fold_data <- do.call(fold_construction_fun, c(list(data = train_data, folds = multifolds), fold_construction_args_fixed, fold_construction_args_tunable))
 
-    fold_data = x[[1]] # extract processed folds
-    training_set_complete = x[[2]] # extract complete training set
-    custom_output = x[[3]] #custom output from function to be returned after all complete training
+    # Iterate across folds and inside each subfold corresponding to each param combination (if exist)
+    for (fold_i in seq_along(fold_data)) {
 
+      # Each fold contains multiple parameter sets (list of lists) --> fold_construction_args_tunable != NULL
+      if (!is.null(fold_construction_args_tunable)) {
+        for (parameter_i in seq_along(fold_data[[fold_i]])) {
+          model <- fold_data[[fold_i]][[parameter_i]][["train_data"]]
+          target <- model$target
 
-    for(fold_i in seq_along(fold_data)){
+          # Preprocessing features (remove collinear variables and no-variance)
+          model <- preprocess_features(model, cor_thresh = 0.9)
 
-      model = fold_data[[fold_i]][["train_data"]]
+          # Replace in original train/test datasets
+          fold_data[[fold_i]][[parameter_i]][["train_data"]] <- model
+          fold_data[[fold_i]][[parameter_i]][["test_data"]] <-
+            fold_data[[fold_i]][[parameter_i]][["test_data"]][, setdiff(colnames(model), "target")]
+        }
+      }else { # Custom function does not have hyperparams to tune --> fold_construction_args_tunable != NULL
+        model <- fold_data[[fold_i]][["train_data"]]
+        target <- model$target
 
-      target = model$target
+        # Preprocessing
+        model <- preprocess_features(model, cor_thresh = 0.9)
 
-      train_data = preprocess_features(model, cor_thresh = 0.9) %>%
-        dplyr::mutate(target = target)
-
-      fold_data[[fold_i]][["train_data"]] = train_data
-      features = setdiff(colnames(train_data), 'target')
-      fold_data[[fold_i]][["test_data"]] = fold_data[[fold_i]][["test_data"]][,features]
+        # Replace
+        fold_data[[fold_i]][["train_data"]] <- model
+        fold_data[[fold_i]][["test_data"]] <-
+          fold_data[[fold_i]][["test_data"]][, setdiff(colnames(model), "target")]
+      }
     }
-
-    target = training_set_complete$target
-
-    training_set_complete = preprocess_features(training_set_complete, cor_thresh = 0.9) %>%
-      dplyr::mutate(target = target)
 
     ###################
 
     # Custom CV validation and hyperparameter tuning
-    fit.rf <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "rf",
-                                                training_set_all = training_set_complete))
 
-    fit.treebag <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "treebag",
-                                                       training_set_all = training_set_complete))
+    ############################# Random Forest
+    cat("Running Random Forest....................\n")
+    models.rf = wrapper_train_best_hyperparams(train_data, fold_data, "rf", fold_construction_fun, fold_construction_args_fixed, ncores=ncores)
+    fit.rf = models.rf$Model
+    training_set.rf = models.rf$training_set
+    custom_output.rf = models.rf$custom_output
 
-    fit.c50 <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "C5.0",
-                                                   training_set_all = training_set_complete))
+    ############################# BAG model
+    cat("Running BAG....................\n")
+    models.treebag = wrapper_train_best_hyperparams(train_data, fold_data, "treebag", fold_construction_fun, fold_construction_args_fixed, ncores=ncores)
+    fit.treebag = models.treebag$Model
+    training_set.treebag = models.treebag$training_set
+    custom_output.treebag = models.treebag$custom_output
 
-    # fit.glm <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "glm",
-    #                                                training_set_all = training_set_complete))
+    ############################# C5.0
+    cat("Running C5.0....................\n")
+    models.c50 = wrapper_train_best_hyperparams(train_data, fold_data, "C5.0", fold_construction_fun, fold_construction_args_fixed, ncores=ncores)
+    fit.c50 = models.c50$Model
+    training_set.c50 = models.c50$training_set
+    custom_output.c50 = models.c50$custom_output
 
-    # fit.lda <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "lda",
-    #                                                training_set_all = training_set_complete))
+    ############################# GLM
+    cat("Running GLM....................\n")
+    models.glm = wrapper_train_best_hyperparams(train_data, fold_data, "glm", fold_construction_fun, fold_construction_args_fixed, ncores=ncores)
+    fit.glm = models.glm$Model
+    training_set.glm = models.glm$training_set
+    custom_output.glm = models.glm$custom_output
 
-    fit.glmnet <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "glmnet",
-                                                      training_set_all = training_set_complete))
+    ############################# LDA
+    cat("Running LDA....................\n")
+    models.lda = wrapper_train_best_hyperparams(train_data, fold_data, "lda", fold_construction_fun, fold_construction_args_fixed, ncores=ncores)
+    fit.lda = models.lda$Model
+    training_set.lda = models.lda$training_set
+    custom_output.lda = models.lda$custom_output
 
-    fit.knn <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "knn",
-                                                   training_set_all = training_set_complete))
+    ############################# GLMNET
+    cat("Running GLMNET....................\n")
+    models.glmnet = wrapper_train_best_hyperparams(train_data, fold_data, "glmnet", fold_construction_fun, fold_construction_args_fixed, ncores=ncores)
+    fit.glmnet = models.glmnet$Model
+    training_set.glmnet = models.glmnet$training_set
+    custom_output.glmnet = models.glmnet$custom_output
 
-    fit.cart <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "rpart",
-                                                    training_set_all = training_set_complete))
+    ############################# KNN
+    cat("Running KNN....................\n")
+    models.knn = wrapper_train_best_hyperparams(train_data, fold_data, "knn", fold_construction_fun, fold_construction_args_fixed, ncores=ncores)
+    fit.knn = models.knn$Model
+    training_set.knn = models.knn$training_set
+    custom_output.knn = models.knn$custom_output
 
-    fit.lasso <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "glmnet",
-                                                     tuneGrid = expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 20)),
-                                                     training_set_all = training_set_complete))
+    ############################# rpart
+    cat("Running Rpart....................\n")
+    models.cart = wrapper_train_best_hyperparams(train_data, fold_data, "rpart", fold_construction_fun, fold_construction_args_fixed, ncores=ncores)
+    fit.cart = models.cart$Model
+    training_set.cart = models.cart$training_set
+    custom_output.cart = models.cart$custom_output
 
-    fit.ridge <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "glmnet",
-                                                     tuneGrid = expand.grid(alpha = 0, lambda = seq(0.001, 1, length = 20)),
-                                                     training_set_all = training_set_complete))
+    ############################# Lasso
+    cat("Running Lasso....................\n")
+    models.lasso = wrapper_train_best_hyperparams(train_data, fold_data, "glmnet", fold_construction_fun, fold_construction_args_fixed,
+                                               tuneGrid = expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 20)), ncores=ncores)
+    fit.lasso = models.lasso$Model
+    training_set.lasso = models.lasso$training_set
+    custom_output.lasso = models.lasso$custom_output
 
-    fit.svm_radial <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "svmRadial",
-                                                          training_set_all = training_set_complete))
+    ############################# Ridge
+    cat("Running Ridge....................\n")
+    models.ridge = wrapper_train_best_hyperparams(train_data, fold_data, "glmnet", fold_construction_fun, fold_construction_args_fixed,
+                                               tuneGrid = expand.grid(alpha = 0, lambda = seq(0.001, 1, length = 20)), ncores=ncores)
+    fit.ridge = models.ridge$Model
+    training_set.ridge = models.ridge$training_set
+    custom_output.ridge = models.ridge$custom_output
 
-    fit.svm_linear <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "svmLinear",
-                                                          training_set_all = training_set_complete))
+    ############################# SVM radial
+    cat("Running SVM radial....................\n")
+    models.svm_radial = wrapper_train_best_hyperparams(train_data, fold_data, "svmRadial", fold_construction_fun, fold_construction_args_fixed, ncores=ncores)
+    fit.svm_radial = models.svm_radial$Model
+    training_set.svm_radial = models.svm_radial$training_set
+    custom_output.svm_radial = models.svm_radial$custom_output
 
-    fit.xgbTree <- do.call(compute_custom_k_fold_CV, list(processed_folds = fold_data, ml_method = "xgbTree",
-                                                       training_set_all = training_set_complete))
+    ############################# SVM linear
+    cat("Running SVM linear....................\n")
+    models.svm_linear = wrapper_train_best_hyperparams(train_data, fold_data, "svmLinear", fold_construction_fun, fold_construction_args_fixed, ncores=ncores)
+    fit.svm_linear = models.svm_linear$Model
+    training_set.svm_linear = models.svm_linear$training_set
+    custom_output.svm_linear = models.svm_linear$custom_output
+
+    ############################# XGBoost
+    cat("Running XGBoost....................\n")
+    models.xgbTree = wrapper_train_best_hyperparams(train_data, fold_data, "xgbTree", fold_construction_fun, fold_construction_args_fixed, ncores=ncores)
+    fit.xgbTree = models.xgbTree$Model
+    training_set.xgbTree = models.xgbTree$training_set
+    custom_output.xgbTree = models.xgbTree$custom_output
+
+    # Store complete tuned training sets per model
+    training_sets <- list(
+      BAG = training_set.treebag,
+      RF = training_set.rf,
+      C50 = training_set.c50,
+      #GLM = training_set.glm,
+      #LDA = training_set.lda,
+      GLMNET = training_set.glmnet,
+      KNN = training_set.knn,
+      CART = training_set.cart,
+      LASSO = training_set.lasso,
+      RIDGE = training_set.ridge,
+      SVM_radial = training_set.svm_radial,
+      SVM_linear = training_set.svm_linear,
+      XGboost = training_set.xgbTree
+    )
+
+    # Store custom outputs from all models
+    custom_outputs <- list(
+      BAG = custom_output.treebag,
+      RF = custom_output.rf,
+      C50 = custom_output.c50,
+      #GLM = custom_output.glm,
+      #LDA = custom_output.lda,
+      GLMNET = custom_output.glmnet,
+      KNN = custom_output.knn,
+      CART = custom_output.cart,
+      LASSO = custom_output.lasso,
+      RIDGE = custom_output.ridge,
+      SVM_radial = custom_output.svm_radial,
+      SVM_linear = custom_output.svm_linear,
+      XGboost = custom_output.xgbTree
+    )
 
   }
-
-  parallel::stopCluster(cl)  # stop the cluster after parallel execution
-  unregister_dopar() #Stop Dopar from running in the background
 
   ####### Optimized based on metric (only AUC or Accuracy available)
   if(metric == "AUROC" || metric == "AUPRC"){
@@ -471,36 +583,100 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     )
 
     # Define corresponding hyperparameters
-    hyperparams <- list(
-      BAG = NULL,
-      RF = "mtry",
-      C50 = c("trials", "model", "winnow"),
-      #GLM = NULL,
-      #LDA = NULL,
-      GLMNET = c("alpha", "lambda"),
-      KNN = "k",
-      CART = "cp",
-      LASSO = c("alpha", "lambda"),
-      RIDGE = c("alpha", "lambda"),
-      SVM_radial = c("sigma", "C"),
-      SVM_linear = "C",
-      XGboost = c("nrounds", "max_depth", "eta", "gamma", "colsample_bytree", "min_child_weight", "subsample")
-    )
+    if(!is.null(fold_construction_args_tunable)){
+      hyperparams <- list(
+        BAG = names(fold_construction_args_tunable),
+        RF = c("mtry",names(fold_construction_args_tunable)),
+        C50 = c("trials", "model", "winnow", names(fold_construction_args_tunable)),
+        #GLM = NULL,
+        #LDA = NULL,
+        GLMNET = c("alpha", "lambda", names(fold_construction_args_tunable)),
+        KNN = c("k", names(fold_construction_args_tunable)),
+        CART = c("cp",names(fold_construction_args_tunable)),
+        LASSO = c("alpha", "lambda", names(fold_construction_args_tunable)),
+        RIDGE = c("alpha", "lambda", names(fold_construction_args_tunable)),
+        SVM_radial = c("sigma", "C", names(fold_construction_args_tunable)),
+        SVM_linear = c("C", names(fold_construction_args_tunable)),
+        XGboost = c("nrounds", "max_depth", "eta", "gamma", "colsample_bytree", "min_child_weight", "subsample", names(fold_construction_args_tunable))
+      )
 
-    # Iterate over models
-    models <- lapply(names(models), function(name) {
-      model <- models[[name]]
-      res <- calculate_cv_metrics(model, metric, hyperparams[[name]])
-      # Update model fields
-      model$pred <- res$Prediction
-      model$resample <- res$Resamples
-      model$results <- res$Results
-      model$bestTune = res$bestTune
-      return(model)
-    })
+      # Iterate over models and update everything
+      updated_results <- lapply(names(models), function(name){
+        res <- calculate_cv_metrics(models[[name]], metric, hyperparams[[name]]) #Re-tuned hyperparams based on a different metric than 'Accuracy'
+
+        # Re-calculate training set based on new optimized hyperparams
+        training_all <- do.call(
+          fold_construction_fun,
+          c(list(data = train_data, bestune = res$bestTune), fold_construction_args_fixed)
+        )
+
+        # Preprocess features
+        training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9)
+
+        # Retrieve custom_output
+        custom_output <- training_all[[2]]
+
+        model <- models[[name]]
+        model$pred <- res$Prediction
+        model$resample <- res$Resamples
+        model$results <- res$Results
+
+        if("none" %in% model$bestTune){
+          model$bestTune <- tibble::tibble(parameter = "none")
+        }else{
+          model$bestTune <- res$bestTune %>% select(-colnames(training_all[[3]]))
+        }
+
+        list(
+          Model = model,
+          training_set = training_set,
+          custom_output = c(training_all[[2]], list("Parameters" = training_all[[3]]))
+        )
+      })
+
+      names(updated_results) <- names(models)
+
+      # Split into three lists
+      models <- lapply(updated_results, `[[`, "Model")
+      training_sets <- lapply(updated_results, `[[`, "training_set")
+      custom_outputs <- lapply(updated_results, `[[`, "custom_output")
+
+    }else{
+      hyperparams <- list(
+        BAG = NULL,
+        RF = "mtry",
+        C50 = c("trials", "model", "winnow"),
+        #GLM = NULL,
+        #LDA = NULL,
+        GLMNET = c("alpha", "lambda"),
+        KNN = "k",
+        CART = "cp",
+        LASSO = c("alpha", "lambda"),
+        RIDGE = c("alpha", "lambda"),
+        SVM_radial = c("sigma", "C"),
+        SVM_linear = "C",
+        XGboost = c("nrounds", "max_depth", "eta", "gamma", "colsample_bytree", "min_child_weight", "subsample")
+      )
+
+      # Iterate over models
+      models <- lapply(names(models), function(name) {
+        model <- models[[name]]
+        res <- calculate_cv_metrics(model, metric, hyperparams[[name]])
+        # Update model fields
+        model$pred <- res$Prediction
+        model$resample <- res$Resamples
+        model$results <- res$Results
+        model$bestTune = res$bestTune
+        return(model)
+      })
+
+      custom_outputs = NULL
+
+    }
 
     # Restore updated models
     names(models) = names(hyperparams)
+
     fit.treebag <- models$BAG
     fit.rf <- models$RF
     fit.c50 <- models$C50
@@ -515,12 +691,13 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.svm_linear <- models$SVM_linear
     fit.xgbTree <- models$XGboost
 
-
   }
 
   if(is.null(fold_construction_fun)){
 
     ###Prediction with best tuned hyper-parameters (Missing to add platt scaling to calibrated probabilities (when tested it didnt converge, need to be checked)) See https://www.cs.cornell.edu/~alexn/papers/calibration.icml05.crc.rev3.pdf
+
+    # -------------------------------------> Missing: Train models with bestTune from CV
 
     ###Bagged CART
 
@@ -616,12 +793,13 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     doParallel::registerDoParallel(cl)
 
     ######## Bagged CART
+    cat("Running BAG....................\n")
 
     # Train model with bestTune from CV
     temp = fit.treebag
     fit.treebag <- caret::train(
       target ~ .,
-      data = training_set_complete,
+      data = training_sets$BAG,
       method = "treebag",
       trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
@@ -634,18 +812,19 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.treebag$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.bag = predict(fit.treebag, newdata = training_set_complete, type = "prob") %>%
+    predictions.bag = predict(fit.treebag, newdata = training_sets$BAG, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(BAG = yes) #Predictions of model (already ordered)
 
     ######## RF
+    cat("Running RF....................\n")
 
     # Train model with bestTune from CV
     temp = fit.rf
     fit.rf <- caret::train(
       target ~ .,
-      data = training_set_complete,
+      data = training_sets$RF,
       method = "rf",
       trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
@@ -658,18 +837,19 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.rf$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.rf = predict(fit.rf, newdata = training_set_complete, type = "prob") %>%
+    predictions.rf = predict(fit.rf, newdata = training_sets$RF, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(RF = yes) #Predictions of model (already ordered)
 
     ######## C5.0
+    cat("Running C50....................\n")
 
     # Train model with bestTune from CV
     temp = fit.c50
     fit.c50 <- caret::train(
       target ~ .,
-      data = training_set_complete,
+      data = training_sets$C50,
       method = "C5.0",
       trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
@@ -682,7 +862,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.c50$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.c50 = predict(fit.c50, newdata = training_set_complete, type = "prob") %>%
+    predictions.c50 = predict(fit.c50, newdata = training_sets$C50, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(C50 = yes) #Predictions of model (already ordered)
@@ -693,7 +873,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     # temp = fit.glm
     # fit.glm <- caret::train(
     #   target ~ .,
-    #   data = training_set_complete,
+    #   data = training_sets$GLM,
     #   method = "glm",
     #   trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
     #   tuneGrid = temp$bestTune
@@ -706,7 +886,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     # fit.glm$bestTune = temp$bestTune
     #
     # # Predictions in trained model
-    # predictions.glm = predict(fit.glm, newdata = training_set_complete, type = "prob") %>%
+    # predictions.glm = predict(fit.glm, newdata = training_sets$GLM, type = "prob") %>%
     #   data.frame() %>%
     #   dplyr::select(yes) %>%
     #   dplyr::rename(GLM = yes) #Predictions of model (already ordered)
@@ -717,7 +897,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     # temp = fit.lda
     # fit.lda <- caret::train(
     #   target ~ .,
-    #   data = training_set_complete,
+    #   data = training_sets$LDA,
     #   method = "lda",
     #   trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
     #   tuneGrid = temp$bestTune
@@ -730,7 +910,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     # fit.lda$bestTune = temp$bestTune
     #
     # # Predictions in trained model
-    # predictions.lda = predict(fit.lda, newdata = training_set_complete, type = "prob") %>%
+    # predictions.lda = predict(fit.lda, newdata = training_sets$LDA, type = "prob") %>%
     #   data.frame() %>%
     #   dplyr::select(yes) %>%
     #   dplyr::rename(LDA = yes) #Predictions of model (already ordered)
@@ -738,11 +918,12 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     ### GLMNET
 
+    cat("Running GLMNET....................\n")
     # Train model with bestTune from CV
     temp = fit.glmnet
     fit.glmnet <- caret::train(
       target ~ .,
-      data = training_set_complete,
+      data = training_sets$GLMNET,
       method = "glmnet",
       trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
@@ -755,18 +936,19 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.glmnet$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.glmnet = predict(fit.glmnet, newdata = training_set_complete, type = "prob") %>%
+    predictions.glmnet = predict(fit.glmnet, newdata = training_sets$GLMNET, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(GLMNET = yes) #Predictions of model (already ordered)
 
     ### KNN
 
+    cat("Running KNN....................\n")
     # Train model with bestTune from CV
     temp = fit.knn
     fit.knn <- caret::train(
       target ~ .,
-      data = training_set_complete,
+      data = training_sets$KNN,
       method = "knn",
       trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
@@ -779,18 +961,19 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.knn$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.knn = predict(fit.knn, newdata = training_set_complete, type = "prob") %>%
+    predictions.knn = predict(fit.knn, newdata = training_sets$KNN, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(KNN = yes) #Predictions of model (already ordered)
 
     ## CART
 
+    cat("Running CART....................\n")
     # Train model with bestTune from CV
     temp = fit.cart
     fit.cart <- caret::train(
       target ~ .,
-      data = training_set_complete,
+      data = training_sets$CART,
       method = "rpart",
       trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
@@ -803,18 +986,19 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.cart$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.cart = predict(fit.cart, newdata = training_set_complete, type = "prob") %>%
+    predictions.cart = predict(fit.cart, newdata = training_sets$CART, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(CART = yes) #Predictions of model (already ordered)
 
     ## Regularized Lasso
 
+    cat("Running Lasso....................\n")
     # Train model with bestTune from CV
     temp = fit.lasso
     fit.lasso <- caret::train(
       target ~ .,
-      data = training_set_complete,
+      data = training_sets$LASSO,
       method = "glmnet",
       trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
@@ -827,18 +1011,19 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.lasso$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.lasso = predict(fit.lasso, newdata = training_set_complete, type = "prob") %>%
+    predictions.lasso = predict(fit.lasso, newdata = training_sets$LASSO, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(LASSO = yes) #Predictions of model (already ordered)
 
     ## Ridge regression
 
+    cat("Running Ridge....................\n")
     # Train model with bestTune from CV
     temp = fit.ridge
     fit.ridge <- caret::train(
       target ~ .,
-      data = training_set_complete,
+      data = training_sets$RIDGE,
       method = "glmnet",
       trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
@@ -851,18 +1036,19 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.ridge$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.ridge = predict(fit.ridge, newdata = training_set_complete, type = "prob") %>%
+    predictions.ridge = predict(fit.ridge, newdata = training_sets$RIDGE, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(RIDGE = yes) #Predictions of model (already ordered)
 
     ## SVM radial
 
+    cat("Running SVM radial....................\n")
     # Train model with bestTune from CV
     temp = fit.svm_radial
     fit.svm_radial <- caret::train(
       target ~ .,
-      data = training_set_complete,
+      data = training_sets$SVM_radial,
       method = "svmRadial",
       trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
@@ -875,18 +1061,19 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.svm_radial$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.svm_radial = predict(fit.svm_radial, newdata = training_set_complete, type = "prob") %>%
+    predictions.svm_radial = predict(fit.svm_radial, newdata = training_sets$SVM_radial, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(SVM_radial = yes) #Predictions of model (already ordered)
 
     ## SVM linear
 
+    cat("Running SVM linear....................\n")
     # Train model with bestTune from CV
     temp = fit.svm_linear
     fit.svm_linear <- caret::train(
       target ~ .,
-      data = training_set_complete,
+      data = training_sets$SVM_linear,
       method = "svmLinear",
       trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
       tuneGrid = temp$bestTune
@@ -899,18 +1086,19 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.svm_linear$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.svm_linear = predict(fit.svm_linear, newdata = training_set_complete, type = "prob") %>%
+    predictions.svm_linear = predict(fit.svm_linear, newdata = training_sets$SVM_linear, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(SVM_linear = yes) #Predictions of model (already ordered)
 
     ## XGboost
 
+    cat("Running XGboost....................\n")
     # Train model with bestTune from CV
     temp = fit.xgbTree
     fit.xgbTree <- caret::train(
       target ~ .,
-      data = training_set_complete,
+      data = training_sets$XGboost,
       method = "xgbTree",
       trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = FALSE),
       tuneGrid = temp$bestTune
@@ -923,7 +1111,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.xgbTree$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.xgboost = predict(fit.xgbTree, newdata = training_set_complete, type = "prob") %>%
+    predictions.xgboost = predict(fit.xgbTree, newdata = training_sets$XGboost, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(XGboost = yes) #Predictions of model (already ordered)
@@ -1027,10 +1215,12 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     output = list("Meta_learner" = meta_learner, "Base_models" = base_models$Base_models, "ML_models" = ensembleResults)
 
-    if(is.null(custom_output) == F){
-      output[[length(output)+1]] = custom_output
-      names(output)[length(output)] = "Custom_output"
-    }
+
+    ####################################################################### To be done, which output to retrieve when stacking is done? Multiple ML models used different cell groups depending on optimization
+    # if(is.null(custom_output) == F){
+    #   output[[length(output)+1]] = custom_outputs[[top_model]]
+    #   names(output)[length(output)] = "Custom_output"
+    # }
 
   }else{
 
@@ -1053,8 +1243,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     output = list("Model" = model, "ML_Models" = ensembleResults, "AUROC_median" = AUROC_median, "AUPRC_median" = AUPRC_median)
 
-    if(is.null(custom_output) == F){
-      output[[length(output)+1]] = custom_output
+    if(any(sapply(custom_outputs, is.null)) == F){ #Check whether custom_output exists or not
+      output[[length(output)+1]] = custom_outputs[[top_model]]
       names(output)[length(output)] = "Custom_output"
     }
 
@@ -1073,14 +1263,14 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 #' @param processed_folds A list of folds. Each fold contains processed training and test data with features.
 #' @param ml_method A character string indicating the machine learning model to use, as supported by the `caret` package (e.g., `"rf"`, `"svmRadial"`, `"glmnet"`).
 #' @param tuneGrid Optional. A data frame specifying the grid of hyperparameters to evaluate. If `NULL`, a default grid of length 3 is generated using caret's `getModelInfo()`.
-#' @param training_set_all A data frame containing the full training set (i.e., all folds combined) with features and a `target` column.
+#' @param ncores Integer. Number of cores to use for parallelization. If not given, detectCores() - 1 will be used.
 #'
-#' @return A list (caret-style object) with the following components:
+#' @return A list with the following components:
 #' \itemize{
-#'   \item \code{fit.train}: The final model trained on the full training set using the best hyperparameters.
-#'   \item \code{results}: A data frame summarizing average cross-validated Accuracy, Kappa, and their standard deviations for each hyperparameter combination.
-#'   \item \code{pred}: A data frame of predictions from each fold, including class probabilities, observed and predicted labels, and hyperparameter values.
-#'   \item \code{resample}: A data frame summarizing Accuracy and Kappa per fold for the best-tuned model.
+#'   \item \code{Results_folds}: A data frame summarizing average cross-validated Accuracy, Kappa, and their standard deviations for each hyperparameter combination.
+#'   \item \code{Prediction_folds}: A data frame of predictions from each fold, including class probabilities, observed and predicted labels, and hyperparameter values.
+#'   \item \code{Resample_matrix}: A data frame summarizing Accuracy and Kappa per fold for the best-tuned model.
+#'   \item \code{Besttune}: List of optimized hyperparameters.
 #' }
 #'
 #' @details
@@ -1097,9 +1287,11 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 #' @importFrom tidyr unnest_wider
 #' @importFrom caret train trainControl getModelInfo
 #' @importFrom stats predict
+#' @importFrom rlang .data
+#'
 #' @export
 #'
-compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL, training_set_all) {
+compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL, ncores = NULL) {
 
   all_preds <- list()
 
@@ -1108,15 +1300,24 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
     grid <- tuneGrid
   } else {
     grid_func <- caret::getModelInfo(ml_method)[[ml_method]]$grid
+
+    # Handle both nested and flat folds: we take only the first parameter because what is important is the number of features (not which ones)
+    first_fold <- if (is.list(processed_folds[[1]][[1]]) && "train_data" %in% names(processed_folds[[1]][[1]])) {
+      processed_folds[[1]][[1]]
+    } else { # No hyperparams to tune
+      processed_folds[[1]]
+    }
+
     grid <- grid_func(
-      x = processed_folds[[1]]$train_data[, -which(names(processed_folds[[1]]$train_data) == "target")],
-      y = processed_folds[[1]]$train_data$target,
-      len = 3
+      x = first_fold$train_data[, -which(names(first_fold$train_data) == "target")],
+      y = first_fold$train_data$target,
+      len = 3 ### Think about module this as a parameter
     )
 
-    if(ml_method == "rf"){ ## only this method needs to be within the range of number of features
+    ##### only this method needs to be within the range of number of features
+    if(ml_method == "rf"){
       # Filter and adjust numeric hyperparameters (avoid higher hyper than number of features)
-      n_features <- ncol(processed_folds[[1]]$train_data[, -which(names(processed_folds[[1]]$train_data) == "target")])
+      n_features <- ncol(first_fold$train_data[, -which(names(first_fold$train_data) == "target")])
 
       # Replace only values greater than n_features
       for (param in names(grid)) {
@@ -1140,63 +1341,105 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
         }
       }
     }
+
+    ###########################################
+
   }
 
-  for (grid_row in seq_len(nrow(grid))) {
-    hp <- grid[grid_row, , drop = FALSE]
-    hp_string <- paste(names(hp), hp, sep = "=", collapse = "; ")
+  # Register parallel backend
+  if(is.null(ncores) == TRUE){
+    ncores = parallel::detectCores() - 2
+  }
 
-    for (i in seq_along(processed_folds)) {
-      fold <- processed_folds[[i]]
+  cl <- parallel::makeCluster(ncores)
+  doParallel::registerDoParallel(cl)
 
-      if(ml_method == "xgbTree"){
-        ## Train model
-        model <- caret::train(
-          target ~ .,
-          data = fold$train_data,
-          method = ml_method,
-          trControl = caret::trainControl(method = "none", classProbs = TRUE, allowParallel = FALSE),
-          tuneGrid = hp,
-          metric = "Accuracy"
-        )
-      }else{
-        ## Train model
-        model <- caret::train(
-          target ~ .,
-          data = fold$train_data,
-          method = ml_method,
-          trControl = caret::trainControl(method = "none", classProbs = TRUE, allowParallel = TRUE),
-          tuneGrid = hp,
-          metric = "Accuracy"
-        )
+  # Build list of all (i, j, grid_row) combinations
+  jobs <- list()
+
+  for(i in seq_along(processed_folds)){
+    # If nested structure (tunable params)
+    if (is.list(processed_folds[[i]][[1]]) && "train_data" %in% names(processed_folds[[i]][[1]])) {
+      subfolds <- processed_folds[[i]]
+    } else {
+      # If flat structure (no tunable params)
+      subfolds <- list(processed_folds[[i]])
+    }
+
+    for (j in seq_along(subfolds)) {
+      for (grid_row in seq_len(nrow(grid))) {
+        jobs[[length(jobs) + 1]] <- list(i = i, j = j, grid_row = grid_row)
       }
-
-      ## Predict
-      fold$test_data = fold$test_data[,colnames(fold$test_data)%in%model$coefnames] #Use only those features selected by model
-      probs <- stats::predict(model, newdata = fold$test_data, type = "prob")
-      preds <- stats::predict(model, newdata = fold$test_data)
-
-      # To be able to bind object
-      rownames(hp) = NULL
-      hp = hp %>% tibble::as_tibble()
-
-      pred_df <- dplyr::tibble(
-        rowIndex = fold$rowIndex,
-        Resample = fold$fold_name,
-        obs = fold$obs_test,
-        pred = preds
-      ) %>%
-        dplyr::bind_cols(hp) %>%
-        dplyr::bind_cols(probs)
-
-      all_preds[[length(all_preds) + 1]] <- pred_df
     }
   }
+
+  all_preds <- foreach::foreach(job = jobs, .combine = "c", .packages = c("caret", "dplyr", "tibble", "stats")) %dopar% {
+    i <- job$i
+    j <- job$j
+    grid_row <- job$grid_row
+
+    # Extract fold
+    if (is.list(processed_folds[[i]][[1]]) && "train_data" %in% names(processed_folds[[i]][[1]])) {
+      fold <- processed_folds[[i]][[j]]
+    } else {
+      fold <- processed_folds[[i]]
+    }
+
+    # Extract hyperparameters
+    hp <- grid[grid_row, , drop = FALSE]
+
+    # Train model
+    model <- caret::train(
+      target ~ .,
+      data = fold$train_data,
+      method = ml_method,
+      trControl = caret::trainControl(method = "none", classProbs = TRUE, allowParallel = (ml_method != "xgbTree")),
+      tuneGrid = hp,
+      metric = "Accuracy"
+    )
+
+    # Predict
+    fold$test_data <- fold$test_data[, colnames(fold$test_data) %in% model$coefnames]
+    probs <- stats::predict(model, newdata = fold$test_data, type = "prob")
+    preds <- stats::predict(model, newdata = fold$test_data)
+
+    # Prepare results
+    rownames(hp) <- NULL
+    hp <- tibble::as_tibble(hp)
+
+    pred_df <- dplyr::tibble(
+      rowIndex = fold$rowIndex,
+      Resample = fold$fold_name,
+      obs = fold$obs_test,
+      pred = preds
+    ) %>%
+      dplyr::bind_cols(hp, probs)
+
+    if (!is.null(fold$params)) {
+      pred_df <- dplyr::bind_cols(pred_df, fold$params)
+    }
+
+    list(pred_df)  # return as list so .combine="c" works
+  }
+
+  parallel::stopCluster(cl)  # stop the cluster after parallel execution
+  unregister_dopar() #Stop Dopar from running in the background
 
   ## Combine predictions
   pred_df_all <- dplyr::bind_rows(all_preds)
   rownames(pred_df_all) <- NULL
+
   hp_cols <- names(grid)
+
+  # Add any extra columns from folds (if present)
+  extra_cols <- setdiff(
+    names(pred_df_all),
+    c("rowIndex", "Resample", "obs", "pred", "no", "yes", names(grid))
+  )
+
+  if (length(extra_cols) > 0) {
+    hp_cols <- c(hp_cols, extra_cols)
+  }
 
   ## Evaluate metrics
   results_matrix <- pred_df_all %>%
@@ -1205,10 +1448,10 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
     tidyr::unnest_wider(metrics) %>%
     dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols))) %>%
     dplyr::summarise(
-      Accuracy = median(Accuracy_resample),
-      Kappa = median(Kappa_resample),
-      AccuracySD = mad(Accuracy_resample),
-      KappaSD = mad(Kappa_resample),
+      Accuracy = median(.data$Accuracy_resample),
+      Kappa = median(.data$Kappa_resample),
+      AccuracySD = stats::mad(.data$Accuracy_resample),
+      KappaSD = stats::mad(.data$Kappa_resample),
       .groups = "keep"
     )
 
@@ -1227,22 +1470,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
     dplyr::arrange(Resample)
 
 
-  # Train model with bestTune from CV
-  final_model <- caret::train(
-    target ~ .,
-    data = training_set_all,
-    method = ml_method,
-    trControl = caret::trainControl(method = "none", classProbs = TRUE),
-    tuneGrid = besttune
-  )
-
-  ## Return caret-like object
-  fit.train <- final_model
-  fit.train$results <- results_matrix
-  fit.train$pred <- pred_df_all
-  fit.train$resample <- resample_df
-
-  return(fit.train)
+  return(list(Results_folds = results_matrix, Prediction_folds = pred_df_all, Resample_matrix = resample_df, Besttune = besttune))
 }
 
 
@@ -1262,8 +1490,16 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
 #' @param file_name Character. File name used to save plots in the \code{Results/} directory.
 #' @param ncores Integer. Number of cores to use for parallelization. If not given, detectCores() - 1 will be used.
 #' @param return Logical. Whether to return and save the plots generated by the function.
-#' @param fold_construction_fun Function. A custom function used to construct the cross-validation folds. It should return a list of training indices for each fold.
-#' @param fold_construction_args List. Named list of additional arguments to pass to \code{fold_construction_fun}.
+#' @param fold_construction_fun Function. A custom function used to construct the cross-validation folds.
+#' This function must accept a \code{bestune} argument, which is used internally to inject optimized parameters
+#' after hyperparameter tuning. If \code{bestune = NULL}, the function will explore a parameter grid across folds
+#' (parallelized with \code{foreach}); if \code{bestune} is provided, the optimized parameters will be applied
+#' to rebuild the features on the full training data.
+#' @param fold_construction_args_fixed List. A list of arguments passed to \code{fold_construction_fun}
+#' that remain fixed during both cross-validation and final training.
+#' @param fold_construction_args_tunable List. A list of arguments passed to \code{fold_construction_fun}
+#' that define the hyperparameters to be tuned during cross-validation. Each element should contain
+#' candidate values for tuning.
 #'
 #' @return A list containing:
 #' \itemize{
@@ -1275,7 +1511,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
 #'
 compute_features.training.ML = function(features_train, target_var, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5,
                                         LODO = FALSE, batch_id = NULL, file_name = NULL, ncores = NULL, return = FALSE,
-                                        fold_construction_fun = NULL, fold_construction_args = list()){
+                                        fold_construction_fun = NULL, fold_construction_args_fixed = NULL, fold_construction_args_tunable = NULL){
 
   #Set training set
   train_data = features_train %>%
@@ -1291,10 +1527,11 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
       dplyr::mutate(dataset = batch_id)
   }
 
-  #Cross-validation training (5 k-folds and 100 repetitions)
+  #Cross-validation training
   training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack,
                                file_name = file_name, LODO = LODO, ncores = ncores, return= return,
-                               fold_construction_fun = fold_construction_fun, fold_construction_args = fold_construction_args)
+                               fold_construction_fun = fold_construction_fun, fold_construction_args_fixed = fold_construction_args_fixed,
+                               fold_construction_args_tunable = fold_construction_args_tunable)
 
   ####################################################Predicting
   if(length(training)!=0){
@@ -1322,22 +1559,24 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
 #' @param stack Logical. Whether to apply model stacking. Default is \code{FALSE}.
 #' @param k_folds Integer. Number of folds for cross-validation.
 #' @param n_rep Integer. Number of cross-validation repetitions.
-#' @param feature.selection Logical. Whether to apply Boruta feature selection before training. Default is \code{FALSE}.
 #' @param LODO Logical. If \code{TRUE}, folds are constructed in a Leave-One-Dataset-Out (LODO) manner based on cohorts.
-#' @param n_boruta Integer. Number of iterations to run Boruta. Since Boruta involves randomness, repeated runs improve consistency. Default is 100.
-#' @param boruta_fix Logical. Whether to fix Boruta’s internal parameters. See `compute_boruta()` for details.
-#' @param tentative Logical. Whether to include tentative features as confirmed in the training dataset (Only valid if boruta_fix = FALSE).
-#' @param boruta_threshold Numeric. Threshold for confirming features after multiple Boruta iterations. For example, 0.8 means features must be confirmed in at least 80% of iterations. Default is 0.8.
 #' @param batch_id A vector indicating the cohort/batch for each sample (only required if \code{LODO = TRUE}).
 #' @param file_name Character. Base name used to save plots in the \code{Results/} directory.
 #' @param ncores Integer. Number of cores to use for parallelization. If not given, detectCores() - 1 will be used.
 #' @param maximize A character string indicating which metric to maximize when selecting the best
 #'                 threshold for the confusion matrix. Options include "Accuracy", "Precision",
 #'                 "Recall", "Specificity", "Sensitivity", "F1", or "MCC". Default is "Accuracy".
+#' @param fold_construction_fun Function. A custom function used to construct the cross-validation folds.
+#' This function must accept a \code{bestune} argument, which is used internally to inject optimized parameters
+#' after hyperparameter tuning. If \code{bestune = NULL}, the function will explore a parameter grid across folds
+#' (parallelized with \code{foreach}); if \code{bestune} is provided, the optimized parameters will be applied
+#' to rebuild the features on the full training data.
+#' @param fold_construction_args_fixed List. A list of arguments passed to \code{fold_construction_fun}
+#' that remain fixed during both cross-validation and final training.
+#' @param fold_construction_args_tunable List. A list of arguments passed to \code{fold_construction_fun}
+#' that define the hyperparameters to be tuned during cross-validation. Each element should contain
+#' candidate values for tuning.
 #' @param return Logical. Whether to return and save plots generated by the function.
-#' @param fold_construction_fun Function. A custom function used to construct the cross-validation folds. It should return a list of training indices for each fold.
-#' @param fold_construction_args List. Named list of additional arguments to pass to \code{fold_construction_fun}.
-#'
 #'
 #' @return A list containing:
 #' \itemize{
@@ -1350,9 +1589,9 @@ compute_features.training.ML = function(features_train, target_var, trait.positi
 #'
 #' @export
 #'
-compute_features.ML = function(features_train, features_test, clinical, trait, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5, feature.selection = FALSE,
-                               LODO = FALSE, n_boruta = 100, boruta_fix = FALSE, tentative = FALSE, boruta_threshold = 0.8, batch_id = NULL, file_name = NULL, ncores = NULL, maximize = "Accuracy", return = FALSE,
-                               fold_construction_fun = NULL, fold_construction_args = list()){
+compute_features.ML = function(features_train, features_test, clinical, trait, trait.positive, metric = "Accuracy", stack, k_folds = 10, n_rep = 5,
+                               LODO = FALSE, batch_id = NULL, file_name = NULL, ncores = NULL, maximize = "Accuracy", return = FALSE,
+                               fold_construction_fun = NULL, fold_construction_args_fixed = NULL, fold_construction_args_tunable = NULL){
 
   # Train cohort
   traitData_train = clinical[rownames(clinical)%in%rownames(features_train), ]
@@ -1377,10 +1616,11 @@ compute_features.ML = function(features_train, features_test, clinical, trait, t
   }
 
 
-  #Cross-validation training (5 k-folds and 100 repetitions)
+  #Cross-validation training
   training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack,
                                file_name = file_name, LODO = LODO, ncores = ncores, return= return,
-                               fold_construction_fun = fold_construction_fun, fold_construction_args = fold_construction_args)
+                               fold_construction_fun = fold_construction_fun, fold_construction_args_fixed = fold_construction_args_fixed,
+                               fold_construction_args_tunable = fold_construction_args_tunable)
 
   ####################################################Predicting
   if(length(training)!=0){
@@ -1646,8 +1886,8 @@ compute_cv_accuracy = function(models, file_name = NULL, base_models = FALSE, re
   res_accuracy <- accuracy_data %>%
     dplyr::group_by(model) %>%
     dplyr::summarise(
-      Mean_Accuracy = median(Accuracy),
-      MAD_Accuracy = mad(Accuracy)
+      Mean_Accuracy = median(.data$Accuracy),
+      MAD_Accuracy = stats::mad(.data$Accuracy)
     ) %>%
     dplyr::arrange(desc(Mean_Accuracy))
 
@@ -1742,16 +1982,16 @@ compute_cv_AUC = function(models, file_name = NULL, base_models = FALSE, AUC_typ
   res_auroc <- auroc_data %>%
     dplyr::group_by(model) %>%
     dplyr::summarise(
-      Mean_AUROC = median(AUROC),
-      MAD_AUROC = mad(AUROC)
+      Mean_AUROC = median(.data$AUROC),
+      MAD_AUROC = stats::mad(.data$AUROC)
     ) %>%
     dplyr::arrange(desc(Mean_AUROC))
 
   res_auprc <- auprc_data %>%
     dplyr::group_by(model) %>%
     dplyr::summarise(
-      Mean_AUPRC = median(AUPRC),
-      MAD_AUPRC = mad(AUPRC)
+      Mean_AUPRC = median(.data$AUPRC),
+      MAD_AUPRC = stats::mad(.data$AUPRC)
     ) %>%
     dplyr::arrange(desc(Mean_AUPRC))
 
@@ -2677,8 +2917,8 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
     ml_model$results <- ml_model$results %>%
       dplyr::select(-dplyr::all_of(hyperparameters), -Accuracy, -Kappa, -AccuracySD, -KappaSD) %>%
       dplyr::bind_cols(df_avg)
-    
-    ml_model$bestTune = NULL
+
+    ml_model$bestTune = tibble::tibble(parameter = "none")
   }
 
   ml_model$resample = ml_model$resample %>%
@@ -2926,7 +3166,7 @@ model_boruta_selection <- function(model,
 
   # Run Boruta
   res_boruta <- feature.selection.boruta(
-    model = model,
+    data = model,
     iterations = boruta_iterations,
     fix = fix_boruta,
     file_name = file_name,
@@ -2962,10 +3202,57 @@ model_boruta_selection <- function(model,
   return(selected_model)
 }
 
+#' Preprocess Features for Machine Learning
+#'
+#' This function preprocesses a dataset by removing features with
+#' near-zero variance, highly correlated features, and features that are
+#' constant within any class of the target variable. It ensures that the
+#' resulting feature set is more suitable for machine learning models.
+#'
+#' @param data A data frame containing predictor features and the target variable.
+#' @param target_col A character string specifying the name of the target column
+#'   in \code{data}. Default is \code{"target"}.
+#' @param cor_thresh A numeric value between 0 and 1 specifying the correlation
+#'   threshold for removing highly correlated features. Default is \code{0.9}.
+#'
+#' @details
+#' The preprocessing steps include:
+#' \enumerate{
+#'   \item Removing near-zero variance features (using \code{caret::nearZeroVar}).
+#'   \item Removing highly correlated features above the specified threshold
+#'         (using \code{caret::findCorrelation}).
+#'   \item Removing features that are constant within any class of the target
+#'         variable (i.e., provide no discriminatory power across classes).
+#' }
+#'
+#' After preprocessing, the target column is re-attached to the dataset.
+#'
+#' @return A data frame with the preprocessed features and the target column.
+#'
+#' @examples
+#' \dontrun{
+#' library(caret)
+#' library(dplyr)
+#'
+#' set.seed(123)
+#' df <- data.frame(
+#'   feature1 = c(1, 1, 1, 1, 1),             # constant
+#'   feature2 = c(1, 2, 3, 4, 5),             # numeric
+#'   feature3 = c(1, 2, 3, 4, 5) * 2,         # highly correlated with feature2
+#'   target   = c("A", "A", "B", "B", "B")
+#' )
+#'
+#' clean_df <- preprocess_features(df, target_col = "target", cor_thresh = 0.9)
+#' }
+#'
+#' @importFrom dplyr select all_of
+#' @importFrom caret nearZeroVar findCorrelation
+#'
+#' @export
 preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
   # Separate target
   target <- data[[target_col]]
-  data <- data %>% dplyr::select(-all_of(target_col))
+  data <- data %>% dplyr::select(-dplyr::all_of(target_col))
 
   # 1. Remove near-zero variance features
   nzv <- caret::nearZeroVar(data, saveMetrics = TRUE)
@@ -2973,7 +3260,7 @@ preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
 
   # 2. Remove highly correlated features
   if (ncol(data) > 1) {
-    cor_matrix <- cor(data, use = "pairwise.complete.obs")
+    cor_matrix <- stats::cor(data, use = "pairwise.complete.obs")
     high_cor <- caret::findCorrelation(cor_matrix, cutoff = cor_thresh)
     if (length(high_cor) > 0) {
       data <- data[, -high_cor, drop = FALSE]
@@ -3004,4 +3291,111 @@ preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
   # Add target back
   data[[target_col]] <- target
   return(data)
+}
+
+#' Train Model with Optimized Hyperparameters
+#'
+#' This function wraps cross-validation, hyperparameter optimization,
+#' and final training into a single workflow. It identifies the best
+#' hyperparameters using a custom cross-validation function, reconstructs
+#' the training set, preprocesses features, and retrains the model on the
+#' complete training data with the selected hyperparameters.
+#'
+#' @param train_data A data frame containing the full training dataset,
+#'   including predictors and the target variable.
+#' @param fold_data A list or object containing pre-constructed folds for
+#'   cross-validation, typically created by \code{fold_construction_fun}.
+#' @param ml_method A character string specifying the machine learning method
+#'   to be passed to \code{caret::train}.
+#' @param fold_construction_fun A function used to (re)construct training
+#'   data partitions given the best hyperparameters.
+#' @param fold_construction_args_fixed A named list of additional fixed arguments
+#'   to pass to \code{fold_construction_fun}.
+#' @param tuneGrid (optional) A data frame of hyperparameter values to evaluate.
+#'   If \code{NULL}, defaults are used.
+#' @param ncores (optional) Integer specifying the number of cores for parallel
+#'   processing during cross-validation. If \code{NULL}, defaults to serial execution.
+#'
+#' @details
+#' The workflow proceeds in the following steps:
+#' \enumerate{
+#'   \item Runs cross-validation using \code{compute_custom_k_fold_CV} to
+#'         identify the best hyperparameter set.
+#'   \item Reconstructs the training set using \code{fold_construction_fun} and
+#'         the selected hyperparameters.
+#'   \item Preprocesses the training features by removing near-zero variance,
+#'         highly correlated, and constant-within-class features
+#'         (via \code{\link{preprocess_features}}).
+#'   \item Retrains the model on the complete training data with the optimized
+#'         hyperparameters.
+#' }
+#'
+#' The returned object mimics a \code{caret} model object but includes
+#' additional elements derived from the custom cross-validation.
+#'
+#' @return A list with the following components:
+#' \describe{
+#'   \item{\code{Model}}{A trained \code{caret} model object with
+#'         results, predictions, and resampling info attached.}
+#'   \item{\code{training_set}}{The final preprocessed training dataset.}
+#'   \item{\code{custom_output}}{Additional output from \code{fold_construction_fun}.}
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' library(caret)
+#'
+#' # Example placeholders
+#' train_data <- your_training_data
+#' fold_data  <- your_prepared_folds
+#'
+#' result <- wrapper_train_best_hyperparams(
+#'   train_data = train_data,
+#'   fold_data  = fold_data,
+#'   ml_method  = "rf",
+#'   fold_construction_fun = your_fold_fun,
+#'   fold_construction_args_fixed = list(arg1 = "value"),
+#'   tuneGrid = expand.grid(mtry = 2:4),
+#'   ncores = 4
+#' )
+#'
+#' result$Model
+#' }
+#'
+#' @seealso \code{\link{compute_custom_k_fold_CV}},
+#'   \code{\link{preprocess_features}}
+#'
+#' @importFrom caret train trainControl
+#' @export
+wrapper_train_best_hyperparams <- function(train_data, fold_data, ml_method, fold_construction_fun, fold_construction_args_fixed, tuneGrid = NULL, ncores = NULL) {
+
+  # Run cross-validation and find best combination of hyperparams
+  optimized <- do.call(compute_custom_k_fold_CV,
+                       list(processed_folds = fold_data, ml_method = ml_method, tuneGrid=tuneGrid, ncores=ncores))
+
+  # Extract optimized hyperparams
+  besttune <- optimized$Besttune
+
+  # Create complete training set using tuned hyperparams from custom function
+  training_all <- do.call(fold_construction_fun,
+                          c(list(data = train_data, bestune = optimized$Besttune), fold_construction_args_fixed))
+
+  # Preprocess features
+  training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9)
+
+  # Retrain ML model with tuned ML hyperparams
+  fit <- caret::train(
+    target ~ .,
+    data = training_set,
+    method = ml_method,
+    trControl = caret::trainControl(method = "none", allowParallel = F, classProbs = TRUE),
+    tuneGrid = besttune %>% select(-colnames(training_all[[3]]))
+  )
+
+  # Return caret-like object
+  fit$results  <- optimized$Results_folds
+  fit$pred     <- optimized$Prediction_folds
+  fit$resample <- optimized$Resample_matrix
+
+  return(list(Model = fit, training_set = training_set, custom_output = training_all[[2]]))
 }

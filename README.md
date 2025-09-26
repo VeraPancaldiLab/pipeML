@@ -21,44 +21,70 @@ pak::pkg_install("VeraPancaldiLab/pipeML")
 
 ## Description
 
-pipeML is a robust R-based pipeline designed to streamline the training
-and testing of machine learning models for classification tasks. It is
-developed for fast, user-friendly deployment while maintaining the
-flexibility and complexity needed for rigorous, reliable implementation
-at every stage of the pipeline (Figure 1).
+`pipeML` is a robust R-based pipeline for building, evaluating, and
+interpreting machine learning models in classification tasks. It is
+designed for fast, user-friendly deployment while maintaining the
+flexibility and rigor required for research-grade analyses. The pipeline
+integrates all essential steps — from preprocessing to feature
+selection, cross-validation, hyperparameter tuning, and model
+interpretation — into a single, consistent framework (Figure 1).
 
 <p align="center">
 <img src="man/figures/MLpipeline.png?raw=true" />
 </p>
 <p align="center">
-<i> Figure 1. Machine learning pipeline. </i>
+<i> Figure 1. General structure of the `pipeML` machine learning
+pipeline. </i>
 </p>
 
-## Key features
+## Key Features
 
-- Stratified data split
-- Iterative Boruta algorithm for feature selection
-- Repeated k-fold cross validation (kCV)
-- Hyperparameter tuning based on AUROC, AUPRC or Accuracy
-- Stratified k-fold construction
-- SHAP values implementation for feature importance
-- Model stacking implementation based on GLM
-- Visualization functions for RO and PR curves
-- 13 Machine Learning methods implemented
-  - Bagged CART
-  - Random Forest (RF)
-  - C50
-  - Logistic regression (LG)
-  - CART
-  - Naive Bayes (NB)
-  - Regularized Lasso
-  - Ridge regression
-  - Linear Discriminant Analysis (LDA)
-  - Regularized Logistic Regression (Elastic net)
-  - K-nearest neighbors (KNN)
-  - Support vector machine with radial kernel (SVMr)
-  - Support vector machine with linear kernel (SVMl)
-  - Extreme Gradient Boosting (XGboost)
+\*Stratified data partitioning to preserve class balance in both
+training and testing sets.
+
+\*Iterative Boruta algorithm for robust feature selection.
+
+\*Customizable cross-validation with repeated k-fold CV or stratified
+CV.
+
+\*Hyperparameter tuning driven by AUROC, AUPRC, or Accuracy.
+
+\*Parallelization support for faster cross-validation and model training
+across multiple cores.
+
+\*Custom fold construction functions: users can inject their own
+fold-building logic.
+
+These functions can also accept a bestune argument, which is
+automatically passed after hyperparameter optimization, allowing
+seamless retraining on the full training set with the best parameters.
+
+\*Preprocessing utilities for feature filtering (e.g., correlation
+pruning).
+
+\*Model interpretation via SHAP values for feature importance.
+
+\*Model stacking based on GLM for ensemble learning.
+
+\*Visualization functions for ROC and PR curves, plus performance
+summaries.
+
+\*Support for 13 machine learning methods, including:
+
+- Bagged CART
+- Random Forest (RF)
+- C50
+- Logistic regression (LG)
+- CART
+- Naive Bayes (NB)
+- Regularized Lasso
+- Ridge regression
+- Linear Discriminant Analysis (LDA)
+- Regularized Logistic Regression (Elastic net)
+- K-nearest neighbors (KNN)
+- Support vector machine with radial kernel (SVMr)
+- Support vector machine with linear kernel (SVMl)
+- Extreme Gradient Boosting (XGboost)
 
 ## General usage
 

@@ -8,7 +8,7 @@ compute_custom_k_fold_CV(
   processed_folds,
   ml_method,
   tuneGrid = NULL,
-  training_set_all
+  ncores = NULL
 )
 }
 \arguments{
@@ -18,15 +18,15 @@ compute_custom_k_fold_CV(
 
 \item{tuneGrid}{Optional. A data frame specifying the grid of hyperparameters to evaluate. If \code{NULL}, a default grid of length 3 is generated using caret's \code{getModelInfo()}.}
 
-\item{training_set_all}{A data frame containing the full training set (i.e., all folds combined) with features and a \code{target} column.}
+\item{ncores}{Integer. Number of cores to use for parallelization. If not given, detectCores() - 1 will be used.}
 }
 \value{
-A list (caret-style object) with the following components:
+A list with the following components:
 \itemize{
-\item \code{fit.train}: The final model trained on the full training set using the best hyperparameters.
-\item \code{results}: A data frame summarizing average cross-validated Accuracy, Kappa, and their standard deviations for each hyperparameter combination.
-\item \code{pred}: A data frame of predictions from each fold, including class probabilities, observed and predicted labels, and hyperparameter values.
-\item \code{resample}: A data frame summarizing Accuracy and Kappa per fold for the best-tuned model.
+\item \code{Results_folds}: A data frame summarizing average cross-validated Accuracy, Kappa, and their standard deviations for each hyperparameter combination.
+\item \code{Prediction_folds}: A data frame of predictions from each fold, including class probabilities, observed and predicted labels, and hyperparameter values.
+\item \code{Resample_matrix}: A data frame summarizing Accuracy and Kappa per fold for the best-tuned model.
+\item \code{Besttune}: List of optimized hyperparameters.
 }
 }
 \description{
