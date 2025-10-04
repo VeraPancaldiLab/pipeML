@@ -393,6 +393,23 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     parallel::stopCluster(cl)  # stop the cluster after parallel execution
     unregister_dopar() #Stop Dopar from running in the background
 
+    # Store models in a named list
+    models <- list(
+      BAG = fit.treebag,
+      RF = fit.rf,
+      C50 = fit.c50,
+      #GLM = fit.glm,
+      #LDA = fit.lda,
+      GLMNET = fit.glmnet,
+      KNN = fit.knn,
+      CART = fit.cart,
+      LASSO = fit.lasso,
+      RIDGE = fit.ridge,
+      SVM_radial = fit.svm_radial,
+      SVM_linear = fit.svm_linear,
+      XGboost = fit.xgbTree
+    )
+
   }else{
 
     # Custom fold construction
@@ -415,21 +432,21 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     ### Extract the file names of the folds
     #result_files <- list.files("Results", pattern = "^fold_.*\\.rds$", full.names = TRUE)
     #fold_data = vector("list", length(result_files))
-    
+
     # Initialize master list to store everything in memory
     models_all_folds <- vector("list", length(result_files))
-    
+
     # Iterate across folds and inside each subfold corresponding to each param combination (if exist)
     for (fold_i in seq_along(result_files)) { ### number of folds (k_fold x n_rep)
 
-      #result = readRDS(result_files[[fold_i]]) 
-      result = result_files[[fold_i]] 
-      
+      #result = readRDS(result_files[[fold_i]])
+      result = result_files[[fold_i]]
+
       # Each fold contains multiple parameter sets (list of lists) --> fold_construction_args_tunable != NULL
       if (!is.null(fold_construction_args_tunable)) {
-        
+
         models_all_params <- vector("list", length(result))
-        
+
         for (parameter_i in seq_along(result)) { ### number of parameter combinations
           train_data_i = result[[parameter_i]][["train_data"]]
           test_data_i =  result[[parameter_i]][["test_data"]]
@@ -442,8 +459,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
           result[[parameter_i]][["test_data"]] = test_data_i[, setdiff(colnames(train_data_i), "target")]
 
           models = lapply(
-            c("treebag", "rf", "C5.0", 
-              "glmnet", "knn", "rpart", "glmnet", "glmnet",  
+            c("treebag", "rf", "C5.0",
+              "glmnet", "knn", "rpart", "glmnet", "glmnet",
               "svmRadial", "svmLinear", "xgbTree"),
             function(method){
               tune_grid = NULL
@@ -466,14 +483,14 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
           # Store models for this parameter set
           models_all_params[[parameter_i]] <- models
-          
+
         }
-        
+
         # Store all parameter results for this fold
         models_all_folds[[fold_i]] <- models_all_params
-        
+
         #saveRDS(models_all_params, paste0("Results/models_fold_", fold_i, ".rds"))
-        
+
       }else { # Custom function does not have hyperparams to tune --> fold_construction_args_tunable != NULL
         train_data_i <- result[["train_data"]]
         test_data_i <- result[["test_data"]]
@@ -486,8 +503,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
         result[["test_data"]] = test_data_i[, setdiff(colnames(train_data_i), "target")]
 
         models = lapply(
-          c("treebag", "rf", "C5.0", 
-            "glmnet", "knn", "rpart", "glmnet", "glmnet",  
+          c("treebag", "rf", "C5.0",
+            "glmnet", "knn", "rpart", "glmnet", "glmnet",
             "svmRadial", "svmLinear", "xgbTree"),
           function(method){
             tune_grid = NULL
@@ -500,26 +517,26 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
               tune_grid = get_tune_grid("ridge")
               method = "glmnet" #still call wrapper with glmnet model type for ridge
             }
-            
+
             # Custom CV validation and hyperparameter tuning
             do.call(compute_custom_k_fold_CV,
                     list(processed_folds = result[[parameter_i]], ml_method = method, tuneGrid=tune_grid, ncores=ncores))
-            
+
           }
         )
-        
+
         models_all_folds[[fold_i]] <- models
         #saveRDS(models, paste0("Results/models_fold_", fold_i, ".rds"))
       }
     }
 
     #result_files <- list.files("Results",pattern = "^models_.*\\.rds$", full.names = TRUE)
-    agg <- aggregate_results(models_all_folds) 
-    
-    methods <- c("treebag", "rf", "C5.0", 
-                 "glmnet", "knn", "rpart", "glmnet", "glmnet",  
+    agg <- aggregate_results(models_all_folds)
+
+    methods <- c("treebag", "rf", "C5.0",
+                 "glmnet", "knn", "rpart", "glmnet", "glmnet",
                  "svmRadial", "svmLinear", "xgbTree")
-    
+
     optimized_models <- lapply(seq_along(methods), function(i) {
       wrapper_train_best_hyperparams(
         agg[[i]],                     # model-specific aggregated results
@@ -528,7 +545,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
         fold_construction_args_fixed
       )
     })
-    
+
     model_names <- c(
       BAG = "treebag",
       RF = "rf",
@@ -542,12 +559,12 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       SVM_linear = "svmLinear",
       XGboost = "xgbTree"
     )
-    
+
     # Split components across lists
     training_sets <- lapply(optimized_models, `[[`, "training_set")
     custom_outputs <- lapply(optimized_models, `[[`, "custom_output")
     models           <- lapply(optimized_models, `[[`, "Model")
-    
+
     # Assign pretty names
     names(training_sets) <- names(model_names)
     names(custom_outputs) <- names(model_names)
@@ -555,7 +572,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
   }
 
-  
+
   ####### Optimized based on metric (only AUC or Accuracy available)
   if(metric == "AUROC" || metric == "AUPRC"){
 
@@ -1270,7 +1287,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
 
   train_data = processed_folds[["train_data"]]
   test_data = processed_folds[["test_data"]]
-  
+
   all_preds <- list()
 
   ## Train once to get grid
@@ -1318,7 +1335,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
   for (grid_row in seq(nrow(grid))) {
     # Extract hyperparameters
     hp <- grid[grid_row, , drop = FALSE]
-    
+
     # Train model
     model <- caret::train(
       target ~ .,
@@ -1328,16 +1345,16 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
       tuneGrid = hp,
       metric = "Accuracy"
     )
-    
+
     # Predict
     test_data <- test_data[, colnames(test_data) %in% model$coefnames]
     probs <- stats::predict(model, newdata = test_data, type = "prob")
     preds <- stats::predict(model, newdata = test_data)
-    
+
     # Prepare results
     rownames(hp) <- NULL
     hp <- tibble::as_tibble(hp)
-    
+
     pred_df <- dplyr::tibble(
       rowIndex = processed_folds$rowIndex,
       Resample = processed_folds$fold_name,
@@ -1345,17 +1362,17 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
       pred = preds
     ) %>%
       dplyr::bind_cols(hp, probs)
-    
+
     if (!is.null(processed_folds$params)) {
       pred_df <- dplyr::bind_cols(pred_df, processed_folds$params)
     }
-    
+
     all_preds[[grid_row]] = pred_df
   }
 
   ## Combine predictions
   pred_df_all <- do.call(rbind, all_preds)
-  
+
   return(list(pred_df_all, names(grid)))
 }
 
@@ -3283,47 +3300,47 @@ wrapper_train_best_hyperparams <- function(optimized, ml_method, fold_constructi
 }
 
 aggregate_results <- function(all_loaded) {
-  
+
   # Load all files (each file = one fold)
   #all_loaded <- lapply(result_files, readRDS)
-  
+
   # Dimensions:
   # all_loaded -> folds
   # all_loaded[[fold]] -> param combinations
   # all_loaded[[fold]][[param]] -> ML models (list of 11)
-  
+
   n_folds  <- length(all_loaded)
   n_params <- length(all_loaded[[1]])
   n_models <- length(all_loaded[[1]][[1]])
-  
+
   results <- vector("list", n_models)
-  
+
   # Iterate over models
   for (m in seq_len(n_models)) {
 
     all_preds   <- NULL
     hp_cols_all <- character()
-    
+
     # Nested loops: avoid overcharging R list and giving error
     for (f in seq_len(n_folds)) {
       for (p in seq_len(n_params)) {
         preds <- all_loaded[[f]][[p]][[m]][[1]]
         hp    <- all_loaded[[f]][[p]][[m]][[2]]
-        
+
         # Bind iteratively to avoid large lists in memory
         if (is.null(all_preds)) {
           all_preds <- preds
         } else {
           all_preds <- dplyr::bind_rows(all_preds, preds)
         }
-        
+
         hp_cols_all <- union(hp_cols_all, hp)
       }
     }
-    
+
 
     rownames(all_preds) <- NULL
-    
+
     # Add any extra columns if present
     extra_cols <- setdiff(
       names(all_preds),
@@ -3332,7 +3349,7 @@ aggregate_results <- function(all_loaded) {
     if (length(extra_cols) > 0) {
       hp_cols_all <- c(hp_cols_all, extra_cols)
     }
-    
+
     # Compute metrics per resample
     results_matrix <- all_preds %>%
       dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols_all)), Resample) %>%
@@ -3349,15 +3366,15 @@ aggregate_results <- function(all_loaded) {
         KappaSD    = stats::mad(.data$Kappa_resample),
         .groups = "keep"
       )
-    
+
     # Select best hyperparams
     best_row <- results_matrix %>%
       dplyr::ungroup() %>%
       dplyr::arrange(dplyr::desc(Accuracy)) %>%
       dplyr::slice_max(Accuracy, n = 1, with_ties = FALSE)
-    
+
     besttune <- best_row %>% dplyr::select(dplyr::all_of(hp_cols_all))
-    
+
     # Compute resample summaries for besttune
     resample_df <- all_preds %>%
       dplyr::inner_join(besttune, by = hp_cols_all) %>%
@@ -3373,7 +3390,7 @@ aggregate_results <- function(all_loaded) {
       ) %>%
       dplyr::select(Accuracy, Kappa, Resample) %>%
       dplyr::arrange(Resample)
-    
+
     # Store results for this model
     results[[m]] <- list(
       Prediction_folds = all_preds,
@@ -3382,7 +3399,7 @@ aggregate_results <- function(all_loaded) {
       Resample_matrix = resample_df
     )
   }
-  
+
   return(results)
 }
 
