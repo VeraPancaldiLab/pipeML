@@ -430,8 +430,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     }
 
     ### Extract the file names of the folds
-    #result_files <- list.files("Results", pattern = "^fold_.*\\.rds$", full.names = TRUE)
-    #fold_data = vector("list", length(result_files))
+    result_files <- list.files("Results", pattern = "^fold_.*\\.rds$", full.names = TRUE)
+    fold_data = vector("list", length(result_files))
 
     # Initialize master list to store everything in memory
     models_all_folds <- vector("list", length(result_files))
@@ -439,8 +439,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     # Iterate across folds and inside each subfold corresponding to each param combination (if exist)
     for (fold_i in seq_along(result_files)) { ### number of folds (k_fold x n_rep)
 
-      #result = readRDS(result_files[[fold_i]])
-      result = result_files[[fold_i]]
+      result = readRDS(result_files[[fold_i]])
+      #result = result_files[[fold_i]]
 
       # Each fold contains multiple parameter sets (list of lists) --> fold_construction_args_tunable != NULL
       if (!is.null(fold_construction_args_tunable)) {
