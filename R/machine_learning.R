@@ -2698,38 +2698,48 @@ compute_platt.scaling = function(obs, yes){ ####DEPRECATED
 
 # This function creates stratified folds while preserving dataset proportions, useful when doing Leaving-one-dataset-out (LODO) approach
 construct_stratified_cohort_folds = function(train_data, batch_id, target_id, k_folds, n_rep){
-
+  
   ## Named cohort and target variable
   train_data = train_data %>%
     dplyr::mutate(dataset = as.factor(train_data[,batch_id]),
                   target = as.factor(train_data[,target_id]))
-
+  
   # Create stratified folds across different repeats
   folds_list <- purrr::map(1:n_rep, ~{
     # Split within each dataset
     dataset_folds <- train_data %>%
       dplyr::group_by(dataset) %>% #Groups data by dataset
       dplyr::group_split() %>% #Splits into a list where each dataset is a separate dataframe
-      purrr::map(~ caret::createFolds(.x$target, k = k_folds, returnTrain = TRUE))  #Inside each dataset, stratified k-fold splits are created using ensuring class balance
-
+      purrr::map(~{
+        # get global indices for this dataset subset
+        global_idx <- which(train_data$dataset == unique(.x$dataset))
+        
+        #Inside each dataset, stratified k-fold splits are created ensuring class balance
+        local_folds <- caret::createFolds(.x$target, k = k_folds, returnTrain = TRUE)
+        
+        # convert local fold indices to global indices
+        purrr::map(local_folds, ~ global_idx[.x])
+      })
+    
     fold_indices <- vector("list", k_folds) #Creates an empty list for k folds
-
+    
     for (i in seq_len(k_folds)) {
       # Extracts the i-th fold from each dataset
+      # unlist() now merges globally-corrected indices from all datasets
       fold_indices[[i]] <- unlist(purrr::map(dataset_folds, ~ .x[[i]])) #Merges fold indices from all datasets into a single vector
     }
-
+    
     return(fold_indices)
   })
-
+  
   multifolds <- unlist(folds_list, recursive = FALSE)
-
+  
   # Name folds like "Fold1.Rep1", "Fold2.Rep1", ..., "FoldK.RepN"
   fold_names <- unlist(lapply(1:n_rep, function(rep) {
     paste0("Fold", 1:k_folds, ".Rep", rep)
   }))
   names(multifolds) <- fold_names
-
+  
   return(multifolds)
 }
 
