@@ -530,6 +530,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       }
     }
 
+    file.remove(result_files) ## Delete the files after using them
     #result_files <- list.files("Results",pattern = "^models_.*\\.rds$", full.names = TRUE)
     agg <- aggregate_results(models_all_folds)
 
@@ -539,6 +540,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     optimized_models <- lapply(seq_along(methods), function(i) {
       wrapper_train_best_hyperparams(
+        train_data,
         agg[[i]],                     # model-specific aggregated results
         methods[i],                   # the matching method name
         fold_construction_fun,
@@ -3280,7 +3282,7 @@ preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
 #'
 #' @importFrom caret train trainControl
 #' @export
-wrapper_train_best_hyperparams <- function(optimized, ml_method, fold_construction_fun, fold_construction_args_fixed) {
+wrapper_train_best_hyperparams <- function(train_data, optimized, ml_method, fold_construction_fun, fold_construction_args_fixed) {
 
   # Extract optimized hyperparams
   besttune <- optimized$Besttune
