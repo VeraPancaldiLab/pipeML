@@ -5,6 +5,7 @@
 #' @importFrom Boruta Boruta
 #' @importFrom dplyr %>%
 #' @importFrom foreach %dopar%
+#' @importFrom stats as.formula
 #' @importFrom stats median
 #' @importFrom stats predict
 #' @importFrom stats sd
