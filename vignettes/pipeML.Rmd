@@ -89,6 +89,7 @@ deconvolution = pipeML::deconvolution
 traitData = pipeML::traitData
 res <- compute_features.training.ML(features_train = deconvolution, 
                                     target_var = traitData$Best.Confirmed.Overall.Response,
+                                    task_type = "classification",
                                     trait.positive = "CR",
                                     metric = "AUROC",
                                     stack = FALSE,
@@ -119,6 +120,7 @@ To apply model stacking, set `stack = TRUE`:
 ```{r}
 res <- compute_features.training.ML(features_train = deconvolution, 
                                     target_var = traitData$Best.Confirmed.Overall.Response,
+                                    task_type = "classification",
                                     trait.positive = "CR",
                                     metric = "AUROC",
                                     stack = TRUE,
@@ -168,6 +170,7 @@ To enable parallelization, specify the number of cores via the `ncores` paramete
 ```{r, eval = FALSE}
 res <- compute_features.training.ML(features_train = deconvolution, 
                                     target_var = traitData$Best.Confirmed.Overall.Response,
+                                    task_type = "classification",
                                     trait.positive = "CR",
                                     metric = "AUROC",
                                     stack = TRUE,
@@ -190,6 +193,7 @@ data_test = deconvolution[!rownames(deconvolution) %in% rownames(data_train),]
 res <- compute_features.ML(features_train = data_train, 
                            features_test = data_test, 
                            clinical = traitData,
+                           task_type = "classification",
                            trait = "Best.Confirmed.Overall.Response",
                            trait.positive = "CR",
                            metric = "AUROC",
@@ -226,7 +230,7 @@ knitr::include_graphics("figures/var_importance.png")
 
 ## **Leaving one dataset out (LODO) analysis**
 
-If your data includes features from multiple cohorts, pipeML provides a flexible approach to perform Leave-One-Dataset-Out (LODO) analysis. This is achieved by applying k-fold stratified sampling across batches, ensuring that each fold preserves the batch structure while maintaining class balance. For this set `LODO = TRUE` and provided the vector containing the batch information in the `batch_id` variable (this should be in the same order as your samples)
+If your data includes features from multiple cohorts, pipeML provides a flexible approach to perform Leave-One-Dataset-Out (LODO) analysis. This is achieved by applying k-fold stratified sampling across batches, ensuring that each fold preserves the batch structure while maintaining class balance. For this set `LODO = TRUE` and provided column name containing the batch information in the `batch_id` variable
 
 Below, we demonstrate how to perform a LODO analysis using simulated datasets:
 
@@ -275,13 +279,14 @@ for (cohort in unique(traitData$Cohort)) {
   #### ML Training
   res = compute_features.training.ML(features_train, 
                                      traitData_train$Response, 
+                                     task_type = "classification",
                                      trait.positive = "R", 
                                      metric = "AUROC", 
                                      stack = T, 
                                      k_folds = 2, 
                                      n_rep = 3, 
                                      LODO = TRUE,
-                                     batch_id = traitData_train$Cohort, 
+                                     batch_id = "Cohort", 
                                      ncores = 2, 
                                      return = F)
 
@@ -516,6 +521,7 @@ When calling `compute_features.training.ML()`, these fixed arguments are passed 
 ```{r, eval=FALSE}
 res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), 
                                            traitData_train$Response, 
+                                           task_type = "classification",
                                            trait.positive = "R", 
                                            metric = "AUROC", 
                                            stack = F, k_folds = 5, 
@@ -534,6 +540,7 @@ There will be cases when user will have parameters that can change value and thu
 ```{r, eval = FALSE}
 res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), 
                                            traitData_train$Response, 
+                                           task_type = "classification",
                                            trait.positive = "R", 
                                            metric = "AUROC", 
                                            stack = F, k_folds = 5, 

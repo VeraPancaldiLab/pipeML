@@ -6,8 +6,11 @@
 \usage{
 compute_features.training.ML(
   features_train,
-  target_var,
-  trait.positive,
+  task_type = c("classification", "survival"),
+  target_var = NULL,
+  trait.positive = NULL,
+  time_var = NULL,
+  event_var = NULL,
   metric = "Accuracy",
   stack,
   k_folds = 10,
@@ -39,7 +42,8 @@ compute_features.training.ML(
 
 \item{LODO}{Logical. If \code{TRUE}, constructs folds stratified by cohorts (Leave-One-Dataset-Out CV).}
 
-\item{batch_id}{A vector indicating the cohort or batch for each sample (required only if \code{LODO = TRUE}).}
+\item{batch_id}{Column name indicating where the cohort or batch membership for each sample is.
+Required if \code{LODO = TRUE}.}
 
 \item{file_name}{Character. File name used to save plots in the \code{Results/} directory.}
 

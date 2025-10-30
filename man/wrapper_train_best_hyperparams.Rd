@@ -6,20 +6,15 @@
 \usage{
 wrapper_train_best_hyperparams(
   train_data,
-  fold_data,
+  optimized,
   ml_method,
   fold_construction_fun,
-  fold_construction_args_fixed,
-  tuneGrid = NULL,
-  ncores = NULL
+  fold_construction_args_fixed
 )
 }
 \arguments{
 \item{train_data}{A data frame containing the full training dataset,
 including predictors and the target variable.}
-
-\item{fold_data}{A list or object containing pre-constructed folds for
-cross-validation, typically created by \code{fold_construction_fun}.}
 
 \item{ml_method}{A character string specifying the machine learning method
 to be passed to \code{caret::train}.}
@@ -29,6 +24,9 @@ data partitions given the best hyperparameters.}
 
 \item{fold_construction_args_fixed}{A named list of additional fixed arguments
 to pass to \code{fold_construction_fun}.}
+
+\item{fold_data}{A list or object containing pre-constructed folds for
+cross-validation, typically created by \code{fold_construction_fun}.}
 
 \item{tuneGrid}{(optional) A data frame of hyperparameter values to evaluate.
 If \code{NULL}, defaults are used.}
