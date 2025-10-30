@@ -148,6 +148,7 @@ cross-validation:</p>
 <span><span class="va">traitData</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/traitData.html">traitData</a></span></span>
 <span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">deconvolution</span>, </span>
 <span>                                    target_var <span class="op">=</span> <span class="va">traitData</span><span class="op">$</span><span class="va">Best.Confirmed.Overall.Response</span>,</span>
+<span>                                    task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
 <span>                                    trait.positive <span class="op">=</span> <span class="st">"CR"</span>,</span>
 <span>                                    metric <span class="op">=</span> <span class="st">"AUROC"</span>,</span>
 <span>                                    stack <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -178,6 +179,7 @@ Figure 1. Models training performance.
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">deconvolution</span>, </span>
 <span>                                    target_var <span class="op">=</span> <span class="va">traitData</span><span class="op">$</span><span class="va">Best.Confirmed.Overall.Response</span>,</span>
+<span>                                    task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
 <span>                                    trait.positive <span class="op">=</span> <span class="st">"CR"</span>,</span>
 <span>                                    metric <span class="op">=</span> <span class="st">"AUROC"</span>,</span>
 <span>                                    stack <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -235,6 +237,7 @@ can also be retrieved with the following function</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">deconvolution</span>, </span>
 <span>                                    target_var <span class="op">=</span> <span class="va">traitData</span><span class="op">$</span><span class="va">Best.Confirmed.Overall.Response</span>,</span>
+<span>                                    task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
 <span>                                    trait.positive <span class="op">=</span> <span class="st">"CR"</span>,</span>
 <span>                                    metric <span class="op">=</span> <span class="st">"AUROC"</span>,</span>
 <span>                                    stack <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -264,6 +267,7 @@ Precision.</p>
 <span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.ML.html">compute_features.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">data_train</span>, </span>
 <span>                           features_test <span class="op">=</span> <span class="va">data_test</span>, </span>
 <span>                           clinical <span class="op">=</span> <span class="va">traitData</span>,</span>
+<span>                           task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
 <span>                           trait <span class="op">=</span> <span class="st">"Best.Confirmed.Overall.Response"</span>,</span>
 <span>                           trait.positive <span class="op">=</span> <span class="st">"CR"</span>,</span>
 <span>                           metric <span class="op">=</span> <span class="st">"AUROC"</span>,</span>
@@ -302,9 +306,9 @@ Figure 2. Variable importance.
 a flexible approach to perform Leave-One-Dataset-Out (LODO) analysis.
 This is achieved by applying k-fold stratified sampling across batches,
 ensuring that each fold preserves the batch structure while maintaining
-class balance. For this set <code>LODO = TRUE</code> and provided the
-vector containing the batch information in the <code>batch_id</code>
-variable (this should be in the same order as your samples)</p>
+class balance. For this set <code>LODO = TRUE</code> and provided column
+name containing the batch information in the <code>batch_id</code>
+variable</p>
 <p>Below, we demonstrate how to perform a LODO analysis using simulated
 datasets:</p>
 <p>Simulate datasets from different batches</p>
@@ -350,13 +354,14 @@ datasets:</p>
 <span>  <span class="co">#### ML Training</span></span>
 <span>  <span class="va">res</span> <span class="op">=</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span><span class="va">features_train</span>, </span>
 <span>                                     <span class="va">traitData_train</span><span class="op">$</span><span class="va">Response</span>, </span>
+<span>                                     task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
 <span>                                     trait.positive <span class="op">=</span> <span class="st">"R"</span>, </span>
 <span>                                     metric <span class="op">=</span> <span class="st">"AUROC"</span>, </span>
 <span>                                     stack <span class="op">=</span> <span class="cn">T</span>, </span>
 <span>                                     k_folds <span class="op">=</span> <span class="fl">2</span>, </span>
 <span>                                     n_rep <span class="op">=</span> <span class="fl">3</span>, </span>
 <span>                                     LODO <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>                                     batch_id <span class="op">=</span> <span class="va">traitData_train</span><span class="op">$</span><span class="va">Cohort</span>, </span>
+<span>                                     batch_id <span class="op">=</span> <span class="st">"Cohort"</span>, </span>
 <span>                                     ncores <span class="op">=</span> <span class="fl">2</span>, </span>
 <span>                                     return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span>
 <span></span>
@@ -694,6 +699,7 @@ arguments are passed via <code>fold_construction_args_fixed</code>:</p>
 <div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">counts_train</span><span class="op">)</span><span class="op">)</span>, </span>
 <span>                                           <span class="va">traitData_train</span><span class="op">$</span><span class="va">Response</span>, </span>
+<span>                                           task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
 <span>                                           trait.positive <span class="op">=</span> <span class="st">"R"</span>, </span>
 <span>                                           metric <span class="op">=</span> <span class="st">"AUROC"</span>, </span>
 <span>                                           stack <span class="op">=</span> <span class="cn">F</span>, k_folds <span class="op">=</span> <span class="fl">5</span>, </span>
@@ -723,6 +729,7 @@ that should be test. Here we want to test the performance using 5, 10,
 <div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">counts_train</span><span class="op">)</span><span class="op">)</span>, </span>
 <span>                                           <span class="va">traitData_train</span><span class="op">$</span><span class="va">Response</span>, </span>
+<span>                                           task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
 <span>                                           trait.positive <span class="op">=</span> <span class="st">"R"</span>, </span>
 <span>                                           metric <span class="op">=</span> <span class="st">"AUROC"</span>, </span>
 <span>                                           stack <span class="op">=</span> <span class="cn">F</span>, k_folds <span class="op">=</span> <span class="fl">5</span>, </span>

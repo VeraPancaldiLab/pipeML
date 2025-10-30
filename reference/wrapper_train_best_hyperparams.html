@@ -52,12 +52,10 @@ complete training data with the selected hyperparameters.</p>
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">wrapper_train_best_hyperparams</span><span class="op">(</span></span>
 <span>  <span class="va">train_data</span>,</span>
-<span>  <span class="va">fold_data</span>,</span>
+<span>  <span class="va">optimized</span>,</span>
 <span>  <span class="va">ml_method</span>,</span>
 <span>  <span class="va">fold_construction_fun</span>,</span>
-<span>  <span class="va">fold_construction_args_fixed</span>,</span>
-<span>  tuneGrid <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  ncores <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  <span class="va">fold_construction_args_fixed</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -68,11 +66,6 @@ complete training data with the selected hyperparameters.</p>
 <dl><dt id="arg-train-data">train_data<a class="anchor" aria-label="anchor" href="#arg-train-data"></a></dt>
 <dd><p>A data frame containing the full training dataset,
 including predictors and the target variable.</p></dd>
-
-
-<dt id="arg-fold-data">fold_data<a class="anchor" aria-label="anchor" href="#arg-fold-data"></a></dt>
-<dd><p>A list or object containing pre-constructed folds for
-cross-validation, typically created by <code>fold_construction_fun</code>.</p></dd>
 
 
 <dt id="arg-ml-method">ml_method<a class="anchor" aria-label="anchor" href="#arg-ml-method"></a></dt>
@@ -88,6 +81,11 @@ data partitions given the best hyperparameters.</p></dd>
 <dt id="arg-fold-construction-args-fixed">fold_construction_args_fixed<a class="anchor" aria-label="anchor" href="#arg-fold-construction-args-fixed"></a></dt>
 <dd><p>A named list of additional fixed arguments
 to pass to <code>fold_construction_fun</code>.</p></dd>
+
+
+<dt id="arg-fold-data">fold_data<a class="anchor" aria-label="anchor" href="#arg-fold-data"></a></dt>
+<dd><p>A list or object containing pre-constructed folds for
+cross-validation, typically created by <code>fold_construction_fun</code>.</p></dd>
 
 
 <dt id="arg-tunegrid">tuneGrid<a class="anchor" aria-label="anchor" href="#arg-tunegrid"></a></dt>
