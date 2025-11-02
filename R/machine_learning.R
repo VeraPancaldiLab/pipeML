@@ -287,6 +287,10 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
                              ncores = NULL, return = FALSE, fold_construction_fun = NULL, fold_construction_args_fixed = NULL,
                              fold_construction_args_tunable = NULL){
 
+  ml_methods_names <- c("treebag", "rf", "C5.0",
+                        "glmnet", "knn", "rpart", "lasso", "ridge",
+                        "svmRadial", "svmLinear", "xgbTree")
+
   if(!(metric %in% c("AUROC", "AUPRC","Accuracy"))){
     stop("The metric assigned is not supported. Choose either accuracy or AUC.")
   }
@@ -320,10 +324,10 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     ncores = parallel::detectCores() - 2
   }
 
-  cl <- parallel::makeCluster(ncores)
-  doParallel::registerDoParallel(cl)
-
   if(is.null(fold_construction_fun)){ #No custom function provided, using normal CV
+
+    cl <- parallel::makeCluster(ncores)
+    doParallel::registerDoParallel(cl)
 
     trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = T, classProbs = TRUE, savePredictions=T)
 
@@ -398,8 +402,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       BAG = fit.treebag,
       RF = fit.rf,
       C50 = fit.c50,
-      #GLM = fit.glm,
-      #LDA = fit.lda,
+      GLM = fit.glm,
       GLMNET = fit.glmnet,
       KNN = fit.knn,
       CART = fit.cart,
@@ -412,22 +415,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
   }else{
 
-    # Custom fold construction
+    # Custom fold construction (is running in parallel)
     do.call(fold_construction_fun, c(list(data = train_data, folds = multifolds), fold_construction_args_fixed, fold_construction_args_tunable))
-
-    ### Helper function: get tuneGrid for models
-    get_tune_grid = function(method){
-      if(method == "glmnet"){
-        return(expand.grid(alpha = c(0,1), lambda = seq(0.001, 1, length = 20)))
-      }
-      if(method == "lasso"){
-        return(expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 20)))
-      }
-      if(method == "ridge"){
-        return(expand.grid(alpha = 0, lambda = seq(0.001, 1, length = 20)))
-      }
-      return(NULL)
-    }
 
     ### Extract the file names of the folds
     result_files <- list.files("Results", pattern = "^fold_.*\\.rds$", full.names = TRUE)
@@ -439,52 +428,50 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     # Iterate across folds and inside each subfold corresponding to each param combination (if exist)
     for (fold_i in seq_along(result_files)) { ### number of folds (k_fold x n_rep)
 
-      result = readRDS(result_files[[fold_i]])
-      #result = result_files[[fold_i]]
+      result = readRDS(result_files[[fold_i]]) ## per resample
+      models_all_params <- vector("list", length(result))
 
       # Each fold contains multiple parameter sets (list of lists) --> fold_construction_args_tunable != NULL
       if (!is.null(fold_construction_args_tunable)) {
 
-        models_all_params <- vector("list", length(result))
+        cl <- parallel::makeCluster(ncores)
+        doParallel::registerDoParallel(cl)
 
-        for (parameter_i in seq_along(result)) { ### number of parameter combinations
-          train_data_i = result[[parameter_i]][["train_data"]]
-          test_data_i =  result[[parameter_i]][["test_data"]]
+        models_all_params <- foreach::foreach(parameter_i = seq_along(result),
+                                              .packages = c("dplyr", "caret")) %dopar% {
 
-          # Preprocessing features (remove collinear variables and no-variance)
-          train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9)
+             train_data_i <- result[[parameter_i]][["train_data"]]
+             test_data_i  <- result[[parameter_i]][["test_data"]]
 
-          # Replace in original train/test datasets
-          result[[parameter_i]][["train_data"]] = train_data_i
-          result[[parameter_i]][["test_data"]] = test_data_i[, setdiff(colnames(train_data_i), "target")]
+             # Preprocessing features (remove collinear variables and no-variance)
+             train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9)
 
-          models = lapply(
-            c("treebag", "rf", "C5.0",
-              "glmnet", "knn", "rpart", "glmnet", "glmnet",
-              "svmRadial", "svmLinear", "xgbTree"),
-            function(method){
-              tune_grid = NULL
-              if(method == "glmnet"){
-                tune_grid = get_tune_grid("glmnet")
-              }else if(method == "lasso"){
-                tune_grid = get_tune_grid("lasso")
-                method = "glmnet" #still call wrapper with glmnet model type for lasso
-              }else if(method == "ridge"){
-                tune_grid = get_tune_grid("ridge")
-                method = "glmnet" #still call wrapper with glmnet model type for ridge
-              }
+             # Replace in original train/test datasets
+             result[[parameter_i]][["train_data"]] <- train_data_i
+             result[[parameter_i]][["test_data"]]  <- test_data_i[, setdiff(colnames(train_data_i), "target")]
 
-              # Custom CV validation and hyperparameter tuning
-              do.call(compute_custom_k_fold_CV,
-                       list(processed_folds = result[[parameter_i]], ml_method = method, tuneGrid=tune_grid, ncores=ncores))
+             # Run all ML methods for this parameter configuration
+             models <- lapply(
+               ml_methods_names,
+               function(method) {
+                 cat("Running model", method, "with param configuration", parameter_i, "and fold", fold_i, "\n")
 
-            }
-          )
+                 tune_grid <- get_tune_grid(method, train_data)
 
-          # Store models for this parameter set
-          models_all_params[[parameter_i]] <- models
+                 model_name <- if (method %in% c("lasso", "ridge")) "glmnet" else method
 
+                 do.call(compute_custom_k_fold_CV,
+                         list(processed_folds = result[[parameter_i]],
+                              ml_method = model_name,
+                              tuneGrid = tune_grid))
+               }
+             )
+
+             models
         }
+
+        parallel::stopCluster(cl)  # stop the cluster after parallel execution
+        unregister_dopar() #Stop Dopar from running in the background
 
         # Store all parameter results for this fold
         models_all_folds[[fold_i]] <- models_all_params
@@ -501,46 +488,64 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
         result[["test_data"]] = test_data_i[, setdiff(colnames(train_data_i), "target")]
 
         models = lapply(
-          c("treebag", "rf", "C5.0",
-            "glmnet", "knn", "rpart", "glmnet", "glmnet",
-            "svmRadial", "svmLinear", "xgbTree"),
+          ml_methods_names,
           function(method){
+            cat("Running model...", method)
+
             tune_grid = NULL
             if(method == "glmnet"){
-              tune_grid = get_tune_grid("glmnet")
+              tune_grid = get_tune_grid("glmnet", train_data)
             }else if(method == "lasso"){
-              tune_grid = get_tune_grid("lasso")
+              tune_grid = get_tune_grid("lasso", train_data)
               method = "glmnet" #still call wrapper with glmnet model type for lasso
             }else if(method == "ridge"){
-              tune_grid = get_tune_grid("ridge")
+              tune_grid = get_tune_grid("ridge", train_data)
               method = "glmnet" #still call wrapper with glmnet model type for ridge
+            }else if(method == "rf"){
+              tune_grid = get_tune_grid("rf", train_data)
+            }else if(method == "svmRadial"){
+              tune_grid = get_tune_grid("svmRadial", train_data)
             }
 
             # Custom CV validation and hyperparameter tuning
             do.call(compute_custom_k_fold_CV,
-                    list(processed_folds = result[[parameter_i]], ml_method = method, tuneGrid=tune_grid, ncores=ncores))
+                    list(processed_folds = result[[parameter_i]], ml_method = method, tuneGrid=tune_grid))
 
           }
         )
 
         models_all_folds[[fold_i]] <- models
-        #saveRDS(models, paste0("Results/models_fold_", fold_i, ".rds"))
       }
     }
 
     file.remove(result_files) ## Delete the files after using them
-    #result_files <- list.files("Results",pattern = "^models_.*\\.rds$", full.names = TRUE)
     agg <- aggregate_results(models_all_folds)
 
-    methods <- c("treebag", "rf", "C5.0",
-                 "glmnet", "knn", "rpart", "glmnet", "glmnet",
-                 "svmRadial", "svmLinear", "xgbTree")
+    ## Sanity check (each param conf has to be evaluated in all resamples)
+    for(i in 1:length(agg)){
+      hp_cols_all = names(agg[[i]][["Besttune"]]) ### Hyperparameter names
+      x = agg[[i]][["Prediction_folds"]] %>%
+        dplyr::distinct(Resample, dplyr::across(all_of(hp_cols_all))) %>%
+        dplyr::count(dplyr::across(all_of(hp_cols_all)), name = "n_resamples") %>%
+        dplyr::arrange(desc(n_resamples))
 
-    optimized_models <- lapply(seq_along(methods), function(i) {
+      # Expected number of resamples (folds × repeats)
+      expected_resamples <- length(unique(agg[[i]][["Prediction_folds"]]$Resample))
+
+      # Sanity check
+      if (any(x$n_resamples != expected_resamples)) {
+        stop("Inconsistent number of resamples detected for parameter configuration\n",
+                    paste0(hp_cols_all, collapse = " "))
+      }
+    }
+
+    ################################ Train model with optimized hyperparameters
+
+    optimized_models <- lapply(seq_along(ml_methods_names), function(i) {
       wrapper_train_best_hyperparams(
         train_data,
         agg[[i]],                     # model-specific aggregated results
-        methods[i],                   # the matching method name
+        ml_methods_names[i],
         fold_construction_fun,
         fold_construction_args_fixed
       )
@@ -638,8 +643,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
         BAG = NULL,
         RF = "mtry",
         C50 = c("trials", "model", "winnow"),
-        #GLM = NULL,
-        #LDA = NULL,
+        GLM = NULL,
+        LDA = NULL,
         GLMNET = c("alpha", "lambda"),
         KNN = "k",
         CART = "cp",
@@ -666,24 +671,23 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     }
 
-    # Restore updated models
-    names(models) = names(hyperparams)
-
-    fit.treebag <- models$BAG
-    fit.rf <- models$RF
-    fit.c50 <- models$C50
-    #fit.glm <- models$GLM
-    #fit.lda <- models$LDA
-    fit.glmnet <- models$GLMNET
-    fit.knn <- models$KNN
-    fit.cart <- models$CART
-    fit.lasso <- models$LASSO
-    fit.ridge <- models$RIDGE
-    fit.svm_radial <- models$SVM_radial
-    fit.svm_linear <- models$SVM_linear
-    fit.xgbTree <- models$XGboost
-
   }
+
+  ############### Collect ML models
+  names(models) = names(hyperparams)
+
+  fit.treebag <- models$BAG
+  fit.rf <- models$RF
+  fit.c50 <- models$C50
+  #fit.glm <- models$GLM
+  fit.glmnet <- models$GLMNET
+  fit.knn <- models$KNN
+  fit.cart <- models$CART
+  fit.lasso <- models$LASSO
+  fit.ridge <- models$RIDGE
+  fit.svm_radial <- models$SVM_radial
+  fit.svm_linear <- models$SVM_linear
+  fit.xgbTree <- models$XGboost
 
   if(is.null(fold_construction_fun)){
 
@@ -907,7 +911,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     #   dplyr::select(yes) %>%
     #   dplyr::rename(LDA = yes) #Predictions of model (already ordered)
 
-
     ### GLMNET
 
     cat("Running GLMNET....................\n")
@@ -958,7 +961,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       dplyr::select(yes) %>%
       dplyr::rename(KNN = yes) #Predictions of model (already ordered)
 
-    ## CART
+    ### CART
 
     cat("Running CART....................\n")
     # Train model with bestTune from CV
@@ -1058,7 +1061,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       dplyr::select(yes) %>%
       dplyr::rename(SVM_radial = yes) #Predictions of model (already ordered)
 
-    ## SVM linear
+    ### SVM linear
 
     cat("Running SVM linear....................\n")
     # Train model with bestTune from CV
@@ -1119,9 +1122,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
                           C50 = fit.c50,
                           #GLM = fit.glm,
                           #LDA = fit.lda,
+                          GLMNET = fit.glmnet,
                           KNN = fit.knn,
                           CART = fit.cart,
-                          GLMNET = fit.glmnet,
                           LASSO = fit.lasso,
                           RIDGE = fit.ridge,
                           SVM_radial = fit.svm_radial,
@@ -1133,9 +1136,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
                     C50 = "C5.0",
                     #GLM = "glm",
                     #LDA = "lda",
+                    GLMNET = "glmnet",
                     KNN = "knn",
                     CART = "rpart",
-                    GLMNET = "glmnet",
                     LASSO = "glmnet",
                     RIDGE = "glmnet",
                     SVM_radial = "svmRadial",
@@ -1148,9 +1151,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
                            C50 = predictions.c50,
                            #GLM = predictions.glm,
                            #LDA = predictions.lda,
+                           GLMNET = predictions.glmnet,
                            KNN = predictions.knn,
                            CART = predictions.cart,
-                           GLMNET = predictions.glmnet,
                            LASSO = predictions.lasso,
                            RIDGE = predictions.ridge,
                            SVM_radial = predictions.svm_radial,
@@ -1255,7 +1258,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 #' @param processed_folds A list of folds. Each fold contains processed training and test data with features.
 #' @param ml_method A character string indicating the machine learning model to use, as supported by the `caret` package (e.g., `"rf"`, `"svmRadial"`, `"glmnet"`).
 #' @param tuneGrid Optional. A data frame specifying the grid of hyperparameters to evaluate. If `NULL`, a default grid of length 3 is generated using caret's `getModelInfo()`.
-#' @param ncores Integer. Number of cores to use for parallelization. If not given, detectCores() - 1 will be used.
 #'
 #' @return A list with the following components:
 #' \itemize{
@@ -1283,68 +1285,26 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 #'
 #' @export
 #'
-compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL, ncores = NULL) {
+compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 
   train_data = processed_folds[["train_data"]]
   test_data = processed_folds[["test_data"]]
 
-  all_preds <- list()
-
-  ## Train once to get grid
-  if (!is.null(tuneGrid)) {
-    grid <- tuneGrid
-  } else {
-    grid_func <- caret::getModelInfo(ml_method)[[ml_method]]$grid
-
-    grid <- grid_func(
-      x = train_data[, -which(names(train_data) == "target")],
-      y = train_data$target,
-      len = 3 ### Think about module this as a parameter
-    )
-
-    ##### only this method needs to be within the range of number of features
-    if(ml_method == "rf"){
-      # Filter and adjust numeric hyperparameters (avoid higher hyper than number of features)
-      n_features <- ncol(train_data[, -which(names(train_data) == "target")])
-
-      # Replace only values greater than n_features
-      for (param in names(grid)) {
-        if (is.numeric(grid[[param]])) {
-          invalid_idx <- which(unique(grid[[param]]) >= n_features)
-          if (length(invalid_idx) > 0) {
-            # Identify the pattern in the original values
-            original_values <- unique(grid[[param]])
-            pattern_length <- length(original_values)
-
-            # Build a replacement range within valid limits (20% - 90%)
-            replacements <- unique(round(seq(n_features * 0.2, n_features * 0.9, length.out = length(invalid_idx))))
-
-            # Replace values in hyperparam df
-            for(k in seq_along(invalid_idx)){ # If there are more than one value to replace
-              old_value <- grid[[param]][invalid_idx[k]]
-              new_value <- replacements[k]
-              grid[[param]][grid[[param]] == old_value] <- new_value
-            }
-          }
-        }
-      }
-    }
-  }
-
   all_preds = list()
-  for (grid_row in seq(nrow(grid))) {
+
+  for (grid_row in seq(nrow(tuneGrid))) {
     # Extract hyperparameters
-    hp <- grid[grid_row, , drop = FALSE]
+    hp <- tuneGrid[grid_row, , drop = FALSE]
 
     # Train model
-    model <- caret::train(
+    model <- suppressWarnings({caret::train(
       target ~ .,
       data = train_data,
       method = ml_method,
-      trControl = caret::trainControl(method = "none", classProbs = TRUE, allowParallel = (ml_method != "xgbTree")),
+      trControl = caret::trainControl(method = "none", classProbs = TRUE, allowParallel = F),
       tuneGrid = hp,
       metric = "Accuracy"
-    )
+    )})
 
     # Predict
     test_data <- test_data[, colnames(test_data) %in% model$coefnames]
@@ -1373,7 +1333,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid = NULL
   ## Combine predictions
   pred_df_all <- do.call(rbind, all_preds)
 
-  return(list(pred_df_all, names(grid)))
+  return(list(pred_df_all, names(tuneGrid)))
 }
 
 
@@ -3057,8 +3017,10 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
     tune = which.max(data.frame(ml_model$results)[,metric])  #Tuning parameter (select combination with top AUROC or AUPRC)
 
     ml_model$bestTune = ml_model$results %>%
-      dplyr::slice(tune) %>%  # Extract only the row with the tuned value
-      dplyr::select(dplyr::all_of(hyperparameters))
+      dplyr::slice(tune) %>%  # Extract the top row
+      dplyr::select(dplyr::all_of(hyperparameters)) %>%
+      dplyr::mutate(dplyr::across(where(is.numeric), as.numeric))%>%
+      as.data.frame()
 
     filter_conditions <- ml_model$bestTune[1, , drop = FALSE] #Take tuned parameters
 
@@ -3450,7 +3412,7 @@ preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
     # Loop through each class
     for (cl in unique(target)) {
       class_vals <- col_values[target == cl]
-      nzv_info <- nearZeroVar(class_vals, saveMetrics = TRUE)
+      nzv_info <- caret::nearZeroVar(class_vals, saveMetrics = TRUE)
 
       if (nzv_info$nzv) {
         constant_features <- c(constant_features, colnames(data)[i])
@@ -3468,7 +3430,7 @@ preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
   return(data)
 }
 
-#' Train Model with Optimized Hyperparameters
+#' Train model with optimized hyperparameters
 #'
 #' This function wraps cross-validation, hyperparameter optimization,
 #' and final training into a single workflow. It identifies the best
@@ -3554,6 +3516,13 @@ wrapper_train_best_hyperparams <- function(train_data, optimized, ml_method, fol
   # Preprocess features
   training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9)
 
+  # Wrap correct model type for lasso and ridge
+  if(ml_method == "lasso"){
+    ml_method = "glmnet"
+  }else if(ml_method == "ridge"){
+    ml_method = "glmnet"
+  }
+
   # Retrain ML model with tuned ML hyperparams
   fit <- caret::train(
     target ~ .,
@@ -3566,9 +3535,11 @@ wrapper_train_best_hyperparams <- function(train_data, optimized, ml_method, fol
   # Return caret-like object
   fit$results  <- optimized$Results_folds
   fit$pred     <- optimized$Prediction_folds
-  fit$resample <- optimized$Resample_matrix
+  fit$resample <- optimized$Resample_matrix ## Resample matrix contains the performance per resample with tuned param conf
 
-  return(list(Model = fit, training_set = training_set, custom_output = training_all[[2]]))
+  ##### training_all[[2]] needs to be filter to return only features from training_set (not possible because we need to generalize custom_fold function so sometimes the structure will be different)
+
+  return(list(Model = fit, training_set = training_set, custom_output = c(training_all[[2]], list("Parameters" = training_all[[3]]))))
 }
 
 aggregate_results <- function(all_loaded) {
@@ -3674,6 +3645,129 @@ aggregate_results <- function(all_loaded) {
 
   return(results)
 }
+
+### Helper function: get tuneGrid for models
+get_tune_grid = function(method, train_data){
+  set.seed(123)
+
+  if(method == "glmnet"){
+    return(expand.grid(alpha = c(0,1), lambda = seq(0.001, 1, length = 20)))
+  }
+  if(method == "lasso"){
+    return(expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 20)))
+  }
+  if(method == "ridge"){
+    return(expand.grid(alpha = 0, lambda = seq(0.001, 1, length = 20)))
+  }
+  if(method == "rf"){
+    n_features <- ncol(train_data) - 1
+    return(data.frame(mtry = unique(round(seq(n_features * 0.2, n_features * 0.9, length.out = 5)))))
+  }
+  if(method == "svmRadial"){
+    return(expand.grid(sigma = 0.01, C = c(0.25, 0.5, 1, 2, 4)))
+  }
+  if(method == "treebag"){
+    return(data.frame(parameter = "none"))
+  }
+  if(method == "C5.0"){
+    return(expand.grid(trials = c(1, 5, 10), model = "tree", winnow = c(TRUE, FALSE)))
+  }
+  if(method == "knn"){
+    return(expand.grid(k = c(3, 5, 7, 9, 11)))
+  }
+  if(method == "rpart"){
+    return(expand.grid(cp = seq(0.001, 0.1, length = 10)))
+  }
+  if(method == "svmLinear"){
+    return(expand.grid(C = c(0.25, 0.5, 1, 2, 4)))
+  }
+  if(method == "xgbTree"){
+    return(expand.grid(
+      nrounds = 100,
+      max_depth = c(3, 6, 9),
+      eta = c(0.01, 0.1, 0.3),
+      gamma = 0,
+      colsample_bytree = 0.8,
+      min_child_weight = 1,
+      subsample = 0.8
+    ))
+  }
+
+  stop(paste("No grid defined for method:", method))
+}
+
+# get_tune_grid = function(method, train_data){ #----> DEPRECATE cause it calls the training recursive times (with big train data) and it fall the stack protection from R
+#   set.seed(123)
+#
+#   if(method == "glmnet"){
+#     return(expand.grid(alpha = c(0,1), lambda = seq(0.001, 1, length = 20)))
+#   }
+#   if(method == "lasso"){
+#     return(expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 20)))
+#   }
+#   if(method == "ridge"){
+#     return(expand.grid(alpha = 0, lambda = seq(0.001, 1, length = 20)))
+#   }
+#   if(method == "rf"){
+#     grid_func <- caret::getModelInfo("rf")[["rf"]]$grid
+#
+#     grid_rf <- grid_func(
+#       x = train_data[, -which(names(train_data) == "target")],
+#       y = train_data$target,
+#       len = 5 ### Think about module this as a parameter
+#     )
+#
+#     # Filter and adjust numeric hyperparameters (avoid higher hyper than number of features)
+#     n_features <- ncol(train_data[, -which(names(train_data) == "target")])
+#
+#     # Replace only values greater than n_features
+#     for (param in names(grid_rf)) {
+#       if (is.numeric(grid_rf[[param]])) {
+#         invalid_idx <- which(unique(grid_rf[[param]]) >= n_features)
+#         if (length(invalid_idx) > 0) {
+#           # Identify the pattern in the original values
+#           original_values <- unique(grid_rf[[param]])
+#           pattern_length <- length(original_values)
+#
+#           # Build a replacement range within valid limits (20% - 90%)
+#           replacements <- unique(round(seq(n_features * 0.2, n_features * 0.9, length.out = length(invalid_idx))))
+#
+#           # Replace values in hyperparam df
+#           for(k in seq_along(invalid_idx)){ # If there are more than one value to replace
+#             old_value <- grid_rf[[param]][invalid_idx[k]]
+#             new_value <- replacements[k]
+#             grid_rf[[param]][grid_rf[[param]] == old_value] <- new_value
+#           }
+#         }
+#       }
+#     }
+#     return(grid_rf)
+#   }
+#   if(method == "svmRadial"){
+#     grid_func <- caret::getModelInfo("svmRadial")[["svmRadial"]]$grid
+#
+#     ### Remove zero variance column
+#     nzv <- caret::nearZeroVar(train_data, saveMetrics = TRUE)
+#     train_data <- train_data[, !nzv$zeroVar, drop = FALSE]
+#
+#     tuneGrid <- grid_func(
+#       x = train_data[, -which(names(train_data) == "target")],
+#       y = train_data$target,
+#       len = 5 ### Think about module this as a parameter
+#     )
+#     return(tuneGrid)
+#   }else{
+#     grid_func <- caret::getModelInfo(method)[[method]]$grid
+#
+#     tuneGrid <- grid_func(
+#       x = train_data[, -which(names(train_data) == "target")],
+#       y = train_data$target,
+#       len = 5 ### Think about module this as a parameter
+#     )
+#     return(tuneGrid)
+#   }
+#
+# }
 
 #' Get default hyperparameter grids for supported survival models
 #'
