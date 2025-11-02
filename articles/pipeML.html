@@ -159,8 +159,7 @@ cross-validation:</p>
 <span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
 <span>                                    ncores <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                    return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Warning: glm.fit: algorithm did not converge</span></span>
-<span><span class="co">#&gt; Best ML model found:  RF </span></span>
+<span><span class="co">#&gt; Best ML model found:  XGboost </span></span>
 <span><span class="co">#&gt; Returning model trained</span></span></code></pre></div>
 <p>Access the best-trained model:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
@@ -190,7 +189,6 @@ Figure 1. Models training performance.
 <span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
 <span>                                    ncores <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                    return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Warning: glm.fit: algorithm did not converge</span></span>
 <span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Models chosen are: GLMNET, SVM_radial, XGboost </span></span>
@@ -414,7 +412,7 @@ datasets:</p>
 <span><span class="co">#&gt; Precision:  58.621 </span></span>
 <span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Models chosen are: GLMNET, KNN, RF </span></span>
+<span><span class="co">#&gt; Models chosen are: C50, KNN, RIDGE </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Meta-learners ML model based on GLM</span></span>
 <span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
@@ -430,22 +428,19 @@ datasets:</p>
 <span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
 <span><span class="co">#&gt; Predicting target variable using provided ML model.................................................</span></span>
 <span><span class="co">#&gt; Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................</span></span>
-<span><span class="co">#&gt; Best threshold:  0.2664552 </span></span>
+<span><span class="co">#&gt; Best threshold:  0.1080667 </span></span>
 <span><span class="co">#&gt; Accuracy:  63.333 </span></span>
-<span><span class="co">#&gt; Sensitivity:  89.474 </span></span>
-<span><span class="co">#&gt; Specificity:  18.182 </span></span>
-<span><span class="co">#&gt; F1 score:  75.556 </span></span>
-<span><span class="co">#&gt; MCC score:  10.853 </span></span>
-<span><span class="co">#&gt; Recall:  89.474 </span></span>
-<span><span class="co">#&gt; Precision:  65.385 </span></span>
+<span><span class="co">#&gt; Sensitivity:  100 </span></span>
+<span><span class="co">#&gt; Specificity:  0 </span></span>
+<span><span class="co">#&gt; F1 score:  77.551 </span></span>
+<span><span class="co">#&gt; MCC score:  0 </span></span>
+<span><span class="co">#&gt; Recall:  100 </span></span>
+<span><span class="co">#&gt; Precision:  63.333 </span></span>
 <span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Models chosen are: BAG, KNN, RIDGE </span></span>
+<span><span class="co">#&gt; Models chosen are: KNN, RIDGE, XGboost </span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; Meta-learners ML model based on GLM</span></span>
-<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
-<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
 <span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
 <span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
 <span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
@@ -454,16 +449,19 @@ datasets:</p>
 <span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
 <span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
 <span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
+<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
+<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
+<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
 <span><span class="co">#&gt; Predicting target variable using provided ML model.................................................</span></span>
 <span><span class="co">#&gt; Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................</span></span>
-<span><span class="co">#&gt; Best threshold:  0.8044616 </span></span>
+<span><span class="co">#&gt; Best threshold:  0.4392626 </span></span>
 <span><span class="co">#&gt; Accuracy:  56.667 </span></span>
-<span><span class="co">#&gt; Sensitivity:  31.25 </span></span>
-<span><span class="co">#&gt; Specificity:  85.714 </span></span>
-<span><span class="co">#&gt; F1 score:  43.478 </span></span>
-<span><span class="co">#&gt; MCC score:  20.01 </span></span>
-<span><span class="co">#&gt; Recall:  31.25 </span></span>
-<span><span class="co">#&gt; Precision:  71.429</span></span></code></pre></div>
+<span><span class="co">#&gt; Sensitivity:  93.75 </span></span>
+<span><span class="co">#&gt; Specificity:  14.286 </span></span>
+<span><span class="co">#&gt; F1 score:  69.767 </span></span>
+<span><span class="co">#&gt; MCC score:  13.363 </span></span>
+<span><span class="co">#&gt; Recall:  93.75 </span></span>
+<span><span class="co">#&gt; Precision:  55.556</span></span></code></pre></div>
 <p>For plotting we will make use of our <code>get_curves</code> function
 adapted in a case for multiple cohorts.</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
