@@ -344,7 +344,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     fit.c50 <- caret::train(target~., data = train_data, method = "C5.0", metric = "Accuracy",trControl = trainControl)
 
     ################## LG - Logistic Regression
-    fit.glm <- caret::train(target~., data = train_data, method="glm", metric="Accuracy",trControl=trainControl)
+    #fit.glm <- caret::train(target~., data = train_data, method="glm", metric="Accuracy",trControl=trainControl)
 
     ################## LDA - Linear Discriminate Analysis
     #fit.lda <- caret::train(target~., data = train_data, method="lda", metric="Accuracy",trControl=trainControl)
@@ -402,7 +402,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       BAG = fit.treebag,
       RF = fit.rf,
       C50 = fit.c50,
-      GLM = fit.glm,
       GLMNET = fit.glmnet,
       KNN = fit.knn,
       CART = fit.cart,
@@ -643,8 +642,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
         BAG = NULL,
         RF = "mtry",
         C50 = c("trials", "model", "winnow"),
-        GLM = NULL,
-        LDA = NULL,
         GLMNET = c("alpha", "lambda"),
         KNN = "k",
         CART = "cp",
@@ -1120,8 +1117,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   ensembleResults <- list(BAG = fit.treebag,
                           RF = fit.rf,
                           C50 = fit.c50,
-                          #GLM = fit.glm,
-                          #LDA = fit.lda,
                           GLMNET = fit.glmnet,
                           KNN = fit.knn,
                           CART = fit.cart,
@@ -1134,8 +1129,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   ml_methods = list(BAG = "treebag",
                     RF = "rf",
                     C50 = "C5.0",
-                    #GLM = "glm",
-                    #LDA = "lda",
                     GLMNET = "glmnet",
                     KNN = "knn",
                     CART = "rpart",
@@ -1149,8 +1142,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   model_predictions = list(BAG = predictions.bag,
                            RF = predictions.rf,
                            C50 = predictions.c50,
-                           #GLM = predictions.glm,
-                           #LDA = predictions.lda,
                            GLMNET = predictions.glmnet,
                            KNN = predictions.knn,
                            CART = predictions.cart,
