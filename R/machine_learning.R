@@ -3637,7 +3637,7 @@ aggregate_results <- function(all_loaded) {
   return(results)
 }
 
-### Helper function: get tuneGrid for models
+### Helper function: get tuneGrid for models --->TO DO: might need to re-think how to choose how many values are gonna be evaluated
 get_tune_grid = function(method, train_data){
   set.seed(123)
 
@@ -3652,35 +3652,45 @@ get_tune_grid = function(method, train_data){
   }
   if(method == "rf"){
     n_features <- ncol(train_data) - 1
-    return(data.frame(mtry = unique(round(seq(n_features * 0.2, n_features * 0.9, length.out = 5)))))
+    return(data.frame(mtry = unique(round(seq(n_features * 0.2, n_features * 0.9, length.out = 3)))))
   }
   if(method == "svmRadial"){
-    return(expand.grid(sigma = 0.01, C = c(0.25, 0.5, 1, 2, 4)))
+    # Typical small-to-moderate RBF widths + modest C range
+    return(expand.grid(
+      sigma = c(0.01, 0.05, 0.1),
+      C     = c(0.5, 1, 2)
+    ))
   }
   if(method == "treebag"){
     return(data.frame(parameter = "none"))
   }
   if(method == "C5.0"){
-    return(expand.grid(trials = c(1, 5, 10), model = "tree", winnow = c(TRUE, FALSE)))
+    return(expand.grid(
+      trials = c(1, 5, 10),
+      model  = "tree",
+      winnow = c(TRUE, FALSE)
+    ))
   }
   if(method == "knn"){
-    return(expand.grid(k = c(3, 5, 7, 9, 11)))
+    # Odd ks to avoid ties; small-to-moderate neighborhood sizes
+    return(expand.grid(k = c(5, 7, 9)))
   }
   if(method == "rpart"){
-    return(expand.grid(cp = seq(0.001, 0.1, length = 10)))
+    # Coarse cp sweep across low/med/high regularization
+    return(expand.grid(cp = c(0.001, 0.01, 0.1)))
   }
   if(method == "svmLinear"){
-    return(expand.grid(C = c(0.25, 0.5, 1, 2, 4)))
+    return(expand.grid(C = c(0.5, 1, 2)))
   }
   if(method == "xgbTree"){
     return(expand.grid(
-      nrounds = 100,
-      max_depth = c(3, 6, 9),
-      eta = c(0.01, 0.1, 0.3),
-      gamma = 0,
-      colsample_bytree = 0.8,
-      min_child_weight = 1,
-      subsample = 0.8
+      nrounds          = c(100, 300, 500),
+      max_depth        = c(3, 6, 9),
+      eta              = c(0.01, 0.1, 0.3),
+      gamma            = 0,            # fixed default
+      colsample_bytree = 0.8,          # fixed default
+      min_child_weight = 1,            # fixed default
+      subsample        = 0.8           # fixed default
     ))
   }
 
