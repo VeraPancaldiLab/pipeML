@@ -426,7 +426,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     # Iterate across folds and inside each subfold corresponding to each param combination (if exist)
     for (fold_i in seq_along(result_files)) { ### number of folds (k_fold x n_rep)
-
+      cat("Running ML models for fold", fold_i, "\n")
       result = readRDS(result_files[[fold_i]]) ## per resample
 
       # Each fold contains multiple parameter sets (list of lists) --> fold_construction_args_tunable != NULL
