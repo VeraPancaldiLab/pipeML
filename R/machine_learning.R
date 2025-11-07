@@ -428,49 +428,46 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     for (fold_i in seq_along(result_files)) { ### number of folds (k_fold x n_rep)
 
       result = readRDS(result_files[[fold_i]]) ## per resample
-      models_all_params <- vector("list", length(result))
 
       # Each fold contains multiple parameter sets (list of lists) --> fold_construction_args_tunable != NULL
       if (!is.null(fold_construction_args_tunable)) {
 
-        cl <- parallel::makeCluster(ncores)
-        doParallel::registerDoParallel(cl)
+        models_all_params <- vector("list", length(result))
 
-        models_all_params <- foreach::foreach(parameter_i = seq_along(result),
-                                              .packages = c("dplyr", "caret")) %dopar% {
+        for (parameter_i in seq_along(result)) {
 
-             train_data_i <- result[[parameter_i]][["train_data"]]
-             test_data_i  <- result[[parameter_i]][["test_data"]]
+          train_data_i <- result[[parameter_i]][["train_data"]]
+          test_data_i  <- result[[parameter_i]][["test_data"]]
 
-             # Preprocessing features (remove collinear variables and no-variance)
-             train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9)
+          # Preprocessing features (remove collinear variables and no-variance)
+          train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9)
 
-             # Replace in original train/test datasets
-             result[[parameter_i]][["train_data"]] <- train_data_i
-             result[[parameter_i]][["test_data"]]  <- test_data_i[, setdiff(colnames(train_data_i), "target")]
+          # Replace in original train/test datasets
+          result[[parameter_i]][["train_data"]] <- train_data_i
+          result[[parameter_i]][["test_data"]]  <- test_data_i[, setdiff(colnames(train_data_i), "target")]
 
-             # Run all ML methods for this parameter configuration
-             models <- lapply(
-               ml_methods_names,
-               function(method) {
-                 cat("Running model", method, "with param configuration", parameter_i, "and fold", fold_i, "\n")
+          # Run all ML methods for this parameter configuration
+          models <- lapply(
+            ml_methods_names,
+            function(method) {
 
-                 tune_grid <- get_tune_grid(method, train_data)
+              tune_grid <- get_tune_grid(method, train_data_i)
 
-                 model_name <- if (method %in% c("lasso", "ridge")) "glmnet" else method
+              model_name <- if (method %in% c("lasso", "ridge")) "glmnet" else method
 
-                 do.call(compute_custom_k_fold_CV,
-                         list(processed_folds = result[[parameter_i]],
-                              ml_method = model_name,
-                              tuneGrid = tune_grid))
-               }
-             )
+              do.call(
+                compute_custom_k_fold_CV,
+                list(processed_folds = result[[parameter_i]],
+                     ml_method = model_name,
+                     tuneGrid = tune_grid)
+              )
+            }
+          )
 
-             models
+          models_all_params[[parameter_i]] <- models
+
         }
 
-        parallel::stopCluster(cl)  # stop the cluster after parallel execution
-        unregister_dopar() #Stop Dopar from running in the background
 
         # Store all parameter results for this fold
         models_all_folds[[fold_i]] <- models_all_params
@@ -1292,7 +1289,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
       target ~ .,
       data = train_data,
       method = ml_method,
-      trControl = caret::trainControl(method = "none", classProbs = TRUE, allowParallel = F),
+      trControl = caret::trainControl(method = "none", classProbs = TRUE, allowParallel = (ml_method != "xgbTree")),
       tuneGrid = hp,
       metric = "Accuracy"
     )})
@@ -3673,14 +3670,14 @@ get_tune_grid = function(method, train_data){
   }
   if(method == "knn"){
     # Odd ks to avoid ties; small-to-moderate neighborhood sizes
-    return(expand.grid(k = c(5, 7, 9)))
+    return(expand.grid(k = c(3, 5, 7, 9, 11)))
   }
   if(method == "rpart"){
     # Coarse cp sweep across low/med/high regularization
-    return(expand.grid(cp = c(0.001, 0.01, 0.1)))
+    return(expand.grid(cp = seq(0.001, 0.1, length = 10)))
   }
   if(method == "svmLinear"){
-    return(expand.grid(C = c(0.5, 1, 2)))
+    return(expand.grid(C = c(0.25, 0.5, 1, 2, 4)))
   }
   if(method == "xgbTree"){
     return(expand.grid(
