@@ -29,6 +29,7 @@ Imports:
     Boruta,
     censored,
     survival,
+    survminer,
     tidyverse,
     tidymodels,
     cowplot,

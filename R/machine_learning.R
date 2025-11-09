@@ -426,7 +426,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     # Iterate across folds and inside each subfold corresponding to each param combination (if exist)
     for (fold_i in seq_along(result_files)) { ### number of folds (k_fold x n_rep)
-      cat("Running ML models for fold", fold_i, "\n")
+
       result = readRDS(result_files[[fold_i]]) ## per resample
 
       # Each fold contains multiple parameter sets (list of lists) --> fold_construction_args_tunable != NULL
@@ -448,29 +448,25 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
           # Run all ML methods for this parameter configuration
           models <- lapply(
-            ml_methods_names,
-            function(method) {
+             ml_methods_names,
+             function(method) {
+               cat("Running model", method, "with param configuration", parameter_i, "and fold", fold_i, "\n")
+               tune_grid <- get_tune_grid(method, train_data)
 
-              tune_grid <- get_tune_grid(method, train_data_i)
+               model_name <- if (method %in% c("lasso", "ridge")) "glmnet" else method
 
-              model_name <- if (method %in% c("lasso", "ridge")) "glmnet" else method
-
-              do.call(
-                compute_custom_k_fold_CV,
-                list(processed_folds = result[[parameter_i]],
-                     ml_method = model_name,
-                     tuneGrid = tune_grid)
-              )
+               do.call(compute_custom_k_fold_CV,
+                         list(processed_folds = result[[parameter_i]],
+                              ml_method = model_name,
+                              tuneGrid = tune_grid))
             }
-          )
+        )
 
-          models_all_params[[parameter_i]] <- models
+        models_all_params[[parameter_i]] <- models
+      }
 
-        }
-
-
-        # Store all parameter results for this fold
-        models_all_folds[[fold_i]] <- models_all_params
+      # Store all parameter results for this fold
+      models_all_folds[[fold_i]] <- models_all_params
 
       }else { # Custom function does not have hyperparams to tune --> fold_construction_args_tunable != NULL
         train_data_i <- result[["train_data"]]
@@ -515,7 +511,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     }
 
     file.remove(result_files) ## Delete the files after using them
-    agg <- aggregate_results(models_all_folds)
+    agg <- aggregate_results_classification(models_all_folds)
 
     ## Sanity check (each param conf has to be evaluated in all resamples)
     for(i in 1:length(agg)){
@@ -538,7 +534,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     ################################ Train model with optimized hyperparameters
 
     optimized_models <- lapply(seq_along(ml_methods_names), function(i) {
-      wrapper_train_best_hyperparams(
+      wrapper_train_best_hyperparams_classification(
         train_data,
         agg[[i]],                     # model-specific aggregated results
         ml_methods_names[i],
@@ -682,6 +678,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   fit.svm_radial <- models$SVM_radial
   fit.svm_linear <- models$SVM_linear
   fit.xgbTree <- models$XGboost
+
+  ############################################# These predictions are use for the meta-learner because it needs the predictions from the models in the complete dataset (might change in the future)
 
   if(is.null(fold_construction_fun)){
 
@@ -1135,7 +1133,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
                     SVM_linear = "svmLinear",
                     XGboost = "xgbTree")
 
-  ############################################# These predictions are use for the meta-learner because it needs the predictions from the models in the complete dataset (might change in the future)
   model_predictions = list(BAG = predictions.bag,
                            RF = predictions.rf,
                            C50 = predictions.c50,
@@ -1226,7 +1223,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     output = list("Model" = model, "ML_Models" = ensembleResults, "AUROC_median" = AUROC_median, "AUPRC_median" = AUPRC_median)
 
-    if(any(sapply(custom_outputs, is.null)) == F){ #Check whether custom_output exists or not
+    if(!is.null(custom_outputs) && !any(sapply(custom_outputs, is.null))){ #Check whether custom_output exists or not
       output[[length(output)+1]] = custom_outputs[[top_model]]
       names(output)[length(output)] = "Custom_output"
     }
@@ -1405,7 +1402,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #'   \item Best hyperparameter configuration (if applicable)
 #' }
 #'
-#' @seealso [cross_validation_custom()], [machine_learning_custom()], [compute_cv_CINDEX()]
+#' @seealso [compute_k_fold_CV_survival()], [compute_ml_survival()], [compute_cv_CINDEX()]
 #'
 #' @export
 compute_features.training.ML = function(features_train, task_type = c("classification", "survival"), target_var = NULL, trait.positive = NULL,
@@ -1463,13 +1460,12 @@ compute_features.training.ML = function(features_train, task_type = c("classific
   else if (task_type == "survival"){
 
     #Prepare training data
-    train_data = features_train %>%
+    train_data <- features_train %>%
       data.frame() %>%
       dplyr::mutate(
-        time = !!rlang::sym(time_var),
-        event = !!rlang::sym(event_var)
-      ) %>%
-      dplyr::select(-all_of(c(time_var, event_var)))  # remove original names
+        time  = time_var,
+        event = as.numeric(event_var == trait.positive)
+      )
 
     if (LODO == TRUE) {
       train_data = train_data %>%
@@ -1481,7 +1477,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
     df_features <- train_data %>% dplyr::select(-time, -event)
 
     #Run survival cross-validation and tuning
-    training = cross_validation_custom(
+    training = compute_k_fold_CV_survival(
       df_features = df_features,
       df_outcome  = df_outcome,
       outcome_col = "time",
@@ -1705,7 +1701,7 @@ compute_features.ML <- function(features_train, features_test, clinical,
     df_features <- train_data %>% dplyr::select(-time, -event)
 
     # ---------------------------- Cross-validation ---------------------------
-    training <- cross_validation_custom(
+    training <- compute_k_fold_CV_survival(
       df_features = df_features,
       df_outcome  = df_outcome,
       outcome_col = "time",
@@ -1725,7 +1721,7 @@ compute_features.ML <- function(features_train, features_test, clinical,
 
     cat("\nRefitting best model on full training data:", best_model_name, "\n")
 
-    fitted_best <- machine_learning_custom(
+    fitted_best <- compute_ml_survival(
       df_train = train_data,
       df_test  = test_data,
       outcome_col = "time",
@@ -3374,16 +3370,35 @@ model_boruta_selection <- function(model,
 #' @importFrom caret nearZeroVar findCorrelation
 #'
 #' @export
-preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
-  # Separate target
-  target <- data[[target_col]]
-  data <- data %>% dplyr::select(-dplyr::all_of(target_col))
+preprocess_features <- function(data,
+                                target_col = NULL,
+                                time_var = NULL,
+                                event_var = NULL,
+                                cor_thresh = 0.9) {
+  # ---- Detect outcome type ----
+  if (!is.null(target_col) && target_col %in% names(data)) {
+    target <- data[[target_col]]
+    outcome_type <- "classification"
+    data <- data %>% dplyr::select(-dplyr::all_of(target_col))
+  } else if (!is.null(time_var) && !is.null(event_var)) {
+    if (!time_var %in% names(data) || !event_var %in% names(data)) {
+      stop("time_var and event_var must be column names in 'data'.")
+    }
+    time_col <- data[[time_var]]
+    event_col <- data[[event_var]]
+    outcome_type <- "survival"
+    data <- data %>% dplyr::select(-dplyr::all_of(c(time_var, event_var)))
+  } else {
+    stop("You must provide either 'target_col' or both 'time_var' and 'event_var'.")
+  }
 
-  # 1. Remove near-zero variance features
-  nzv <- caret::nearZeroVar(data, saveMetrics = TRUE)
-  data <- data[, !nzv$nzv, drop = FALSE]
+  # ---- Step 1: Remove near-zero variance features ----
+  if (ncol(data) > 0) {
+    nzv <- caret::nearZeroVar(data, saveMetrics = TRUE)
+    data <- data[, !nzv$nzv, drop = FALSE]
+  }
 
-  # 2. Remove highly correlated features
+  # ---- Step 2: Remove highly correlated features ----
   if (ncol(data) > 1) {
     cor_matrix <- stats::cor(data, use = "pairwise.complete.obs")
     high_cor <- caret::findCorrelation(cor_matrix, cutoff = cor_thresh)
@@ -3392,33 +3407,37 @@ preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
     }
   }
 
-  constant_features <- c()
-  # 3. Remove features that are constant within any class
-  for (i in seq_along(colnames(data))) {
-    col_values <- data[[i]]
-
-    # Loop through each class
-    for (cl in unique(target)) {
-      class_vals <- col_values[target == cl]
-      nzv_info <- caret::nearZeroVar(class_vals, saveMetrics = TRUE)
-
-      if (nzv_info$nzv) {
-        constant_features <- c(constant_features, colnames(data)[i])
-        break  # no need to check other classes for this feature
+  # ---- Step 3: Remove features constant within classes (if classification) ----
+  if (outcome_type == "classification" && ncol(data) > 0) {
+    constant_features <- c()
+    for (i in seq_along(colnames(data))) {
+      col_values <- data[[i]]
+      for (cl in unique(target)) {
+        class_vals <- col_values[target == cl]
+        nzv_info <- caret::nearZeroVar(as.data.frame(class_vals), saveMetrics = TRUE)
+        if (nzv_info$nzv) {
+          constant_features <- c(constant_features, colnames(data)[i])
+          break
+        }
       }
+    }
+    if (length(constant_features) > 0) {
+      data <- data[, !colnames(data) %in% constant_features, drop = FALSE]
     }
   }
 
-  if(!is.null(constant_features)){
-    data <- data[, !colnames(data)%in%constant_features, drop = FALSE]
+  # ---- Step 4: Add back outcome columns ----
+  if (outcome_type == "classification") {
+    data[[target_col]] <- target
+  } else if (outcome_type == "survival") {
+    data[[time_var]] <- time_col
+    data[[event_var]] <- event_col
   }
 
-  # Add target back
-  data[[target_col]] <- target
   return(data)
 }
 
-#' Train model with optimized hyperparameters
+#' Train model with optimized hyperparameters for classification tasks
 #'
 #' This function wraps cross-validation, hyperparameter optimization,
 #' and final training into a single workflow. It identifies the best
@@ -3474,7 +3493,7 @@ preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
 #' train_data <- your_training_data
 #' fold_data  <- your_prepared_folds
 #'
-#' result <- wrapper_train_best_hyperparams(
+#' result <- wrapper_train_best_hyperparams_classification(
 #'   train_data = train_data,
 #'   fold_data  = fold_data,
 #'   ml_method  = "rf",
@@ -3492,7 +3511,7 @@ preprocess_features <- function(data, target_col = "target", cor_thresh = 0.9) {
 #'
 #' @importFrom caret train trainControl
 #' @export
-wrapper_train_best_hyperparams <- function(train_data, optimized, ml_method, fold_construction_fun, fold_construction_args_fixed) {
+wrapper_train_best_hyperparams_classification <- function(train_data, optimized, ml_method, fold_construction_fun, fold_construction_args_fixed) {
 
   # Extract optimized hyperparams
   besttune <- optimized$Besttune
@@ -3530,7 +3549,177 @@ wrapper_train_best_hyperparams <- function(train_data, optimized, ml_method, fol
   return(list(Model = fit, training_set = training_set, custom_output = c(training_all[[2]], list("Parameters" = training_all[[3]]))))
 }
 
-aggregate_results <- function(all_loaded) {
+wrapper_train_best_hyperparams_survival <- function(train_data,
+                                                    optimized,
+                                                    ml_method,
+                                                    fold_construction_fun,
+                                                    fold_construction_args_fixed,
+                                                    outcome_col = "time",
+                                                    event_col = "event") {
+
+  # Extract optimized hyperparams
+  besttune <- optimized$Besttune
+
+  # Build full training data using tuned hyperparams
+  training_all <- do.call(
+    fold_construction_fun,
+    c(list(data = train_data, bestune = besttune), fold_construction_args_fixed)
+  )
+
+  # training_all[[1]]: features
+  # training_all[[2]]: custom CellTFusion output, etc.
+  # training_all[[3]]: parameter table
+
+  # Preprocess features
+  training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9,
+                                      time_var = "time", event_var = "event")
+
+  # Define the model specification based on ml_method
+  model <- ml_method
+  model_spec <- NULL
+
+  if (model == "cox_ph_survival") {
+    model_spec <- parsnip::proportional_hazards(mode = "censored regression", engine = "survival")
+
+  } else if (model == "proportional_hazards_glmnet") {
+    model_spec <- parsnip::proportional_hazards(
+      penalty = tune(), mixture = tune(),
+      mode = "censored regression", engine = "glmnet"
+    )
+
+  } else if (model == "survreg_flexsurv") {
+    model_spec <- parsnip::survival_reg(mode = "censored regression", engine = "flexsurv")
+
+  } else if (model == "rand_forest_partykit") {
+    model_spec <- parsnip::rand_forest(trees = tune(), mode = "censored regression", engine = "partykit")
+
+  } else if (model == "rand_forest_aorsf") {
+    model_spec <- parsnip::rand_forest(trees = tune(), mode = "censored regression", engine = "aorsf")
+
+  } else if (model == "decision_tree_partykit") {
+    model_spec <- parsnip::decision_tree(mode = "censored regression", engine = "partykit")
+
+  } else if (model == "bag_tree_rpart") {
+    model_spec <- parsnip::bag_tree(mode = "censored regression", engine = "rpart")
+
+  } else if (model == "boost_tree_mboost") {
+    model_spec <- parsnip::boost_tree(trees = tune(), mode = "censored regression", engine = "mboost")
+
+  } else {
+    stop("Unsupported survival model: ", model)
+  }
+
+  model_hyperparams <- besttune %>%
+    dplyr::select(-dplyr::all_of(colnames(training_all[[3]])))
+
+  # If ML model doesnt have hyperparams
+  if (ncol(model_hyperparams) == 0) {
+    model_hyperparams <- NULL
+  }
+
+  # Apply hyperparameters to model spec if available
+  if (!is.null(model_hyperparams)) {
+    model_spec <- do.call(parsnip::set_args, c(list(object = model_spec), model_hyperparams))
+  }
+
+  # Build survival formula
+  formula_model <- as.formula(paste0("Surv(", outcome_col, ", ", event_col, ") ~ ."))
+
+  wf <- workflows::workflow() %>%
+    workflows::add_model(model_spec) %>%
+    workflows::add_formula(formula_model)
+
+  # Fit on full training set
+  fitted <- parsnip::fit(wf, data = training_set)
+
+  # Create a caret-like output
+  fit <- list()
+  fit$model <- model
+  fit$fitted <- fitted
+  fit$results <- optimized$Results_folds
+  fit$pred <- optimized$Prediction_folds
+  fit$resample <- optimized$Resample_matrix
+  fit$besttune <- besttune
+
+  # Return everything consistent with the classification wrapper
+  return(list(
+    Model = fit,
+    training_set = training_set,
+    custom_output = c(training_all[[2]], list("Parameters" = training_all[[3]]))
+  ))
+}
+
+#' Aggregate Cross-Validation Results for Classification Models
+#'
+#' This function aggregates the results of cross-validation runs across folds,
+#' parameter combinations, and machine learning models for classification tasks.
+#' It summarizes per-fold performance metrics (Accuracy and Kappa), computes
+#' median and variability measures (MAD), and identifies the best hyperparameter
+#' configuration for each model.
+#'
+#' It assumes that the input `all_loaded` structure follows the hierarchy:
+#' \enumerate{
+#'   \item Folds
+#'   \item Parameter combinations
+#'   \item Models (list per fold and parameter set)
+#' }
+#'
+#' Each model entry should contain:
+#' \itemize{
+#'   \item A data frame with predictions and observed labels.
+#'   \item A character vector of hyperparameter names.
+#' }
+#'
+#' @param all_loaded A nested list containing model evaluation results from
+#'   cross-validation:
+#'   \itemize{
+#'     \item \code{all_loaded[[fold]][[param]][[model]][[1]]} — Data frame of predictions,
+#'       including columns `obs`, `pred`, and resample metadata.
+#'     \item \code{all_loaded[[fold]][[param]][[model]][[2]]} — Character vector of
+#'       hyperparameter column names.
+#'   }
+#'   Each prediction data frame must include columns such as:
+#'   \code{"obs"}, \code{"pred"}, \code{"Resample"}, and any hyperparameter columns.
+#'
+#' @details
+#' The function:
+#' \enumerate{
+#'   \item Concatenates predictions across folds and parameter sets.
+#'   \item Computes Accuracy and Kappa per resample using
+#'         `calculate_accuracy_kappa_resample()`.
+#'   \item Aggregates median and MAD (robust variability) of Accuracy and Kappa
+#'         across folds.
+#'   \item Identifies the hyperparameter configuration with the highest median Accuracy.
+#'   \item Extracts per-fold metrics for the best configuration.
+#' }
+#'
+#' This allows ranking models by performance stability and selecting the most
+#' reliable hyperparameter configuration.
+#'
+#' @return A list (one element per model), where each element includes:
+#' \describe{
+#'   \item{`Prediction_folds`}{Data frame containing all per-fold predictions and metrics.}
+#'   \item{`Results_folds`}{Summary table of median Accuracy and Kappa (and their MADs).}
+#'   \item{`Besttune`}{Data frame with the best-performing hyperparameter configuration.}
+#'   \item{`Resample_matrix`}{Per-fold Accuracy and Kappa for the best configuration.}
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Aggregate results from nested CV
+#' aggregated_results <- aggregate_results_classification(all_loaded)
+#'
+#' # View best hyperparameters for model 2
+#' aggregated_results[[2]]$Besttune
+#'
+#' # Inspect Accuracy and Kappa per fold for best configuration
+#' aggregated_results[[2]]$Resample_matrix
+#' }
+#'
+#' @seealso [calculate_accuracy_kappa_resample()], [compute_k_fold_CV_classification()]
+#' @export
+#'
+aggregate_results_classification <- function(all_loaded) {
 
   # Load all files (each file = one fold)
   #all_loaded <- lapply(result_files, readRDS)
@@ -3633,6 +3822,140 @@ aggregate_results <- function(all_loaded) {
 
   return(results)
 }
+
+#' Aggregate Cross-Validation Results for Survival Models
+#'
+#' This function aggregates and summarizes cross-validation results across folds
+#' (and parameter configurations, if present) for multiple survival models.
+#' It computes summary statistics such as the **median** and **median absolute deviation (MAD)**
+#' of the Concordance Index (C-index) per hyperparameter configuration and
+#' identifies the best-performing configuration for each model.
+#'
+#' The function supports two types of data structures:
+#' \enumerate{
+#'   \item Folds → Parameters → Models (when multiple parameter combinations are tested)
+#'   \item Folds → Models (when there are no parameter combinations)
+#' }
+#'
+#' @param all_loaded A nested list of model evaluation results from
+#'   cross-validation:
+#'   \itemize{
+#'     \item If parameter tuning was used:
+#'       \code{all_loaded[[fold]][[param]][[model]]} contains results for each model.
+#'     \item If no parameter tuning was used:
+#'       \code{all_loaded[[fold]][[model]]} contains the results directly.
+#'   }
+#'   Each result object must be a data frame containing columns:
+#'   \code{"Resample"}, \code{"model"}, \code{"c_index"}, and any hyperparameter columns.
+#'
+#' @details
+#' For each survival model, the function:
+#' \enumerate{
+#'   \item Concatenates results across all folds (and parameter combinations if available).
+#'   \item Groups by hyperparameter configuration to compute:
+#'         \itemize{
+#'           \item Median C-index (`c_index_median`)
+#'           \item MAD of C-index (`c_index_mad`)
+#'         }
+#'   \item Selects the best hyperparameter configuration (highest median C-index).
+#'   \item Extracts the per-fold results for the best configuration.
+#' }
+#'
+#' The output provides both a detailed and summarized view of model performance,
+#' enabling comparison of tuned configurations and stability across folds.
+#'
+#' @return A list (one element per model), where each element contains:
+#' \describe{
+#'   \item{`Prediction_folds`}{Data frame of all per-fold predictions and metrics.}
+#'   \item{`Results_folds`}{Summary table of median and MAD of C-index per configuration.}
+#'   \item{`Besttune`}{Data frame with the best hyperparameter configuration.}
+#'   \item{`Resample_matrix`}{Per-fold C-index values for the best configuration.}
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Example: aggregate cross-validation results after nested CV
+#' aggregated <- aggregate_results_survival(all_loaded)
+#'
+#' # Access the best hyperparameters for model 1
+#' aggregated[[1]]$Besttune
+#'
+#' # View per-fold C-index for the best configuration
+#' aggregated[[1]]$Resample_matrix
+#' }
+#'
+#' @seealso [compute_k_fold_CV_survival()], [compute_cv_CINDEX()]
+#' @export
+#'
+aggregate_results_survival <- function(all_loaded) {
+
+  # Detect structure: TRUE if folds → params → models
+  has_params <- is.list(all_loaded[[1]][[1]][[1]])
+
+  n_folds  <- length(all_loaded)
+  n_models <- if (has_params) length(all_loaded[[1]][[1]]) else length(all_loaded[[1]])
+  n_params <- if (has_params) length(all_loaded[[1]]) else 1
+
+  results <- vector("list", n_models)
+
+  # ---- Iterate over models ----
+  for (m in seq_len(n_models)) {
+
+    all_preds   <- NULL
+    hp_cols_all <- character()
+
+    # ---- Gather all predictions across folds (and params if exist) ----
+    for (f in seq_len(n_folds)) {
+      if (has_params) {
+        for (p in seq_len(n_params)) {
+          preds <- all_loaded[[f]][[p]][[m]]
+          hp_cols <- setdiff(names(preds), c("Resample", "model", "fold", "c_index"))
+          all_preds <- dplyr::bind_rows(all_preds, preds)
+          hp_cols_all <- union(hp_cols_all, hp_cols)
+        }
+      } else {
+        preds <- all_loaded[[f]][[m]]
+        hp_cols <- setdiff(names(preds), c("Resample", "model", "fold", "c_index"))
+        all_preds <- dplyr::bind_rows(all_preds, preds)
+        hp_cols_all <- union(hp_cols_all, hp_cols)
+      }
+    }
+
+    rownames(all_preds) <- NULL
+
+    # ---- Summarize performance per hyperparameter configuration ----
+    results_matrix <- all_preds %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols_all))) %>%
+      dplyr::summarise(
+        c_index_median = stats::median(c_index, na.rm = TRUE),
+        c_index_mad    = stats::mad(c_index, constant = 1, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      dplyr::arrange(dplyr::desc(c_index_median))
+
+    # ---- Select best configuration ----
+    best_row <- results_matrix %>%
+      dplyr::slice_max(c_index_median, n = 1, with_ties = FALSE)
+
+    besttune <- best_row %>% dplyr::select(dplyr::all_of(hp_cols_all))
+
+    # ---- Compute per-fold for best config ----
+    resample_df <- all_preds %>%
+      dplyr::inner_join(besttune, by = hp_cols_all) %>%
+      dplyr::arrange(Resample)
+
+    # ---- Store results ----
+    results[[m]] <- list(
+      Prediction_folds = all_preds,
+      Results_folds    = results_matrix,
+      Besttune         = besttune,
+      Resample_matrix  = resample_df
+    )
+  }
+
+  return(results)
+}
+
 
 ### Helper function: get tuneGrid for models --->TO DO: might need to re-think how to choose how many values are gonna be evaluated
 get_tune_grid = function(method, train_data){
@@ -3899,70 +4222,92 @@ unregister_dopar <- function() {
   }
 }
 
-#' Train and Evaluate a Single Survival Model
+#' Train and Evaluate a Survival Model
 #'
-#' This function trains and evaluates a single survival model (e.g., Cox, AFT,
-#' Random Forest, Gradient Boosting, etc.) using the tidymodels framework.
-#' It supports a variety of model engines, user-defined hyperparameters, and
-#' computes the Concordance Index (C-index) as the primary evaluation metric.
+#' This function trains and evaluates a single survival model using the
+#' **tidymodels** framework. It supports a range of survival model types,
+#' including Cox, penalized Cox, AFT, random forests, bagged trees, and
+#' gradient boosting models.
 #'
-#' The function automatically standardizes predictions from different engines,
-#' ensuring that all models produce a comparable numeric risk score
-#' (higher = higher risk). It gracefully handles differences in prediction
-#' formats across models and adjusts the prediction direction when necessary.
+#' The function automatically applies user-specified hyperparameters,
+#' standardizes predictions from different engines, and evaluates model
+#' performance using the **Concordance Index (C-index)** as the primary metric.
+#' It ensures a consistent risk-score direction across models (higher values
+#' indicate higher risk).
 #'
-#' @param df_train A data frame (or tibble) containing training samples, including
+#' @param df_train A data frame containing the training data, including
 #'   survival time, event indicator, and predictor variables.
-#' @param df_test A data frame (or tibble) containing test samples, structured
-#'   identically to `df_train`.
-#' @param outcome_col Character string giving the name of the survival time column.
-#' @param event_col Character string giving the name of the event indicator column
-#'   (1 = event occurred, 0 = censored).
-#' @param model Character string specifying the model to train. Supported values include:
+#' @param df_test A data frame containing the test data with the same structure
+#'   and columns as `df_train`.
+#' @param outcome_col Character string specifying the name of the survival
+#'   time column.
+#' @param event_col Character string specifying the name of the event indicator
+#'   column (`1 = event occurred`, `0 = censored`).
+#' @param model Character string specifying which survival model to train.
+#'   Supported values include:
 #'   \itemize{
 #'     \item `"cox_ph_survival"` – Cox proportional hazards model ({survival})
 #'     \item `"proportional_hazards_glmnet"` – Penalized Cox model (LASSO/Elastic Net)
-#'     \item `"survreg_flexsurv"` – Parametric AFT model
-#'     \item `"rand_forest_partykit"` – Random survival forest using conditional inference trees
+#'     \item `"survreg_flexsurv"` – Parametric AFT model ({flexsurv})
+#'     \item `"rand_forest_partykit"` – Random survival forest (ctree engine)
 #'     \item `"rand_forest_aorsf"` – Oblique random survival forest
 #'     \item `"decision_tree_partykit"` – Single survival tree
 #'     \item `"bag_tree_rpart"` – Bagged survival trees
-#'     \item `"boost_tree_mboost"` – Gradient boosting for censored data
+#'     \item `"boost_tree_mboost"` – Gradient boosting for survival data
 #'   }
-#' @param models_hyperparameters A (possibly named) list containing hyperparameter
-#'   settings to apply to the selected model. Typically one element per model,
-#'   e.g. `list(list(trees = 500, min_n = 10
+#' @param models_hyperparameters A list containing model hyperparameter values
+#'   to apply. Typically created from a tuning grid or optimization step, e.g.:
+#'   `list(list(trees = 500, min_n = 10))`. If `NULL`, default parameters are used.
+#'
+#' @return A tibble with two columns:
+#' \describe{
+#'   \item{`model`}{The model name as a character string.}
+#'   \item{`c_index`}{Numeric value of the computed C-index on the test data.}
+#' }
+#'
+#' @details
+#' The function uses the **parsnip** interface from tidymodels to define,
+#' train, and evaluate models.
+#'
+#' Workflow:
+#' \enumerate{
+#'   \item Defines the model specification (`parsnip::model_spec`).
+#'   \item Optionally applies user-specified hyperparameters via
+#'         `parsnip::set_args()`.
+#'   \item Constructs a survival formula of the form `Surv(time, event) ~ .`.
+#'   \item Fits the model using `parsnip::fit()` on the training data.
+#'   \item Evaluates model performance using
+#'         [predict_and_evaluate_survival()], which computes the C-index.
+#' }
+#'
+#' @seealso [predict_and_evaluate_survival()]
 #' @export
-machine_learning_custom <- function(df_train, df_test,
-                                    outcome_col, event_col = NULL,
-                                    model, models_hyperparameters){
+#'
+compute_ml_survival <- function(df_train, df_test,
+                                outcome_col, event_col = NULL,
+                                model, models_hyperparameters){
   # ---------------------------------------------------------------------------
-  # Step 3a: Define the model specification based on the model name
+  # Define the model specification based on the chosen model
   # ---------------------------------------------------------------------------
-  # Each model is created using the {parsnip} interface, which provides a unified
-  # syntax for specifying models across various engines.
-  # All models are defined with mode = "censored regression", which is required
-  # for survival analysis tasks.
-  #
-  # The engine determines the computational backend used for fitting:
-  #   - "survival" → Classical Cox or AFT model from {survival}
-  #   - "glmnet"   → Penalized regression (LASSO / Elastic Net)
-  #   - "partykit" → Tree-based survival models (ctree framework)
-  #   - "aorsf"    → Oblique random survival forest (fast, optimized)
-  #   - "rpart"    → CART-style bagged trees
-  #   - "mboost"   → Gradient boosting for survival analysis
+  # Each model is created using the {parsnip} unified syntax.
+  # Mode is always set to "censored regression" for survival analysis.
+  # The engine determines the computational backend:
+  #   - "survival" → Classical Cox or AFT
+  #   - "glmnet"   → Penalized regression (LASSO/Elastic Net)
+  #   - "partykit" → Tree-based survival (ctree)
+  #   - "aorsf"    → Oblique random survival forest
+  #   - "rpart"    → Bagged CART trees
+  #   - "mboost"   → Gradient boosting for censored data
   #
   if (model == "cox_ph_survival") {
-    # Standard Cox proportional hazards model (no tunable hyperparameters)
+    # Cox proportional hazards (no tunable parameters)
     model_spec <- parsnip::proportional_hazards(
       mode = "censored regression",
       engine = "survival"
     )
 
   } else if (model == "proportional_hazards_glmnet") {
-    # Penalized Cox model — introduces two tunable parameters:
-    #   penalty (λ): regularization strength
-    #   mixture (α): elastic net mixing (0 = ridge, 1 = lasso)
+    # Penalized Cox (elastic net): tune penalty (λ) and mixture (α)
     model_spec <- parsnip::proportional_hazards(
       penalty = tune(),
       mixture = tune(),
@@ -3971,14 +4316,14 @@ machine_learning_custom <- function(df_train, df_test,
     )
 
   } else if (model == "survreg_flexsurv") {
-    # Parametric accelerated failure time (AFT) model via flexsurv engine
+    # Parametric AFT model
     model_spec <- parsnip::survival_reg(
       mode = "censored regression",
       engine = "flexsurv"
     )
 
   } else if (model == "rand_forest_partykit") {
-    # Random survival forest using conditional inference trees
+    # Random survival forest via conditional inference framework
     model_spec <- parsnip::rand_forest(
       trees = tune(),
       mode = "censored regression",
@@ -3986,7 +4331,7 @@ machine_learning_custom <- function(df_train, df_test,
     )
 
   } else if (model == "rand_forest_aorsf") {
-    # Random survival forest using oblique splits (aorsf package)
+    # Oblique random survival forest (efficient implementation)
     model_spec <- parsnip::rand_forest(
       trees = tune(),
       mode = "censored regression",
@@ -3994,21 +4339,21 @@ machine_learning_custom <- function(df_train, df_test,
     )
 
   } else if (model == "decision_tree_partykit") {
-    # Single conditional inference survival tree
+    # Single survival decision tree
     model_spec <- parsnip::decision_tree(
       mode = "censored regression",
       engine = "partykit"
     )
 
   } else if (model == "bag_tree_rpart") {
-    # Bagged ensemble of CART survival trees
+    # Bagged CART-based survival trees
     model_spec <- parsnip::bag_tree(
       mode = "censored regression",
       engine = "rpart"
     )
 
   } else if (model == "boost_tree_mboost") {
-    # Gradient boosting model for censored survival data
+    # Gradient boosting for censored data
     model_spec <- parsnip::boost_tree(
       trees = tune(),
       mode = "censored regression",
@@ -4016,21 +4361,19 @@ machine_learning_custom <- function(df_train, df_test,
     )
 
   } else {
-    # Catch any unsupported model names
+    # Unsupported model name
     stop("Unsupported model: ", model)
   }
 
 
   # ---------------------------------------------------------------------------
-  # Step 3b: Apply user-provided hyperparameters
+  # Apply user-defined hyperparameters (if provided)
   # ---------------------------------------------------------------------------
-  # Hyperparameters are provided as a list of parameter sets, typically created
-  # from a tuning grid. Example:
-  #   models_hyperparameters = list(list(trees = 500, min_n = 10))
+  # Hyperparameters are applied dynamically using do.call() and set_args(),
+  # allowing flexible argument passing from a parameter grid.
   #
-  # The parsnip::set_args() function updates the model specification with
-  # these custom values. Wrapping the call in do.call() allows passing an
-  # arbitrary number of named arguments dynamically.
+  # Example:
+  #   models_hyperparameters = list(list(trees = 500, min_n = 10))
   #
   if (!is.null(models_hyperparameters)) {
     model_spec <- do.call(
@@ -4040,16 +4383,13 @@ machine_learning_custom <- function(df_train, df_test,
   }
 
   # ---------------------------------------------------------------------------
-  # Step 3c: Fit the model using a tidymodels workflow
+  # Define workflow and fit the model
   # ---------------------------------------------------------------------------
-  # A workflow combines a model specification with a formula or recipe.
-  # For survival models, the response must be defined as:
-  #   Surv(time, event) ~ predictors
+  # Combine the model and survival formula into a workflow.
+  # Formula format: Surv(time, event) ~ predictors
+  # Ensures compatibility with survival engines during fitting.
   #
-  # This structure is recognized by survival engines and allows them to
-  # compute censored regression models correctly.
-  #
-  formula_model <- as.formula(
+  formula_model <- stats::as.formula(
     paste0("Surv(", outcome_col, ", ", event_col, ") ~ .")
   )
 
@@ -4057,145 +4397,85 @@ machine_learning_custom <- function(df_train, df_test,
     workflows::add_model(model_spec) %>%
     workflows::add_formula(formula_model)
 
-  # Fit the model to the training data
+  # Fit model on training data
   fitted <- parsnip::fit(wf, data = df_train)
 
   # ---------------------------------------------------------------------------
-  # Step 3d: Generate predictions on test data
+  # Evaluate performance on test data
   # ---------------------------------------------------------------------------
-  # The code tries different prediction "types" depending on what the fitted model supports.
+  # Uses predict_and_evaluate_survival() to compute the Concordance Index (C-index),
+  # which measures the model’s ability to correctly rank survival outcomes.
   #
-  # 1. "linear_pred"  → Risk score or log hazard (e.g., Cox model)
-  #      - Higher values = higher risk (shorter survival)
-  #      - Direction: higher = worse outcome
-  #
-  # 2. "time"         → Expected survival time (e.g., parametric AFT models)
-  #      - Higher values = longer expected lifetime
-  #      - Direction: higher = better outcome (will be reversed later)
-  #
-  # 3. "survival"     → Survival probability at a given evaluation time
-  #      - Higher values = more likely to survive (less risk)
-  #      - Direction: higher = better outcome (will be reversed later)
-  #
-  # The try–catch structure ensures the code works for any survival model:
-  # - Try risk-based prediction first
-  # - If not supported, try time-based prediction
-  # - If that fails, fall back to survival probability at a fixed eval_time
-  # ---------------------------------------------------------------------------
+  metric_val = predict_and_evaluate_survival(fitted, df_test)$c_index
 
-  pred_type <- NULL  # track which type succeeded
-
-  preds <- tryCatch({
-    pred_type <<- "linear_pred"
-    stats::predict(fitted, df_test, type = "linear_pred")
-  }, error = function(e1) {
-    tryCatch({
-      pred_type <<- "time"
-      stats::predict(fitted, df_test, type = "time")
-    }, error = function(e2) {
-      # Fallback: use survival probabilities at the median observed time
-      eval_time <- stats::median(df_train[[outcome_col]], na.rm = TRUE)
-      pred_type <<- "survival"
-      stats::predict(fitted, df_test, type = "survival", eval_time = eval_time)
-    })
-  })
-
-  # ---------------------------------------------------------------------------
-  # Step 3e: Standardize prediction output into a numeric tibble
-  # ---------------------------------------------------------------------------
-  # Prediction outputs vary by engine:
-  #   - Some return numeric vectors (risk scores)
-  #   - Others return matrices (e.g., survival curves across time)
-  #   - Some may return lists of probabilities
-  #
-  # This section standardizes all prediction outputs into a tibble with a
-  # single numeric column `.pred`, computing the median when multiple
-  # predictions per sample exist.
-  #
-
-  if ("matrix" %in% class(preds[[1]])) {
-    preds <- tibble::tibble(.pred = apply(as.data.frame(preds[[1]]), 1, median, na.rm = TRUE))
-  } else if (!is.numeric(preds[[1]])) {
-    preds <- tibble::tibble(.pred = apply(as.matrix(preds), 1, median, na.rm = TRUE))
-  } else {
-    pred_col <- names(preds)[1]
-    preds <- preds %>% dplyr::rename(.pred = dplyr::all_of(pred_col))
-  }
-
-  # ---------------------------------------------------------------------------
-  # Step 3f: Ensure direction consistency (higher = higher risk)
-  # ---------------------------------------------------------------------------
-
-  # Reverse predictions if type implies "more = better survival"
-  if (is.null(pred_type)) {
-    warning("⚠️ No successful prediction type for model: ", model)
-  } else if (pred_type %in% c("time", "survival")) {
-    preds$.pred <- -preds$.pred
-  }
-
-  # ---------------------------------------------------------------------------
-  # Step 3g: Evaluate model performance using the Concordance Index (C-index)
-  # ---------------------------------------------------------------------------
-  # The C-index measures how well the model ranks survival times relative to
-  # true outcomes (i.e., discrimination ability). It ranges from 0.5 (random)
-  # to 1 (perfect discrimination).
-  #
-  # The function `censored::concordance_survival_vec()` computes the metric.
-  # If the computation fails, the value is safely returned as NA.
-  #
-  metric_val <- tryCatch({
-    yardstick::concordance_survival_vec(
-      truth = survival::Surv(df_test[[outcome_col]], df_test[[event_col]]),
-      estimate = preds$.pred
-    )
-  }, error = function(e) {
-    message("Concordance calculation failed: ", e$message)
-    NA_real_
-  })
-
-  # ---------------------------------------------------------------------------
-  # Step 3h: Return the model name and computed C-index
-  # ---------------------------------------------------------------------------
-  # The function returns a tibble containing the model name and the computed
-  # C-index, making it easy to aggregate and compare across models and folds.
-  #
+  # Return standardized tibble with model name and C-index
   return(tibble::tibble(model = model, c_index = metric_val))
 }
 
-#' Perform Nested Cross-Validation for Multiple Survival Models
+
+#' Nested Cross-Validation for Survival Models with Optional Custom Fold Construction
 #'
-#' This function performs *nested cross-validation* with hyperparameter tuning
-#' across multiple survival models using the tidymodels framework.
-#' It supports both standard stratified cross-validation (by event rate)
-#' and *Leave-One-Domain-Out (LODO)* stratification, which balances by
-#' cohort × event combinations.
+#' This function performs *nested cross-validation* to evaluate and tune multiple
+#' survival models using the tidymodels ecosystem. It supports both standard
+#' event-stratified cross-validation and *Leave-One-Domain-Out (LODO)* setups,
+#' allowing cohort-balanced performance evaluation. Hyperparameter grids are
+#' automatically constructed for each model type.
 #'
-#' For each model and hyperparameter configuration, the function:
+#' Depending on the inputs, the function can:
 #' \enumerate{
-#'   \item Trains the model across multiple folds
-#'   \item Computes the C-index (concordance index)
-#'   \item Aggregates median and MAD (robust variability measure) across folds
+#'   \item Build folds internally or accept custom folds from an external function.
+#'   \item Train survival models with or without hyperparameter tuning.
+#'   \item Compute and aggregate C-index (Concordance Index) across folds.
+#'   \item Identify and retrain the top-performing model using optimal parameters.
 #' }
-#' Finally, it identifies the best-performing model and hyperparameter
-#' configuration and returns all results in a structured list.
 #'
-#' @param df_features A data frame (or tibble) containing predictor variables (X matrix).
-#' @param df_outcome A data frame (or tibble) containing survival outcome columns:
-#'   typically survival time and event indicator.
-#' @param outcome_col Character string specifying the name of the survival time column.
-#' @param event_col Character string specifying the name of the event indicator column (0 = censored, 1 = event).
-#' @param ml_options A named list of machine learning options controlling cross-validation and parallelization:
+#' @param df_features A data frame containing predictor variables (features).
+#' @param df_outcome A data frame containing survival outcomes — typically including
+#'   survival time and event indicator columns.
+#' @param outcome_col Character string naming the survival time column.
+#' @param event_col Character string naming the event indicator column
+#'   (`0 = censored`, `1 = event`).
+#' @param ml_options A named list of cross-validation and parallelization options:
 #'   \describe{
-#'     \item{`nb_folds`}{Number of folds for v-fold cross-validation (default = 5).}
-#'     \item{`nb_repeats`}{Number of repetitions of cross-validation (default = 1).}
-#'     \item{`ncores`}{Number of CPU cores for parallel processing (default = `parallel::detectCores() - 1`).}
-#'     \item{`LODO`}{Logical; if `TRUE`, use Leave-One-Domain-Out stratification by cohort × event.}
-#'     \item{`batch_id`}{Character; name of the cohort or batch column (required if `LODO = TRUE`).}
+#'     \item{`nb_folds`}{Number of folds for K-fold cross-validation (default = 5).}
+#'     \item{`nb_repeats`}{Number of repeated CV iterations (default = 1).}
+#'     \item{`ncores`}{Number of CPU cores to use for parallelization.}
+#'     \item{`LODO`}{Logical; if `TRUE`, performs Leave-One-Domain-Out stratification
+#'     using `batch_id`.}
+#'     \item{`batch_id`}{Name of the batch or cohort column (required if `LODO = TRUE`).}
 #'   }
-#' @param file_name Optional character string specifying the file name suffix for
-#'   saving the generated C-index summary plot (PDF).
+#' @param file_name Optional string specifying the suffix of the generated
+#'   C-index summary PDF saved in `"Results/"`.
+#'
+#' @details
+#' Internally, the function:
+#' \itemize{
+#'   \item Combines predictors and outcomes into a unified dataset.
+#'   \item Creates stratified folds using {rsample}, either by event rate or
+#'     by cohort × event combinations (if LODO = TRUE).
+#'   \item Evaluates a predefined set of survival models:
+#'     Cox PH, penalized Cox (glmnet), AFT models, decision/bagged trees, and random forests.
+#'   \item Aggregates median and MAD of C-index across resamples.
+#'   \item Retrains the top model with its optimal hyperparameters.
+#' }
+#'
+#' The function can also interface with a user-defined `fold_construction_fun()`
+#' to support custom preprocessing pipelines (e.g., CellTFusion), handling folds
+#' in parallel and storing intermediate results to disk.
+#'
+#' @return A named list containing:
+#' \describe{
+#'   \item{`Model`}{The best-performing model retrained on full data.}
+#'   \item{`ML_Models`}{All evaluated survival models with aggregated C-index results.}
+#'   \item{`C_index_median`}{Median C-index of the top model.}
+#'   \item{`Custom_output`}{Optional custom fold output (if applicable).}
+#' }
+#'
+#' @seealso [aggregate_results_survival()], [compute_cv_CINDEX()],
+#'   [wrapper_train_best_hyperparams_survival()]
 #' @export
-cross_validation_custom <- function(df_features, df_outcome,
+#'
+compute_k_fold_CV_survival <- function(df_features, df_outcome,
                                     outcome_col, event_col,
                                     ml_options = list(nb_folds = 5,
                                                       nb_repeats = 1,
@@ -4204,34 +4484,28 @@ cross_validation_custom <- function(df_features, df_outcome,
                                                       batch_id = NULL),
                                     file_name = NULL){
 
-  ### Implement parallelization over folds
-  # Set the number of CPU cores for parallel processing, as specified in ml_options.
+  ### -------------------------------------------------------------------------
+  ### Step 1: Configure parallelization
+  ### -------------------------------------------------------------------------
+  # Retrieve the number of CPU cores to use for parallel processing.
   ncores <- ml_options$ncores
 
   # ---------------------------------------------------------------------------
-  # Step 2: Combine predictors and outcomes
+  # Step 2: Merge features and outcomes
   # ---------------------------------------------------------------------------
-  # Merge the feature matrix (X) and the outcome data (Y) into a single dataset.
-  # This ensures that both survival time and event indicators are correctly aligned
-  # for each individual prior to creating cross-validation splits.
+  # Combine predictor variables (df_features) with survival outcomes (df_outcome)
+  # to ensure consistent ordering before creating cross-validation folds.
   #
   df_all <- df_features %>%
     dplyr::bind_cols(df_outcome)
 
   # ---------------------------------------------------------------------------
-  # Step 3: Create v-fold cross-validation splits  (with optional LODO stratification)
+  # Step 3: Define cross-validation folds
   # ---------------------------------------------------------------------------
-  # Use the {rsample} package to generate stratified K-fold CV partitions.
-  # Stratification ensures that the proportion of events (1) vs. censored (0)
-  # is roughly preserved across folds, improving stability of C-index estimates.
-  # Each fold contains:
-  #   - an analysis set (training data)
-  #   - an assessment set (validation data)
-  # If `nb_repeats` > 1, the v-fold partitioning is repeated multiple times
-  # for more stable performance estimates.
-  # If LODO = FALSE → standard stratified by event rate
-  # If LODO = TRUE  → stratified by both cohort (batch_id) and event indicator
-
+  # Generate stratified K-fold CV partitions using {rsample}.
+  #   - If LODO = FALSE → standard stratification by event rate.
+  #   - If LODO = TRUE  → stratify by cohort × event to preserve domain balance.
+  #
   if (isTRUE(ml_options$LODO)) {
     if (is.null(ml_options$batch_id) || !ml_options$batch_id %in% names(df_all)) {
       stop("When LODO = TRUE, you must provide 'batch_id' as a column name in df_all.")
@@ -4257,19 +4531,27 @@ cross_validation_custom <- function(df_features, df_outcome,
       df_all,
       v = ml_options$nb_folds,
       repeats = ml_options$nb_repeats,
-      strata = df_all[[event_col]]  # stratify by event indicator only
+      strata = event_col  # stratify by event indicator only
     )
   }
 
-  # ---------------------------------------------------------------------------
-  # Step 4: Define or load hyperparameter grids
-  # ---------------------------------------------------------------------------
-  # If no explicit hyperparameter grids are provided, automatically generate
-  # default grids for supported survival models using the helper function
-  # `get_default_hyperparams()`, which leverages the {dials} package.
+  ### -------------------------------------------------------------------------
+  ### Step 4: Reformat folds to caret-compatible list format
+  ### -------------------------------------------------------------------------
+  # Convert the rsample object into a list of training indices, enabling reuse
+  # of legacy caret-compatible aggregation utilities.
   #
+  multifolds <- purrr::map(
+    seq_len(nrow(folds)),
+    ~ folds$splits[[.x]]$in_id
+  ) %>%
+    purrr::set_names(folds$id)
 
-  # List of survival models to evaluate
+  # ---------------------------------------------------------------------------
+  # Step 5: Define candidate survival models
+  # ---------------------------------------------------------------------------
+  # Each model is a tidymodels-compatible specification supporting censored data.
+  #
   model_list <- c(
     "cox_ph_survival",              # classical Cox proportional hazards model
     "proportional_hazards_glmnet",  # penalized Cox (LASSO / elastic net)
@@ -4281,273 +4563,469 @@ cross_validation_custom <- function(df_features, df_outcome,
     #"boost_tree_mboost"            # gradient boosting for survival (optional)
   )
 
-  # Create model-specific parameter grids.
-  # Each element in model_grids is a list of hyperparameter value vectors.
+  # ---------------------------------------------------------------------------
+  # Step 6: Generate default hyperparameter grids
+  # ---------------------------------------------------------------------------
+  # Construct model-specific grids (via get_default_hyperparams()).
+  # Each element corresponds to a model with tunable parameter ranges.
+  #
   model_grids <- purrr::map(model_list, ~ get_default_hyperparams(.x, train_x = df_features))
   names(model_grids) <- model_list
 
+  # Initialize master list to store everything in memory
+  models_all_folds <- vector("list", k_folds*n_rep)
+
   # ---------------------------------------------------------------------------
-  # Step 5: Nested loop over models and hyperparameter configurations
+  # Step 7: Run nested cross-validation and model training
   # ---------------------------------------------------------------------------
-  # Outer loop: iterate over each model.
-  # Inner loop: iterate over all hyperparameter combinations for that model.
-  # Innermost loop: perform v-fold cross-validation for each configuration.
+  # Depending on whether fold_construction_fun is defined, this section either:
+  #   - Performs standard nested CV (train/test splits within this function), or
+  #   - Executes an external custom fold construction pipeline (e.g., CellTFusion).
   #
-  # This structure implements nested CV: tuning parameters inside cross-validation.
-  #
-  cl <- parallel::makeCluster(ncores)
-  doParallel::registerDoParallel(cl)
+  # Each fold produces performance results stored for later aggregation.
+  if(is.null(fold_construction_fun)){
+    for (fold_i in seq_along(multifolds)) { ### number of folds (k_fold x n_rep)
 
-  # Export necessary global objects to all worker processes
-  parallel::clusterExport(
-    cl,
-    varlist = c("folds", "outcome_col", "event_col", "ml_options"),
-    envir = environment()
-  )
+      train_idx <- multifolds[[fold_i]]
+      test_idx <- setdiff(seq_len(nrow(df_all)), train_idx)
 
-  # ---------------------------------------------------------------------------
-  # Step 6: Model training and evaluation loop
-  # ---------------------------------------------------------------------------
-  # For each model in the list, train and evaluate all configurations in parallel.
-  # Results are aggregated into a single tibble using map_dfr().
-  #
-  all_results <- purrr::map_dfr(model_list, function(current_model) {
+      train_data <- df_all[train_idx, , drop = FALSE]
+      test_data <- df_all[test_idx, , drop = FALSE]
 
-    cat("Training with model", current_model, "\n")
+      #Preprocessing features (remove collinear variables and no-variance)
+      train_data <- preprocess_features(train_data, cor_thresh = 0.9, time_var = "time", event_var = "event")
 
-    # Retrieve hyperparameter grid for the current model
-    hyperparams <- model_grids[[current_model]]
-
-    # Fallback: if the model has no tunable parameters, create a single configuration
-    if (is.null(hyperparams)) {
-      param_grid <- tibble::tibble(.config_id = 1)
-    } else {
-      param_grid <- tidyr::expand_grid(!!!hyperparams) %>%
-        dplyr::mutate(.config_id = row_number())
-    }
-
-    # -----------------------------------------------------------------------
-    # Inner hyperparameter tuning loop
-    # -----------------------------------------------------------------------
-    # For each hyperparameter configuration, perform full v-fold CV evaluation.
-    #
-    model_results <- purrr::map_dfr(1:nrow(param_grid), function(g) {
-      current_params <- param_grid[g, , drop = FALSE]
-
-      # Export model-specific variables to all cluster workers
-      parallel::clusterExport(
-        cl,
-        varlist = c("current_model", "hyperparams", "current_params", "g"),
-        envir = environment()
+      common_features <- intersect(
+        colnames(train_data),
+        colnames(test_data)
       )
 
-      # ---------------------------------------------------------------------
-      # Inner-most loop: parallelized cross-validation folds
-      # ---------------------------------------------------------------------
-      # Train the model and compute C-index for each fold in parallel.
-      #
-      results <- foreach::foreach(i = seq_along(folds$splits),
-                                  .combine = dplyr::bind_rows,
-                                  .packages = c("dplyr")) %dopar% {
-                                    # Source the model training function in worker environments
-                                    source("machine_learning_survival.R")
+      test_data <- test_data[, common_features, drop = FALSE]
 
-                                    # Split into training and validation sets
-                                    split <- folds$splits[[i]]
-                                    train_df <- rsample::analysis(split)
-                                    test_df  <- rsample::assessment(split)
+      # Run all ML methods for this parameter configuration
+      models <- lapply(
+        model_list,
+        function(method) {
+          # Retrieve hyperparameter grid for the current model
+          hyperparams <- model_grids[[method]]
 
-                                    # Remove auxiliary columns only in LODO mode
-                                    if (isTRUE(ml_options$LODO)) {
-                                      drop_cols <- c("strata", ml_options$batch_id)
-                                      train_df <- train_df %>% dplyr::select(-dplyr::any_of(drop_cols))
-                                      test_df  <- test_df %>% dplyr::select(-dplyr::any_of(drop_cols))
-                                    }
+          # Fallback: if the model has no tunable parameters, create a single configuration
+          if (is.null(hyperparams)) {
+            param_grid <- tibble::tibble(.config_id = 1)
+          } else {
+            param_grid <- tidyr::expand_grid(!!!hyperparams) %>%
+              dplyr::mutate(.config_id = row_number())
+          }
 
-                                    # Train model and evaluate C-index on the held-out fold
-                                    trained <- machine_learning_custom(
-                                      df_train = train_df,
-                                      df_test = test_df,
-                                      outcome_col = outcome_col,
-                                      event_col = event_col,
-                                      model = current_model,
-                                      models_hyperparameters = if (is.null(hyperparams)) NULL else list(
-                                        current_params %>% dplyr::select(-.config_id)
-                                      )
-                                    )
+          model_results <- purrr::map_dfr(1:nrow(param_grid), function(g) {
 
-                                    # Return fold-specific results
-                                    tibble::tibble(
-                                      model = current_model,
-                                      .config_id = g,
-                                      fold = folds$id[i],
-                                      c_index = trained$c_index
-                                    )
-                                  }
+            current_params <- param_grid[g, , drop = FALSE]
 
-      # Aggregate fold results: compute median and MAD (robust dispersion)
-      results %>%
-        dplyr::group_by(model, .config_id) %>%
-        dplyr::summarise(
-          median = stats::median(c_index, na.rm = TRUE),
-          mad = stats::mad(c_index, na.rm = TRUE),
-          .groups = "drop"
+            # Train model and evaluate C-index on the held-out fold
+            trained <- compute_ml_survival(df_train = train_data,
+                                           df_test = test_data,
+                                           outcome_col = outcome_col, event_col = event_col,
+                                           model = method,
+                                           models_hyperparameters = if (is.null(hyperparams)) NULL else list(
+                                             current_params %>% dplyr::select(-.config_id)))
+
+            trained_df <- trained %>%
+              data.frame() %>%
+              dplyr::mutate(
+                model = method,
+                Resample = paste0("Fold", fold_i)
+              ) %>%
+              dplyr::bind_cols(current_params %>% dplyr::select(-.config_id))%>%
+              dplyr::relocate(c_index, .after = dplyr::last_col())
+
+          })
+
+        }
+      )
+
+      # Store all results for this fold
+      models_all_folds[[fold_i]] <- models
+
+    }
+
+    models = aggregate_results_survival(models_all_folds)
+    names(models) <- model_list
+
+    ## Sanity check (each param conf has to be evaluated in all resamples)
+    for(i in 1:length(models)){
+      hp_cols_all = names(models[[i]][["Besttune"]]) ### Hyperparameter names
+      x = models[[i]][["Prediction_folds"]] %>%
+        dplyr::distinct(Resample, dplyr::across(all_of(hp_cols_all))) %>%
+        dplyr::count(dplyr::across(all_of(hp_cols_all)), name = "n_resamples") %>%
+        dplyr::arrange(desc(n_resamples))
+
+      # Expected number of resamples (folds × repeats)
+      expected_resamples <- length(unique(models[[i]][["Prediction_folds"]]$Resample))
+
+      # Sanity check
+      if (any(x$n_resamples != expected_resamples)) {
+        stop("Inconsistent number of resamples detected for parameter configuration\n",
+             paste0(hp_cols_all, collapse = " "))
+      }
+    }
+
+    custom_outputs = NULL
+
+  }else{
+    # Custom fold construction (is running in parallel)
+    do.call(fold_construction_fun, c(list(data = df_features, folds = multifolds), fold_construction_args_fixed, fold_construction_args_tunable))
+
+    ### Extract the file names of the folds
+    result_files <- list.files("Results", pattern = "^fold_.*\\.rds$", full.names = TRUE)
+
+    # Iterate across folds and inside each subfold corresponding to each param combination (if exist)
+    for (fold_i in seq_along(result_files)) { ### number of folds (k_fold x n_rep)
+
+      result = readRDS(result_files[[fold_i]]) ## per resample
+
+      # Each fold contains multiple parameter sets (list of lists) --> fold_construction_args_tunable != NULL
+      if (!is.null(fold_construction_args_tunable)) {
+        models_all_params <- vector("list", length(result))
+
+        cl <- parallel::makeCluster(ncores)
+        doParallel::registerDoParallel(cl)
+
+        models_all_params <- foreach::foreach(parameter_i = seq_along(result),
+                                              .packages = c("dplyr", "caret")) %dopar% {
+
+                                                train_data_i <- result[[parameter_i]][["train_data"]]
+                                                test_data_i  <- result[[parameter_i]][["test_data"]]
+
+                                                # Preprocessing features (remove collinear variables and no-variance)
+                                                train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9,
+                                                                                    time_var = "time", event_var = "event")
+
+                                                # Replace in original train/test datasets
+                                                result[[parameter_i]][["train_data"]] <- train_data_i
+
+                                                common_features <- intersect(
+                                                  colnames(train_data_i),
+                                                  colnames(test_data_i)
+                                                )
+
+                                                result[[parameter_i]][["test_data"]] <- test_data_i[, common_features, drop = FALSE]
+
+                                                # Run all ML methods for this parameter configuration
+                                                models <- lapply(
+                                                  model_list,
+                                                  function(method) {
+                                                    cat("Running model", method, "with param configuration", parameter_i, "and fold", fold_i, "\n")
+
+                                                    # Retrieve hyperparameter grid for the current model
+                                                    hyperparams <- model_grids[[method]]
+
+                                                    # Fallback: if the model has no tunable parameters, create a single configuration
+                                                    if (is.null(hyperparams)) {
+                                                      param_grid <- tibble::tibble(.config_id = 1)
+                                                    } else {
+                                                      param_grid <- tidyr::expand_grid(!!!hyperparams) %>%
+                                                        dplyr::mutate(.config_id = row_number())
+                                                    }
+
+                                                    model_results <- purrr::map_dfr(1:nrow(param_grid), function(g) {
+
+                                                      current_params <- param_grid[g, , drop = FALSE]
+
+                                                      # Train model and evaluate C-index on the held-out fold
+                                                      trained <- compute_ml_survival(df_train = result[[parameter_i]][["train_data"]],
+                                                                                     df_test = result[[parameter_i]][["test_data"]],
+                                                                                     outcome_col = outcome_col, event_col = event_col,
+                                                                                     model = method,
+                                                                                     models_hyperparameters = if (is.null(hyperparams)) NULL else list(
+                                                                                       current_params %>% dplyr::select(-.config_id)))
+
+                                                      trained_df <- trained %>%
+                                                        data.frame() %>%
+                                                        dplyr::mutate(
+                                                          model = method,
+                                                          Resample = paste0("Fold", fold_i)
+                                                        ) %>%
+                                                        dplyr::bind_cols(current_params %>% dplyr::select(-.config_id))%>%
+                                                        dplyr::bind_cols(result[[parameter_i]][["params"]]) %>%
+                                                        dplyr::relocate(c_index, .after = dplyr::last_col())
+
+                                                    })
+
+                                                  }
+                                                )
+
+                                                models
+                                              }
+
+        parallel::stopCluster(cl)  # stop the cluster after parallel execution
+        unregister_dopar() #Stop Dopar from running in the background
+
+        # Store all parameter results for this fold
+        models_all_folds[[fold_i]] <- models_all_params
+
+      }else { # Custom function does not have hyperparams to tune --> fold_construction_args_tunable != NULL
+        train_data_i <- result[["train_data"]]
+        test_data_i <- result[["test_data"]]
+
+        # Preprocessing
+        train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9,
+                                            time_var = "time", event_var = "event")
+
+        # Replace
+        result[["train_data"]] = train_data_i
+        result[["test_data"]] = test_data_i[, setdiff(colnames(train_data_i), "target")]
+
+        # Run all ML methods for this parameter configuration
+        models <- lapply(
+          model_list,
+          function(method) {
+
+            # Retrieve hyperparameter grid for the current model
+            hyperparams <- model_grids[[method]]
+
+            # Fallback: if the model has no tunable parameters, create a single configuration
+            if (is.null(hyperparams)) {
+              param_grid <- tibble::tibble(.config_id = 1)
+            } else {
+              param_grid <- tidyr::expand_grid(!!!hyperparams) %>%
+                dplyr::mutate(.config_id = row_number())
+            }
+
+            model_results <- purrr::map_dfr(1:nrow(param_grid), function(g) {
+
+              current_params <- param_grid[g, , drop = FALSE]
+
+              # Train model and evaluate C-index on the held-out fold
+              trained <- compute_ml_survival(df_train = result[["train_data"]],
+                                             df_test = result[["test_data"]],
+                                             outcome_col = outcome_col, event_col = event_col,
+                                             model = method,
+                                             models_hyperparameters = if (is.null(hyperparams)) NULL else list(
+                                               current_params %>% dplyr::select(-.config_id)))
+
+              trained_df <- trained %>%
+                data.frame() %>%
+                dplyr::mutate(
+                  model = method,
+                  Resample = paste0("Fold", fold_i)
+                ) %>%
+                dplyr::bind_cols(current_params %>% dplyr::select(-.config_id))%>%
+                dplyr::relocate(c_index, .after = dplyr::last_col())
+
+            })
+
+          }
         )
 
+        models_all_folds[[fold_i]] <- models
+
+      }
+    }
+
+    # Step 8: Aggregate results and validate fold consistency
+    # ---------------------------------------------------------------------------
+    # Combines all model results using aggregate_results_survival().
+    # Ensures that each hyperparameter configuration was evaluated across all folds.
+    models = aggregate_results_survival(models_all_folds)
+    names(models) <- model_list
+
+    ## Sanity check (each param conf has to be evaluated in all resamples)
+    for(i in 1:length(models)){
+      hp_cols_all = names(models[[i]][["Besttune"]]) ### Hyperparameter names
+      x = models[[i]][["Prediction_folds"]] %>%
+        dplyr::distinct(Resample, dplyr::across(all_of(hp_cols_all))) %>%
+        dplyr::count(dplyr::across(all_of(hp_cols_all)), name = "n_resamples") %>%
+        dplyr::arrange(desc(n_resamples))
+
+      # Expected number of resamples (folds × repeats)
+      expected_resamples <- length(unique(models[[i]][["Prediction_folds"]]$Resample))
+
+      # Sanity check
+      if (any(x$n_resamples != expected_resamples)) {
+        stop("Inconsistent number of resamples detected for parameter configuration\n",
+             paste0(hp_cols_all, collapse = " "))
+      }
+    }
+  }
+
+  if (!is.null(fold_construction_args_tunable)){
+
+    ################################ Train model with optimized hyperparameters
+
+    optimized_models <- lapply(seq_along(model_list), function(i) {
+      cat("Running model...", model_list[i])
+      wrapper_train_best_hyperparams_survival(
+        train_data = df_features,
+        optimized = models[[i]],
+        ml_method = model_list[i],
+        fold_construction_fun,
+        fold_construction_args_fixed
+      )
     })
 
-    # Return summarized cross-validation results for the current model
-    model_results
+    # Split components across lists
+    training_sets <- lapply(optimized_models, `[[`, "training_set")
+    custom_outputs <- lapply(optimized_models, `[[`, "custom_output")
+    models           <- lapply(optimized_models, `[[`, "Model")
 
-  })
+    # Assign pretty names
+    names(training_sets) <- model_list
+    names(custom_outputs) <- model_list
+    names(models) <- model_list
+  }else{
+    custom_outputs = NULL
+  }
 
-  # Stop the parallel cluster and clean up
-  parallel::stopCluster(cl)
-  unregister_dopar() # Ensure no background parallel backend remains
-
+  # Step 9: Retrain best model on full data (if tuning performed)
   # ---------------------------------------------------------------------------
-  # Step 7: Identify the best hyperparameter configuration
-  # ---------------------------------------------------------------------------
-  # After all configurations have been evaluated:
-  #   - Identify the best-performing configuration per model
-  #   - Select the top model overall based on the median C-index
-  #
-  best_configs_per_model <- all_results %>%
-    dplyr::group_by(model) %>%
-    dplyr::slice_max(median, n = 1, with_ties = FALSE) %>%
-    dplyr::ungroup()
+  # Once optimal hyperparameters are found per model, retrain the top model
+  # using wrapper_train_best_hyperparams_survival().
 
-  # Select the best model overall based on highest median C-index
-  best_model <- best_configs_per_model %>%
-    dplyr::slice_max(median, n = 1, with_ties = FALSE)
+  #Top model with best accuracy or AUC
+  metrics <- compute_cv_CINDEX(models, file_name = "MySurvivalModels")
 
-  # Extract the best model name and configuration ID
-  best_model_name <- best_model$model
-  best_config_id <- best_model$.config_id
+  top_model = metrics[["Top_model"]]
+  c_index_median = metrics[["CINDEX_summary"]] %>%
+    dplyr::filter(model == top_model) %>%
+    dplyr::pull(Median_CINDEX)
 
-  # Retrieve corresponding hyperparameter values for the winning configuration
-  best_hyperparams <- tidyr::expand_grid(!!!get_default_hyperparams(best_model_name)) %>%
-    dplyr::slice(best_config_id)
+  model = models[[top_model]]
 
-  # Visualize and summarize performance
-  plot_summary <- compute_cv_CINDEX(best_configs_per_model, file_name = file_name)
+  cat("Best ML model found: ", top_model, "\n")
 
-  print(plot_summary$CINDEX_summary)
-  cat("Top model:", plot_summary$Top_model, "\n")
+  cat("Returning model trained\n")
 
-  # ---------------------------------------------------------------------------
-  # Step 8: Return structured results
-  # ---------------------------------------------------------------------------
-  # The output is a comprehensive list containing:
-  #   - all_results: C-index performance for each model/configuration/fold
-  #   - best_configs_per_model: top configuration per model
-  #   - best_model: name of the best-performing model
-  #   - best_score: median C-index of the top model
-  #   - best_sd: MAD (robust SD) of that configuration
-  #
-  list(
-    all_results = all_results,
-    best_configs_per_model = best_configs_per_model,
-    best_model = best_model$model,
-    best_score = best_model$median,
-    best_sd = best_model$mad
-  )
+  output = list("Model" = model, "ML_Models" = models, "C_index_median" = c_index_median)
+
+  if(!is.null(custom_outputs) && !any(sapply(custom_outputs, is.null))){ #Check whether custom_output exists or not
+    output[[length(output)+1]] = custom_outputs[[top_model]]
+    names(output)[length(output)] = "Custom_output"
+  }
+
+  return(output)
 }
 
 #' Summarize and Visualize C-index Results from Survival Model Cross-Validation
 #'
-#' This function summarizes and visualizes the C-index (concordance index)
-#' results obtained from survival model cross-validation, typically produced by
-#' [cross_validation_custom()]. It computes median C-index and MAD (median
-#' absolute deviation) per model, ranks models by performance, and generates a
-#' bar plot showing median C-index ± MAD for easy comparison.
+#' This function aggregates and visualizes the C-index (concordance index)
+#' results obtained from cross-validation of multiple survival models.
+#' Each model should contain a `Resample_matrix` element with per-fold C-index
+#' values. The function computes the median and MAD (median absolute deviation)
+#' of the C-index for each model, identifies the top-performing model, and
+#' optionally generates a bar plot summarizing model performance.
 #'
-#' @param surv_results A data frame or tibble containing the summarized
-#'   cross-validation performance results for each survival model. It must
-#'   include the following columns:
+#' @param models A named list of survival model objects, where each element
+#'   corresponds to one fitted model. Each model must contain a
+#'   `Resample_matrix` data frame with columns:
 #'   \describe{
-#'     \item{`model`}{Model name or identifier (character).}
-#'     \item{`median`}{Median C-index across folds (numeric).}
-#'     \item{`mad`}{Median absolute deviation of C-index (numeric).}
+#'     \item{`c_index`}{C-index value per resample (numeric).}
+#'     \item{`Resample`}{Fold or resample identifier (e.g., "Fold1", "Fold2").}
 #'   }
 #' @param file_name Optional character string used to name the output PDF file
 #'   saved under `"Results/CINDEX_CV_methods_<file_name>.pdf"`. If `NULL`, the
-#'   file name is omitted or handled by default behavior.
-#' @param return Logical; if `TRUE` (default), the plot is generated and saved
-#'   as a PDF in the `"Results/"` directory.
+#'   file is not named explicitly.
+#' @param plot_results Logical; if `TRUE` (default), generates and saves a PDF
+#'   bar plot showing median C-index ± MAD per model.
 #'
 #' @details
-#' The plot displays:
+#' For each model:
 #' \itemize{
-#'   \item Bars = Median C-index per model.
-#'   \item Error bars = ± MAD (robust variability).
+#'   \item The **median C-index** represents the typical discrimination
+#'     performance across folds.
+#'   \item The **MAD (Median Absolute Deviation)** measures variability
+#'     in C-index values (robust equivalent of standard deviation).
 #' }
 #'
-#' The output allows easy visual comparison of survival models based on their
-#' discriminative performance.
+#' The plot helps visualize and compare models based on survival prediction
+#' performance, with error bars representing ± MAD.
 #'
 #' @return
-#' A list containing two elements:
+#' A list with the following elements:
 #' \describe{
-#'   \item{`CINDEX_summary`}{A tibble summarizing model performance (median and MAD).}
-#'   \item{`Top_model`}{Character string indicating the model with the highest median C-index.}
+#'   \item{`CINDEX_summary`}{A tibble summarizing median and MAD per model.}
+#'   \item{`All_folds`}{A tibble with raw C-index values from all folds and models.}
+#'   \item{`Top_model`}{Character string naming the model with the highest median C-index.}
 #' }
 #'
 #' @examples
 #' \dontrun{
-#' results <- tibble::tibble(
-#'   model = c("cox_ph_survival", "rand_forest_aorsf"),
-#'   median = c(0.78, 0.82),
-#'   mad = c(0.03, 0.02)
+#' models <- list(
+#'   cox_ph_survival = list(
+#'     Resample_matrix = tibble::tibble(
+#'       c_index = c(0.72, 0.75, 0.70),
+#'       Resample = c("Fold1", "Fold2", "Fold3")
+#'     )
+#'   ),
+#'   rand_forest_aorsf = list(
+#'     Resample_matrix = tibble::tibble(
+#'       c_index = c(0.80, 0.82, 0.78),
+#'       Resample = c("Fold1", "Fold2", "Fold3")
+#'     )
+#'   )
 #' )
-#' compute_cv_CINDEX(results, file_name = "example")
+#' compute_cv_CINDEX(models, file_name = "example")
 #' }
 #'
-#' @seealso [cross_validation_custom()]
+#' @seealso [aggregate_results_survival()], [predict_and_evaluate_survival()]
 #' @export
-compute_cv_CINDEX = function(surv_results, file_name = NULL, return = TRUE) {
+#'
+compute_cv_CINDEX = function(models, file_name = NULL, plot_results = TRUE){
+  # Step 1: Extract C-index values per fold from all models
+  # ---------------------------------------------------------------------------
+  # Each element in `models` must contain $Resample_matrix with columns:
+  #   - c_index: numeric value per resample (e.g., per fold)
+  #   - Resample: fold identifier (e.g., "Fold1", "Fold2", ...)
+  #
+  res_cindex <- purrr::map_df(names(models), function(m) {
+    model_obj <- models[[m]]
+    if (!is.null(model_obj$Resample_matrix) && "c_index" %in% colnames(model_obj$Resample_matrix)) {
+      tibble::tibble(
+        model = m,
+        c_index = model_obj$Resample_matrix$c_index,
+        Resample = model_obj$Resample_matrix$Resample
+      )
+    } else {
+      tibble::tibble(model = m, c_index = NA_real_, Resample = NA_character_)
+    }
+  })
+
+  # Remove missing values (in case some models failed)
+  res_cindex <- res_cindex %>% dplyr::filter(!is.na(c_index))
 
   # ---------------------------------------------------------------------------
-  # Step 1: Prepare summarized C-index results
+  # Step 2: Summarize performance statistics per model
   # ---------------------------------------------------------------------------
-  # The input `surv_results` should contain one row per model with:
-  #   - model: model identifier
-  #   - median: median C-index from cross-validation
-  #   - mad: median absolute deviation of C-index (robust SD estimate)
-  #
-  # This section renames and reorders columns for readability and plotting.
-  #
-  res_cindex <- surv_results %>%
-    dplyr::select(model, median, mad) %>%
-    dplyr::rename(Median_CINDEX = median, MAD_CINDEX = mad) %>%
-    dplyr::arrange(desc(Median_CINDEX))
+  summary_cindex <- res_cindex %>%
+    dplyr::group_by(model) %>%
+    dplyr::summarise(
+      Median_CINDEX = stats::median(c_index, na.rm = TRUE),
+      MAD_CINDEX = stats::mad(c_index, constant = 1, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(dplyr::desc(Median_CINDEX))
 
   # ---------------------------------------------------------------------------
-  # Step 2: Plot median C-index ± MAD per model
+  # Step 3: Optional plotting
   # ---------------------------------------------------------------------------
-  # Generates a bar plot summarizing the cross-validation performance
-  # of each survival model. Bars represent the median C-index, and error bars
-  # correspond to ± MAD_CINDEX (robust variability).
-  #
-  # The figure is saved as a PDF to the "Results/" folder, named according
-  # to the provided `file_name` argument.
-  #
-  # The layout uses a consistent ggplot2 style (matching compute_cv_AUC()).
-  #
-  if (return) {
+  if (plot_results) {
+
     grDevices::pdf(paste0("Results/CINDEX_CV_methods_", file_name, ".pdf"), width = 10)
-    plot(
-      ggplot2::ggplot(res_cindex, ggplot2::aes(x = model, y = Median_CINDEX, fill = model)) +
+    print(
+      ggplot2::ggplot(summary_cindex,
+                      ggplot2::aes(x = model, y = Median_CINDEX, fill = model)) +
         ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6) +
         ggplot2::geom_errorbar(
-          ggplot2::aes(ymin = Median_CINDEX - MAD_CINDEX, ymax = Median_CINDEX + MAD_CINDEX),
+          ggplot2::aes(
+            ymin = Median_CINDEX - MAD_CINDEX,
+            ymax = Median_CINDEX + MAD_CINDEX
+          ),
           width = 0.2,
           position = ggplot2::position_dodge(0.6)
         ) +
         ggplot2::labs(
-          title = "Performance of Survival Models",
+          title = "Cross-Validation Performance (C-index)",
           x = "Model",
-          y = "Median C-index"
+          y = "Median C-index ± MAD"
         ) +
         ggplot2::theme_minimal() +
         ggplot2::theme(
@@ -4556,32 +5034,22 @@ compute_cv_CINDEX = function(surv_results, file_name = NULL, return = TRUE) {
         ) +
         ggplot2::scale_y_continuous(breaks = seq(0, 1, by = 0.05))
     )
+
     grDevices::dev.off()
   }
 
   # ---------------------------------------------------------------------------
-  # Step 3: Identify top-performing model
+  # Step 4: Identify top-performing model
   # ---------------------------------------------------------------------------
-  # Determines the model with the highest median C-index.
-  # Ties are resolved by taking the first occurrence (with_ties = FALSE).
-  #
-  top_model <- res_cindex %>%
+  top_model <- summary_cindex %>%
     dplyr::slice_max(Median_CINDEX, n = 1, with_ties = FALSE) %>%
     dplyr::pull(model)
 
   # ---------------------------------------------------------------------------
-  # Step 4: Return structured summary
+  # Step 5: Return structured summary
   # ---------------------------------------------------------------------------
-  # Returns a list containing:
-  #   - CINDEX_summary: table of models and corresponding C-index statistics
-  #   - Top_model: the name of the model with the best median C-index
-  #
-  list(
-    CINDEX_summary = res_cindex,
-    Top_model = top_model
-  )
+  return(list(CINDEX_summary = summary_cindex, All_folds = res_cindex, Top_model = top_model))
 }
-
 
 #' Plot and save survival performance of a model on test data
 #'
@@ -4624,12 +5092,6 @@ compute_cv_CINDEX = function(surv_results, file_name = NULL, return = TRUE) {
 #'
 #' @export
 plot_survival_performance <- function(df_test, c_index = NULL, n_groups = 3, file_name = NULL) {
-  suppressPackageStartupMessages({
-    library(survival)
-    library(ggplot2)
-    library(survminer)
-    library(dplyr)
-  })
 
   # Check required columns
   required_cols <- c("time", "event", ".pred")
@@ -4678,3 +5140,160 @@ plot_survival_performance <- function(df_test, c_index = NULL, n_groups = 3, fil
 
 }
 
+#' Predict and Evaluate Survival Model Performance
+#'
+#' This function generates predictions from a fitted survival model and evaluates
+#' its performance using the Concordance Index (C-index). It automatically
+#' handles different prediction output types supported by various survival
+#' modeling engines and standardizes predictions into a comparable numeric format.
+#'
+#' @param model_fit A fitted survival model object (typically created via
+#'   a `parsnip` or `workflow` model specification).
+#' @param data A data frame containing the predictors and survival outcome
+#'   variables used for prediction and evaluation.
+#' @param outcome_col Character string specifying the name of the survival time
+#'   column in `data`. Default is `"time"`.
+#' @param event_col Character string specifying the name of the event indicator
+#'   column in `data`. Default is `"event"`.
+#'
+#' @details
+#' The function attempts to generate predictions using multiple possible
+#' prediction types, depending on what the model supports:
+#' \itemize{
+#'   \item `"linear_pred"` — Linear predictor or log hazard (e.g., Cox models),
+#'     where higher values indicate higher risk.
+#'   \item `"time"` — Expected survival time (e.g., AFT models),
+#'     where higher values imply longer survival (automatically reversed).
+#'   \item `"survival"` — Survival probability at a specific evaluation time,
+#'     where higher values indicate better survival (automatically reversed).
+#' }
+#'
+#' It standardizes the prediction output into a tibble with one numeric column
+#' `.pred`, ensuring consistency across engines.
+#' The function then computes the Concordance Index (C-index) using
+#' `yardstick::concordance_survival_vec()` to assess how well the model ranks
+#' predicted survival relative to actual outcomes.
+#'
+#' @return
+#' A list with two elements:
+#' \describe{
+#'   \item{`preds`}{A tibble containing standardized numeric predictions.}
+#'   \item{`c_index`}{Numeric value representing the computed C-index.}
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' fitted_model <- parsnip::fit(
+#'   parsnip::proportional_hazards(engine = "survival"),
+#'   Surv(time, event) ~ .,
+#'   data = lung
+#' )
+#' results <- predict_and_evaluate_survival(fitted_model, lung)
+#' results$c_index
+#' }
+#'
+#' @seealso [yardstick::concordance_survival_vec()], [aggregate_results_survival()]
+#' @export
+#'
+predict_and_evaluate_survival <- function(model_fit,
+                                          data,
+                                          outcome_col = "time",
+                                          event_col = "event") {
+
+
+  # ---------------------------------------------------------------------------
+  # Generate predictions on test data
+  # ---------------------------------------------------------------------------
+  # The code tries different prediction "types" depending on what the fitted model supports.
+  #
+  # 1. "linear_pred"  → Risk score or log hazard (e.g., Cox model)
+  #      - Higher values = higher risk (shorter survival)
+  #      - Direction: higher = worse outcome
+  #
+  # 2. "time"         → Expected survival time (e.g., parametric AFT models)
+  #      - Higher values = longer expected lifetime
+  #      - Direction: higher = better outcome (will be reversed later)
+  #
+  # 3. "survival"     → Survival probability at a given evaluation time
+  #      - Higher values = more likely to survive (less risk)
+  #      - Direction: higher = better outcome (will be reversed later)
+  #
+  # The try–catch structure ensures the code works for any survival model:
+  # - Try risk-based prediction first
+  # - If not supported, try time-based prediction
+  # - If that fails, fall back to survival probability at a fixed eval_time
+  # ---------------------------------------------------------------------------
+  pred_type = NULL
+
+  preds <- tryCatch({
+    pred_type = "linear_pred"
+    stats::predict(model_fit, data, type = "linear_pred")
+  }, error = function(e1) {
+    tryCatch({
+      pred_type = "time"
+      stats::predict(model_fit, data, type = "time")
+    }, error = function(e2) {
+      eval_time <- stats::median(data[[outcome_col]], na.rm = TRUE)
+      pred_type = "survival"
+      stats::predict(model_fit, data, type = "survival", eval_time = eval_time)
+    })
+  })
+
+  # ---------------------------------------------------------------------------
+  # Standardize prediction output into a numeric tibble
+  # ---------------------------------------------------------------------------
+  # Prediction outputs vary by engine:
+  #   - Some return numeric vectors (risk scores)
+  #   - Others return matrices (e.g., survival curves across time)
+  #   - Some may return lists of probabilities
+  #
+  # This section standardizes all prediction outputs into a tibble with a
+  # single numeric column `.pred`, computing the median when multiple
+  # predictions per sample exist.
+  #
+  if ("matrix" %in% class(preds[[1]])) {
+    preds <- tibble::tibble(.pred = apply(as.data.frame(preds[[1]]), 1, median, na.rm = TRUE))
+  } else if (!is.numeric(preds[[1]])) {
+    preds <- tibble::tibble(.pred = apply(as.matrix(preds), 1, median, na.rm = TRUE))
+  } else {
+    pred_col <- names(preds)[1]
+    preds <- preds %>% dplyr::rename(.pred = dplyr::all_of(pred_col))
+  }
+
+  # ---------------------------------------------------------------------------
+  # Ensure direction consistency (higher = higher risk)
+  # ---------------------------------------------------------------------------
+
+  # Reverse predictions if type implies "more = better survival"
+  if (pred_type %in% c("time", "survival")) {
+    preds$.pred <- -preds$.pred
+  }
+
+  # ---------------------------------------------------------------------------
+  # Evaluate model performance using the Concordance Index (C-index)
+  # ---------------------------------------------------------------------------
+  # The C-index measures how well the model ranks survival times relative to
+  # true outcomes (i.e., discrimination ability). It ranges from 0.5 (random)
+  # to 1 (perfect discrimination).
+  #
+  # The function `censored::concordance_survival_vec()` computes the metric.
+  # If the computation fails, the value is safely returned as NA.
+  #
+  metric_val <- tryCatch({
+    yardstick::concordance_survival_vec(
+      truth = survival::Surv(data[[outcome_col]], data[[event_col]]),
+      estimate = preds$.pred
+    )
+  }, error = function(e) {
+    message("Concordance calculation failed: ", e$message)
+    NA_real_
+  })
+
+  # ---------------------------------------------------------------------------
+  # Return the model name and computed C-index
+  # ---------------------------------------------------------------------------
+  # The function returns a tibble containing the model name and the computed
+  # C-index, making it easy to aggregate and compare across models and folds.
+  #
+  return(list(preds = preds, c_index = metric_val))
+}

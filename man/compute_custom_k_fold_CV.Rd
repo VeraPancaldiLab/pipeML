@@ -4,12 +4,7 @@
 \alias{compute_custom_k_fold_CV}
 \title{Train and evaluate machine learning models on previously constructed k folds}
 \usage{
-compute_custom_k_fold_CV(
-  processed_folds,
-  ml_method,
-  tuneGrid = NULL,
-  ncores = NULL
-)
+compute_custom_k_fold_CV(processed_folds, ml_method, tuneGrid)
 }
 \arguments{
 \item{processed_folds}{A list of folds. Each fold contains processed training and test data with features.}
@@ -17,8 +12,6 @@ compute_custom_k_fold_CV(
 \item{ml_method}{A character string indicating the machine learning model to use, as supported by the \code{caret} package (e.g., \code{"rf"}, \code{"svmRadial"}, \code{"glmnet"}).}
 
 \item{tuneGrid}{Optional. A data frame specifying the grid of hyperparameters to evaluate. If \code{NULL}, a default grid of length 3 is generated using caret's \code{getModelInfo()}.}
-
-\item{ncores}{Integer. Number of cores to use for parallelization. If not given, detectCores() - 1 will be used.}
 }
 \value{
 A list with the following components:

@@ -4,60 +4,72 @@
 \alias{compute_cv_CINDEX}
 \title{Summarize and Visualize C-index Results from Survival Model Cross-Validation}
 \usage{
-compute_cv_CINDEX(surv_results, file_name = NULL, return = TRUE)
+compute_cv_CINDEX(models, file_name = NULL, plot_results = TRUE)
 }
 \arguments{
-\item{surv_results}{A data frame or tibble containing the summarized
-cross-validation performance results for each survival model. It must
-include the following columns:
+\item{models}{A named list of survival model objects, where each element
+corresponds to one fitted model. Each model must contain a
+\code{Resample_matrix} data frame with columns:
 \describe{
-\item{\code{model}}{Model name or identifier (character).}
-\item{\code{median}}{Median C-index across folds (numeric).}
-\item{\code{mad}}{Median absolute deviation of C-index (numeric).}
+\item{\code{c_index}}{C-index value per resample (numeric).}
+\item{\code{Resample}}{Fold or resample identifier (e.g., "Fold1", "Fold2").}
 }}
 
 \item{file_name}{Optional character string used to name the output PDF file
 saved under \code{"Results/CINDEX_CV_methods_<file_name>.pdf"}. If \code{NULL}, the
-file name is omitted or handled by default behavior.}
+file is not named explicitly.}
 
-\item{return}{Logical; if \code{TRUE} (default), the plot is generated and saved
-as a PDF in the \code{"Results/"} directory.}
+\item{plot_results}{Logical; if \code{TRUE} (default), generates and saves a PDF
+bar plot showing median C-index ± MAD per model.}
 }
 \value{
-A list containing two elements:
+A list with the following elements:
 \describe{
-\item{\code{CINDEX_summary}}{A tibble summarizing model performance (median and MAD).}
-\item{\code{Top_model}}{Character string indicating the model with the highest median C-index.}
+\item{\code{CINDEX_summary}}{A tibble summarizing median and MAD per model.}
+\item{\code{All_folds}}{A tibble with raw C-index values from all folds and models.}
+\item{\code{Top_model}}{Character string naming the model with the highest median C-index.}
 }
 }
 \description{
-This function summarizes and visualizes the C-index (concordance index)
-results obtained from survival model cross-validation, typically produced by
-\code{\link[=cross_validation_custom]{cross_validation_custom()}}. It computes median C-index and MAD (median
-absolute deviation) per model, ranks models by performance, and generates a
-bar plot showing median C-index ± MAD for easy comparison.
+This function aggregates and visualizes the C-index (concordance index)
+results obtained from cross-validation of multiple survival models.
+Each model should contain a \code{Resample_matrix} element with per-fold C-index
+values. The function computes the median and MAD (median absolute deviation)
+of the C-index for each model, identifies the top-performing model, and
+optionally generates a bar plot summarizing model performance.
 }
 \details{
-The plot displays:
+For each model:
 \itemize{
-\item Bars = Median C-index per model.
-\item Error bars = ± MAD (robust variability).
+\item The \strong{median C-index} represents the typical discrimination
+performance across folds.
+\item The \strong{MAD (Median Absolute Deviation)} measures variability
+in C-index values (robust equivalent of standard deviation).
 }
 
-The output allows easy visual comparison of survival models based on their
-discriminative performance.
+The plot helps visualize and compare models based on survival prediction
+performance, with error bars representing ± MAD.
 }
 \examples{
 \dontrun{
-results <- tibble::tibble(
-  model = c("cox_ph_survival", "rand_forest_aorsf"),
-  median = c(0.78, 0.82),
-  mad = c(0.03, 0.02)
+models <- list(
+  cox_ph_survival = list(
+    Resample_matrix = tibble::tibble(
+      c_index = c(0.72, 0.75, 0.70),
+      Resample = c("Fold1", "Fold2", "Fold3")
+    )
+  ),
+  rand_forest_aorsf = list(
+    Resample_matrix = tibble::tibble(
+      c_index = c(0.80, 0.82, 0.78),
+      Resample = c("Fold1", "Fold2", "Fold3")
+    )
+  )
 )
-compute_cv_CINDEX(results, file_name = "example")
+compute_cv_CINDEX(models, file_name = "example")
 }
 
 }
 \seealso{
-\code{\link[=cross_validation_custom]{cross_validation_custom()}}
+\code{\link[=aggregate_results_survival]{aggregate_results_survival()}}, \code{\link[=predict_and_evaluate_survival]{predict_and_evaluate_survival()}}
 }

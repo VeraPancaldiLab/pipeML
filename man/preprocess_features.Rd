@@ -4,7 +4,13 @@
 \alias{preprocess_features}
 \title{Preprocess Features for Machine Learning}
 \usage{
-preprocess_features(data, target_col = "target", cor_thresh = 0.9)
+preprocess_features(
+  data,
+  target_col = NULL,
+  time_var = NULL,
+  event_var = NULL,
+  cor_thresh = 0.9
+)
 }
 \arguments{
 \item{data}{A data frame containing predictor features and the target variable.}
