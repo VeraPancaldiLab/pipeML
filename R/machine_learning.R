@@ -297,10 +297,10 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
   if(is.null(fold_construction_fun)){ ### Preprocessing (remove collinear variables and low variance)
     if(LODO == TRUE){
-      train_data = preprocess_features(model %>% dplyr::select(-dataset), cor_thresh = 0.9) %>%
+      train_data = preprocess_features(model %>% dplyr::select(-dataset), cor_thresh = 0.9, target_col = "target") %>%
         dplyr::mutate(dataset = model$dataset)
     }else{
-      train_data = preprocess_features(model, cor_thresh = 0.9)
+      train_data = preprocess_features(model, cor_thresh = 0.9, target_col = "target")
     }
   }else{
     train_data = model
@@ -440,7 +440,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
           test_data_i  <- result[[parameter_i]][["test_data"]]
 
           # Preprocessing features (remove collinear variables and no-variance)
-          train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9)
+          train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9, target_col = "target")
 
           # Replace in original train/test datasets
           result[[parameter_i]][["train_data"]] <- train_data_i
@@ -473,7 +473,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
         test_data_i <- result[["test_data"]]
 
         # Preprocessing
-        train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9)
+        train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9, target_col = "target")
 
         # Replace
         result[["train_data"]] = train_data_i
@@ -600,7 +600,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
         )
 
         # Preprocess features
-        training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9)
+        training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9, target_col = "target")
 
         # Retrieve custom_output
         custom_output <- training_all[[2]]
@@ -3521,7 +3521,7 @@ wrapper_train_best_hyperparams_classification <- function(train_data, optimized,
                           c(list(data = train_data, bestune = optimized$Besttune), fold_construction_args_fixed))
 
   # Preprocess features
-  training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9)
+  training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9, target_col = "target")
 
   # Wrap correct model type for lasso and ridge
   if(ml_method == "lasso"){
