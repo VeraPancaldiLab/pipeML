@@ -75,7 +75,7 @@ outcomes.
 ## See also
 
 [`yardstick::concordance_survival_vec()`](https://yardstick.tidymodels.org/reference/concordance_survival.html),
-[`aggregate_results_survival()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results_survival.md)
+[`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md)
 
 ## Examples
 

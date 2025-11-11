@@ -2,10 +2,9 @@
 
 ## All functions
 
-- [`aggregate_results_classification()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results_classification.md)
-  : Aggregate Cross-Validation Results for Classification Models
-- [`aggregate_results_survival()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results_survival.md)
-  : Aggregate Cross-Validation Results for Survival Models
+- [`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md)
+  : Aggregate Nested Cross-Validation Results for Classification or
+  Survival Tasks
 - [`calculate_accuracy()`](https://verapancaldilab.github.io/pipeML/reference/calculate_accuracy.md)
   : Calculates accuracy values from prediction
 - [`calculate_auprc()`](https://verapancaldilab.github.io/pipeML/reference/calculate_auprc.md)
@@ -89,3 +88,5 @@
   : Clinical data
 - [`wrapper_train_best_hyperparams_classification()`](https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_classification.md)
   : Train model with optimized hyperparameters for classification tasks
+- [`wrapper_train_best_hyperparams_survival()`](https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_survival.md)
+  : Train the Best Survival Model Using Optimized Hyperparameters

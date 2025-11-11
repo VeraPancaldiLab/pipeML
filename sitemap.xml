@@ -5,8 +5,7 @@
 <url><loc>https://verapancaldilab.github.io/pipeML/articles/pipeML.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/authors.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/index.html</loc></url>
-<url><loc>https://verapancaldilab.github.io/pipeML/reference/aggregate_results_classification.html</loc></url>
-<url><loc>https://verapancaldilab.github.io/pipeML/reference/aggregate_results_survival.html</loc></url>
+<url><loc>https://verapancaldilab.github.io/pipeML/reference/aggregate_results.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/calculate_accuracy.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/calculate_auprc.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/calculate_auroc.html</loc></url>
@@ -47,5 +46,6 @@
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/raw.counts.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/traitData.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_classification.html</loc></url>
+<url><loc>https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_survival.html</loc></url>
 </urlset>
 

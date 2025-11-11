@@ -72,7 +72,7 @@ performance, with error bars representing ± MAD.
 
 ## See also
 
-[`aggregate_results_survival()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results_survival.md),
+[`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md),
 [`predict_and_evaluate_survival()`](https://verapancaldilab.github.io/pipeML/reference/predict_and_evaluate_survival.md)
 
 ## Examples
