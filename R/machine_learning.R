@@ -4768,9 +4768,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
         doParallel::registerDoParallel(cl)
 
         models_all_params <- foreach::foreach(parameter_i = seq_along(result),
-                                              .packages = c("dplyr", "caret", "censored")) %dopar% {
-
-                                                source("~/Documents/pipeML/R/machine_learning.R")
+                                              .packages = c("dplyr", "caret", "censored", "pipeML")) %dopar% {
 
                                                 train_data_i <- result[[parameter_i]][["train_data"]]
                                                 test_data_i  <- result[[parameter_i]][["test_data"]]
