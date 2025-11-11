@@ -284,7 +284,8 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
 #'
 #'
 compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "Accuracy", file_name = NULL, LODO = FALSE,
-                             ncores = NULL, return = FALSE, fold_construction_fun = NULL, fold_construction_args_fixed = NULL,
+                             ncores = NULL, return = FALSE, fold_construction_fun = NULL,
+                             fold_construction_args_fixed = NULL,
                              fold_construction_args_tunable = NULL){
 
   ml_methods_names <- c("treebag", "rf", "C5.0",
@@ -325,6 +326,8 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
   }
 
   if(is.null(fold_construction_fun)){ #No custom function provided, using normal CV
+
+    custom_outputs = NULL
 
     cl <- parallel::makeCluster(ncores)
     doParallel::registerDoParallel(cl)
@@ -426,7 +429,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     # Iterate across folds and inside each subfold corresponding to each param combination (if exist)
     for (fold_i in seq_along(result_files)) { ### number of folds (k_fold x n_rep)
-      cat("Running ML models with fold", fold_i, "\n")
+      cat("\nRunning ML models with fold", fold_i, "\n")
 
       result = readRDS(result_files[[fold_i]]) ## per resample
 
@@ -483,24 +486,16 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
           ml_methods_names,
           function(method){
 
-            tune_grid = NULL
-            if(method == "glmnet"){
-              tune_grid = get_tune_grid("glmnet", train_data)
-            }else if(method == "lasso"){
-              tune_grid = get_tune_grid("lasso", train_data)
-              method = "glmnet" #still call wrapper with glmnet model type for lasso
-            }else if(method == "ridge"){
-              tune_grid = get_tune_grid("ridge", train_data)
-              method = "glmnet" #still call wrapper with glmnet model type for ridge
-            }else if(method == "rf"){
-              tune_grid = get_tune_grid("rf", train_data)
-            }else if(method == "svmRadial"){
-              tune_grid = get_tune_grid("svmRadial", train_data)
-            }
+            tune_grid <- get_tune_grid(method, train_data)
+
+            model_name <- if (method %in% c("lasso", "ridge")) "glmnet" else method
 
             # Custom CV validation and hyperparameter tuning
             do.call(compute_custom_k_fold_CV,
-                    list(processed_folds = result[[parameter_i]], ml_method = method, tuneGrid=tune_grid))
+                    list(processed_folds = result,
+                         ml_method = model_name,
+                         tuneGrid = tune_grid))
+
 
           }
         )
@@ -510,11 +505,11 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     }
 
     file.remove(result_files) ## Delete the files after using them
-    agg <- aggregate_results_classification(models_all_folds)
+    agg <- aggregate_results(models_all_folds, task = 'classification')
 
     ## Sanity check (each param conf has to be evaluated in all resamples)
     for(i in 1:length(agg)){
-      hp_cols_all = names(agg[[i]][["Besttune"]]) ### Hyperparameter names
+      hp_cols_all = names(agg[[i]][["bestTune"]]) ### Hyperparameter names
       x = agg[[i]][["Prediction_folds"]] %>%
         dplyr::distinct(Resample, dplyr::across(all_of(hp_cols_all))) %>%
         dplyr::count(dplyr::across(all_of(hp_cols_all)), name = "n_resamples") %>%
@@ -530,18 +525,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       }
     }
 
-    ################################ Train model with optimized hyperparameters
-
-    optimized_models <- lapply(seq_along(ml_methods_names), function(i) {
-      wrapper_train_best_hyperparams_classification(
-        train_data,
-        agg[[i]],                     # model-specific aggregated results
-        ml_methods_names[i],
-        fold_construction_fun,
-        fold_construction_args_fixed
-      )
-    })
-
     model_names <- c(
       BAG = "treebag",
       RF = "rf",
@@ -556,80 +539,40 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       XGboost = "xgbTree"
     )
 
-    # Split components across lists
-    training_sets <- lapply(optimized_models, `[[`, "training_set")
-    custom_outputs <- lapply(optimized_models, `[[`, "custom_output")
-    models           <- lapply(optimized_models, `[[`, "Model")
+    ################################ Train model with optimized hyperparameters
 
-    # Assign pretty names
-    names(training_sets) <- names(model_names)
-    names(custom_outputs) <- names(model_names)
-    names(models) <- names(model_names)
+    if (!is.null(fold_construction_args_tunable)) {
+      optimized_models <- lapply(seq_along(ml_methods_names), function(i) {
+        wrapper_train_best_hyperparams_classification(
+          train_data,
+          agg[[i]],                     # model-specific aggregated results
+          ml_methods_names[i],
+          fold_construction_fun,
+          fold_construction_args_fixed
+        )
+      })
+
+      # Split components across lists
+      training_sets <- lapply(optimized_models, `[[`, "training_set")
+      custom_outputs <- lapply(optimized_models, `[[`, "custom_output")
+      models           <- lapply(optimized_models, `[[`, "Model")
+
+      # Assign pretty names
+      names(training_sets) <- names(model_names)
+      names(custom_outputs) <- names(model_names)
+      names(models) <- names(model_names)
+    }else{
+      models = agg
+      names(models) <- names(model_names)
+    }
 
   }
-
 
   ####### Optimized based on metric (only AUC or Accuracy available)
   if(metric == "AUROC" || metric == "AUPRC"){
 
-    # Define corresponding hyperparameters
-    if(!is.null(fold_construction_args_tunable)){
-      hyperparams <- list(
-        BAG = names(fold_construction_args_tunable),
-        RF = c("mtry",names(fold_construction_args_tunable)),
-        C50 = c("trials", "model", "winnow", names(fold_construction_args_tunable)),
-        GLMNET = c("alpha", "lambda", names(fold_construction_args_tunable)),
-        KNN = c("k", names(fold_construction_args_tunable)),
-        CART = c("cp",names(fold_construction_args_tunable)),
-        LASSO = c("alpha", "lambda", names(fold_construction_args_tunable)),
-        RIDGE = c("alpha", "lambda", names(fold_construction_args_tunable)),
-        SVM_radial = c("sigma", "C", names(fold_construction_args_tunable)),
-        SVM_linear = c("C", names(fold_construction_args_tunable)),
-        XGboost = c("nrounds", "max_depth", "eta", "gamma", "colsample_bytree", "min_child_weight", "subsample", names(fold_construction_args_tunable))
-      )
+    if(is.null(fold_construction_fun)){
 
-      # Iterate over models and update everything
-      updated_results <- lapply(names(models), function(name){
-        res <- calculate_cv_metrics(models[[name]], metric, hyperparams[[name]]) #Re-tuned hyperparams based on a different metric than 'Accuracy'
-
-        # Re-calculate training set based on new optimized hyperparams
-        training_all <- do.call(
-          fold_construction_fun,
-          c(list(data = train_data, bestune = res$bestTune), fold_construction_args_fixed)
-        )
-
-        # Preprocess features
-        training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9, target_col = "target")
-
-        # Retrieve custom_output
-        custom_output <- training_all[[2]]
-
-        model <- models[[name]]
-        model$pred <- res$Prediction
-        model$resample <- res$Resamples
-        model$results <- res$Results
-
-        if("none" %in% model$bestTune){
-          model$bestTune <- tibble::tibble(parameter = "none")
-        }else{
-          model$bestTune <- res$bestTune %>% select(-colnames(training_all[[3]]))
-        }
-
-        list(
-          Model = model,
-          training_set = training_set,
-          custom_output = c(training_all[[2]], list("Parameters" = training_all[[3]]))
-        )
-      })
-
-      names(updated_results) <- names(models)
-
-      # Split into three lists
-      models <- lapply(updated_results, `[[`, "Model")
-      training_sets <- lapply(updated_results, `[[`, "training_set")
-      custom_outputs <- lapply(updated_results, `[[`, "custom_output")
-
-    }else{
       hyperparams <- list(
         BAG = NULL,
         RF = "mtry",
@@ -647,19 +590,135 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       # Iterate over models
       models <- lapply(names(models), function(name) {
         model <- models[[name]]
+        names(model)[names(model) == "pred"] <- "Prediction_folds"
+        names(model)[names(model) == "results"] <- "Results_folds"
+        names(model)[names(model) == "resample"] <- "Resample_matrix"
+
         res <- calculate_cv_metrics(model, metric, hyperparams[[name]])
-        # Update model fields
-        model$pred <- res$Prediction
-        model$resample <- res$Resamples
-        model$results <- res$Results
+
+        # Remove transition objects (might change after with better code)
+        model$Prediction_folds = NULL
+        model$Results_folds = NULL
+        model$Resample_matrix = NULL
+
+        # Replace model fields
+        model$pred <- res$Prediction_folds
+        model$resample <- res$Resample_matrix
+        model$results <- res$Results_folds
         model$bestTune = res$bestTune
+
         return(model)
       })
 
       custom_outputs = NULL
 
-    }
+    }else{ #### There is custom fold function
 
+      if(!is.null(fold_construction_args_tunable)){
+        hyperparams <- list(
+          BAG = names(fold_construction_args_tunable),
+          RF = c("mtry",names(fold_construction_args_tunable)),
+          C50 = c("trials", "model", "winnow", names(fold_construction_args_tunable)),
+          GLMNET = c("alpha", "lambda", names(fold_construction_args_tunable)),
+          KNN = c("k", names(fold_construction_args_tunable)),
+          CART = c("cp",names(fold_construction_args_tunable)),
+          LASSO = c("alpha", "lambda", names(fold_construction_args_tunable)),
+          RIDGE = c("alpha", "lambda", names(fold_construction_args_tunable)),
+          SVM_radial = c("sigma", "C", names(fold_construction_args_tunable)),
+          SVM_linear = c("C", names(fold_construction_args_tunable)),
+          XGboost = c("nrounds", "max_depth", "eta", "gamma", "colsample_bytree", "min_child_weight", "subsample", names(fold_construction_args_tunable))
+        )
+
+        # Iterate over models and update everything
+        updated_results <- lapply(names(models), function(name){
+          res <- calculate_cv_metrics(models[[name]], metric, hyperparams[[name]]) #Re-tuned hyperparams based on a different metric than 'Accuracy'
+
+          # Re-calculate training set based on new optimized hyperparams
+          training_all <- do.call(
+            fold_construction_fun,
+            c(list(data = train_data, bestune = res$bestTune), fold_construction_args_fixed)
+          )
+
+          # Preprocess features
+          training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9, target_col = "target")
+
+          # Retrieve custom_output
+          custom_output <- training_all[[2]]
+
+          model <- models[[name]]
+          model$Prediction_folds <- res$Prediction_folds
+          model$Resample_matrix <- res$Resample_matrix
+          model$Results_folds <- res$Results_folds
+
+          if("none" %in% model$bestTune){
+            model$bestTune <- tibble::tibble(parameter = "none")
+          }else{
+            model$bestTune <- res$bestTune %>% select(-colnames(training_all[[3]]))
+          }
+
+          list(
+            Model = model,
+            training_set = training_set,
+            custom_output = c(training_all[[2]], list("Parameters" = training_all[[3]]))
+          )
+        })
+
+        names(updated_results) <- names(models)
+
+        # Split into three lists
+        models <- lapply(updated_results, `[[`, "Model")
+        training_sets <- lapply(updated_results, `[[`, "training_set")
+        custom_outputs <- lapply(updated_results, `[[`, "custom_output")
+
+      }else{
+        hyperparams <- list(
+          BAG = NULL,
+          RF = "mtry",
+          C50 = c("trials", "model", "winnow"),
+          GLMNET = c("alpha", "lambda"),
+          KNN = "k",
+          CART = "cp",
+          LASSO = c("alpha", "lambda"),
+          RIDGE = c("alpha", "lambda"),
+          SVM_radial = c("sigma", "C"),
+          SVM_linear = "C",
+          XGboost = c("nrounds", "max_depth", "eta", "gamma", "colsample_bytree", "min_child_weight", "subsample")
+        )
+
+        # Iterate over models and update everything
+        updated_results <- lapply(names(models), function(name){
+          res <- calculate_cv_metrics(models[[name]], metric, hyperparams[[name]]) #Re-tuned hyperparams based on a different metric than 'Accuracy' (e.g. AUROC)
+
+          # Re-calculate training set
+          training_all <- do.call(
+            fold_construction_fun,
+            c(list(data = train_data, bestune = res$bestTune), fold_construction_args_fixed)
+          )
+
+          # Preprocess features
+          training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9, target_col = "target")
+
+          model <- models[[name]]
+          model$Prediction_folds <- res$Prediction_folds
+          model$Resample_matrix <- res$Resample_matrix
+          model$Results_folds <- res$Results_folds
+
+
+          list(
+            Model = model,
+            training_set = training_set,
+            custom_output = training_all[[2]]
+          )
+        })
+
+        names(updated_results) <- names(models)
+
+        # Split into three lists
+        models <- lapply(updated_results, `[[`, "Model")
+        training_sets <- lapply(updated_results, `[[`, "training_set")
+        custom_outputs <- lapply(updated_results, `[[`, "custom_output")
+      }
+    }
   }
 
   ############### Collect ML models
@@ -780,7 +839,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     doParallel::registerDoParallel(cl)
 
     ######## Bagged CART
-    cat("Running BAG....................\n")
+    cat("\nRunning BAG....................\n")
 
     # Train model with bestTune from CV
     temp = fit.treebag
@@ -793,9 +852,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     )
 
     # Return caret-like object
-    fit.treebag$results = temp$results
-    fit.treebag$pred = temp$pred
-    fit.treebag$resample = temp$resample
+    fit.treebag$results = temp$Results_folds
+    fit.treebag$pred = temp$Prediction_folds
+    fit.treebag$resample = temp$Resample_matrix
     fit.treebag$bestTune = temp$bestTune
 
     # Predictions in trained model
@@ -805,7 +864,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       dplyr::rename(BAG = yes) #Predictions of model (already ordered)
 
     ######## RF
-    cat("Running RF....................\n")
+    cat("\nRunning RF....................\n")
 
     # Train model with bestTune from CV
     temp = fit.rf
@@ -818,9 +877,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     )
 
     # Return caret-like object
-    fit.rf$results = temp$results
-    fit.rf$pred = temp$pred
-    fit.rf$resample = temp$resample
+    fit.rf$results = temp$Results_folds
+    fit.rf$pred = temp$Prediction_folds
+    fit.rf$resample = temp$Resample_matrix
     fit.rf$bestTune = temp$bestTune
 
     # Predictions in trained model
@@ -830,7 +889,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
       dplyr::rename(RF = yes) #Predictions of model (already ordered)
 
     ######## C5.0
-    cat("Running C50....................\n")
+    cat("\nRunning C50....................\n")
 
     # Train model with bestTune from CV
     temp = fit.c50
@@ -843,9 +902,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     )
 
     # Return caret-like object
-    fit.c50$results = temp$results
-    fit.c50$pred = temp$pred
-    fit.c50$resample = temp$resample
+    fit.c50$results = temp$Results_folds
+    fit.c50$pred = temp$Prediction_folds
+    fit.c50$resample = temp$Resample_matrix
     fit.c50$bestTune = temp$bestTune
 
     # Predictions in trained model
@@ -867,9 +926,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     # )
     #
     # # Return caret-like object
-    # fit.glm$results = temp$results
-    # fit.glm$pred = temp$pred
-    # fit.glm$resample = temp$resample
+    # fit.glm$results = temp$Results_folds
+    # fit.glm$pred = temp$Prediction_folds
+    # fit.glm$resample = temp$Resample_matrix
     # fit.glm$bestTune = temp$bestTune
     #
     # # Predictions in trained model
@@ -891,9 +950,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     # )
 
     # # Return caret-like object
-    # fit.lda$results = temp$results
-    # fit.lda$pred = temp$pred
-    # fit.lda$resample = temp$resample
+    # fit.lda$results = temp$Results_folds
+    # fit.lda$pred = temp$Prediction_folds
+    # fit.lda$resample = temp$Resample_matrix
     # fit.lda$bestTune = temp$bestTune
     #
     # # Predictions in trained model
@@ -904,7 +963,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     ### GLMNET
 
-    cat("Running GLMNET....................\n")
+    cat("\nRunning GLMNET....................\n")
     # Train model with bestTune from CV
     temp = fit.glmnet
     fit.glmnet <- caret::train(
@@ -916,9 +975,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     )
 
     # Return caret-like object
-    fit.glmnet$results = temp$results
-    fit.glmnet$pred = temp$pred
-    fit.glmnet$resample = temp$resample
+    fit.glmnet$results = temp$Results_folds
+    fit.glmnet$pred = temp$Prediction_folds
+    fit.glmnet$resample = temp$Resample_matrix
     fit.glmnet$bestTune = temp$bestTune
 
     # Predictions in trained model
@@ -929,7 +988,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     ### KNN
 
-    cat("Running KNN....................\n")
+    cat("\nRunning KNN....................\n")
     # Train model with bestTune from CV
     temp = fit.knn
     fit.knn <- caret::train(
@@ -941,9 +1000,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     )
 
     # Return caret-like object
-    fit.knn$results = temp$results
-    fit.knn$pred = temp$pred
-    fit.knn$resample = temp$resample
+    fit.knn$results = temp$Results_folds
+    fit.knn$pred = temp$Prediction_folds
+    fit.knn$resample = temp$Resample_matrix
     fit.knn$bestTune = temp$bestTune
 
     # Predictions in trained model
@@ -954,7 +1013,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     ### CART
 
-    cat("Running CART....................\n")
+    cat("\nRunning CART....................\n")
     # Train model with bestTune from CV
     temp = fit.cart
     fit.cart <- caret::train(
@@ -966,9 +1025,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     )
 
     # Return caret-like object
-    fit.cart$results = temp$results
-    fit.cart$pred = temp$pred
-    fit.cart$resample = temp$resample
+    fit.cart$results = temp$Results_folds
+    fit.cart$pred = temp$Prediction_folds
+    fit.cart$resample = temp$Resample_matrix
     fit.cart$bestTune = temp$bestTune
 
     # Predictions in trained model
@@ -979,7 +1038,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     ## Regularized Lasso
 
-    cat("Running Lasso....................\n")
+    cat("\nRunning Lasso....................\n")
     # Train model with bestTune from CV
     temp = fit.lasso
     fit.lasso <- caret::train(
@@ -991,9 +1050,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     )
 
     # Return caret-like object
-    fit.lasso$results = temp$results
-    fit.lasso$pred = temp$pred
-    fit.lasso$resample = temp$resample
+    fit.lasso$results = temp$Results_folds
+    fit.lasso$pred = temp$Prediction_folds
+    fit.lasso$resample = temp$Resample_matrix
     fit.lasso$bestTune = temp$bestTune
 
     # Predictions in trained model
@@ -1004,7 +1063,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     ## Ridge regression
 
-    cat("Running Ridge....................\n")
+    cat("\nRunning Ridge....................\n")
     # Train model with bestTune from CV
     temp = fit.ridge
     fit.ridge <- caret::train(
@@ -1016,9 +1075,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     )
 
     # Return caret-like object
-    fit.ridge$results = temp$results
-    fit.ridge$pred = temp$pred
-    fit.ridge$resample = temp$resample
+    fit.ridge$results = temp$Results_folds
+    fit.ridge$pred = temp$Prediction_folds
+    fit.ridge$resample = temp$Resample_matrix
     fit.ridge$bestTune = temp$bestTune
 
     # Predictions in trained model
@@ -1029,7 +1088,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     ## SVM radial
 
-    cat("Running SVM radial....................\n")
+    cat("\nRunning SVM radial....................\n")
     # Train model with bestTune from CV
     temp = fit.svm_radial
     fit.svm_radial <- caret::train(
@@ -1041,9 +1100,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     )
 
     # Return caret-like object
-    fit.svm_radial$results = temp$results
-    fit.svm_radial$pred = temp$pred
-    fit.svm_radial$resample = temp$resample
+    fit.svm_radial$results = temp$Results_folds
+    fit.svm_radial$pred = temp$Prediction_folds
+    fit.svm_radial$resample = temp$Resample_matrix
     fit.svm_radial$bestTune = temp$bestTune
 
     # Predictions in trained model
@@ -1054,7 +1113,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     ### SVM linear
 
-    cat("Running SVM linear....................\n")
+    cat("\nRunning SVM linear....................\n")
     # Train model with bestTune from CV
     temp = fit.svm_linear
     fit.svm_linear <- caret::train(
@@ -1066,9 +1125,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     )
 
     # Return caret-like object
-    fit.svm_linear$results = temp$results
-    fit.svm_linear$pred = temp$pred
-    fit.svm_linear$resample = temp$resample
+    fit.svm_linear$results = temp$Results_folds
+    fit.svm_linear$pred = temp$Prediction_folds
+    fit.svm_linear$resample = temp$Resample_matrix
     fit.svm_linear$bestTune = temp$bestTune
 
     # Predictions in trained model
@@ -1079,7 +1138,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
     ## XGboost
 
-    cat("Running XGboost....................\n")
+    cat("\nRunning XGboost....................\n")
     # Train model with bestTune from CV
     temp = fit.xgbTree
     fit.xgbTree <- caret::train(
@@ -1091,9 +1150,9 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     )
 
     # Return caret-like object
-    fit.xgbTree$results = temp$results
-    fit.xgbTree$pred = temp$pred
-    fit.xgbTree$resample = temp$resample
+    fit.xgbTree$results = temp$Results_folds
+    fit.xgbTree$pred = temp$Prediction_folds
+    fit.xgbTree$resample = temp$Resample_matrix
     fit.xgbTree$bestTune = temp$bestTune
 
     # Predictions in trained model
@@ -1193,7 +1252,6 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     meta_learner <- caret::train(true_label ~ ., data = meta_features, method = "glmnet", trControl = trainControl) #Staking based on simple logistic regression
 
     output = list("Meta_learner" = meta_learner, "Base_models" = base_models$Base_models, "ML_models" = ensembleResults)
-
 
     ####################################################################### To be done, which output to retrieve when stacking is done? Multiple ML models used different cell groups depending on optimization
     # if(is.null(custom_output) == F){
@@ -1481,8 +1539,13 @@ compute_features.training.ML = function(features_train, task_type = c("classific
       df_outcome  = df_outcome,
       outcome_col = "time",
       event_col   = "event",
-      ml_options  = list(nb_folds = k_folds, nb_repeats = n_rep, ncores = ncores),
-      file_name   = file_name
+      k_folds = k_folds,
+      n_rep = n_rep,
+      ncores = ncores,
+      file_name   = file_name,
+      fold_construction_fun = fold_construction_fun,
+      fold_construction_args_fixed = fold_construction_args_fixed,
+      fold_construction_args_tunable = fold_construction_args_tunable
     )
 
   }
@@ -2958,7 +3021,7 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
   }
 
   ## Calculate AUCs and integrate into prediction matrix
-  ml_model$pred = ml_model$pred %>%
+  ml_model$Prediction_folds = ml_model$Prediction_folds %>%
     dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) %>% ## Group by resample and parameters
     dplyr::mutate(AUROC = calculate_auc_roc_resample(obs, yes), # Calculate AUC-ROC if metric is "AUROC"
                   AUPRC = calculate_auc_prc_resample(obs, yes) # Calculate AUC-PRC if metric is "AUPRC"
@@ -2967,14 +3030,14 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
     data.frame()
 
   ## Calculate prediction metrics (Accuracy, Recall, Precision, F1, MCC)
-  metrics <- ml_model$pred %>%
+  metrics <- ml_model$Prediction_folds %>%
     dplyr::group_by(dplyr::across(dplyr::all_of(group_vars))) %>%
     dplyr::group_split() %>%
     purrr::map(~ get_sensitivity_specificity(.x, .x$obs, "test")) %>%
     dplyr::bind_rows() %>%
     dplyr::select(-model)
 
-  ml_model$pred = ml_model$pred %>%
+  ml_model$Prediction_folds = ml_model$Prediction_folds %>%
     dplyr::select(-yes) %>% #remove yes probabilities from resamples (only keep those ordered for calculated the metrics)
     dplyr::bind_cols(metrics) %>%
     dplyr::select(-pred, -obs, -no) %>%
@@ -2983,7 +3046,7 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 
   if(is.null(hyperparameters) == F){
     ## Integrate average CV metrics across repetitions into resample matrix
-    df_avg <- ml_model$pred %>%
+    df_avg <- ml_model$Prediction_folds %>%
       dplyr::group_by(dplyr::across(dplyr::all_of(hyperparameters))) %>% ## here we only group by hyperparameter not resample (to choose best hyperparams combination)
       dplyr::summarise(
         AUROC = median(AUROC, na.rm = TRUE),
@@ -2993,13 +3056,13 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
       ) %>%
       dplyr::ungroup()
 
-    ml_model$results <- df_avg
+    ml_model$Results_folds <- df_avg
 
     ##### Hyperparameter tuning
 
-    tune = which.max(data.frame(ml_model$results)[,metric])  #Tuning parameter (select combination with top AUROC or AUPRC)
+    tune = which.max(data.frame(ml_model$Results_folds)[,metric])  #Tuning parameter (select combination with top AUROC or AUPRC)
 
-    ml_model$bestTune = ml_model$results %>%
+    ml_model$bestTune = ml_model$Results_folds %>%
       dplyr::slice(tune) %>%  # Extract the top row
       dplyr::select(dplyr::all_of(hyperparameters)) %>%
       dplyr::mutate(dplyr::across(where(is.numeric), as.numeric))%>%
@@ -3008,7 +3071,7 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
     filter_conditions <- ml_model$bestTune[1, , drop = FALSE] #Take tuned parameters
 
     ## Integrate average CV metrics across repetitions only in tuned parameters into resample matrix
-    df_filtered <- ml_model$pred
+    df_filtered <- ml_model$Prediction_folds
 
     for (col in names(filter_conditions)) {
       df_filtered <- df_filtered[df_filtered[[col]] == filter_conditions[[col]], ] #Filter by keeping only rows where the column matches the corresponding value in filter_conditions (Continue refining until all conditions are applied)
@@ -3025,7 +3088,7 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 
   }else{
     ## Integrate average CV metrics across repetitions into resample matrix
-    df_avg <- ml_model$pred %>%
+    df_avg <- ml_model$Prediction_folds %>%
       dplyr::summarise(
         AUROC = median(AUROC, na.rm = TRUE),
         AUPRC = median(AUPRC, na.rm = TRUE),
@@ -3034,14 +3097,14 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
       ) %>%
       dplyr::ungroup()
 
-    ml_model$results <- ml_model$results %>%
+    ml_model$Results_folds <- ml_model$Results_folds %>%
       dplyr::select(-dplyr::all_of(hyperparameters), -Accuracy, -Kappa, -AccuracySD, -KappaSD) %>%
       dplyr::bind_cols(df_avg)
 
     ml_model$bestTune = tibble::tibble(parameter = "none")
   }
 
-  ml_model$resample = ml_model$resample %>%
+  ml_model$Resample_matrix = ml_model$Resample_matrix %>%
     dplyr::select(-Accuracy, -Kappa) %>%
     dplyr::arrange(match(Resample, df_avg$Resample)) %>%
     dplyr::select(-Resample) %>%
@@ -3049,7 +3112,8 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
     { if ("Resample" %in% colnames(.)) dplyr::select(., -Resample) else . }
 
 
-  return(list(Prediction = ml_model$pred, Resamples = ml_model$resample, Results = ml_model$results, bestTune = ml_model$bestTune))
+  return(list(Prediction_folds = ml_model$Prediction_folds, Resample_matrix = ml_model$Resample_matrix,
+              Results_folds = ml_model$Results_folds, bestTune = ml_model$bestTune))
 
 
 }
@@ -3513,11 +3577,11 @@ preprocess_features <- function(data,
 wrapper_train_best_hyperparams_classification <- function(train_data, optimized, ml_method, fold_construction_fun, fold_construction_args_fixed) {
 
   # Extract optimized hyperparams
-  besttune <- optimized$Besttune
+  besttune <- optimized$bestTune
 
   # Create complete training set using tuned hyperparams from custom function
   training_all <- do.call(fold_construction_fun,
-                          c(list(data = train_data, bestune = optimized$Besttune), fold_construction_args_fixed))
+                          c(list(data = train_data, bestune = optimized$bestTune), fold_construction_args_fixed))
 
   # Preprocess features
   training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9, target_col = "target")
@@ -3539,15 +3603,80 @@ wrapper_train_best_hyperparams_classification <- function(train_data, optimized,
   )
 
   # Return caret-like object
-  fit$results  <- optimized$Results_folds
-  fit$pred     <- optimized$Prediction_folds
-  fit$resample <- optimized$Resample_matrix ## Resample matrix contains the performance per resample with tuned param conf
+  fit$Results_folds  <- optimized$Results_folds
+  fit$Prediction_folds     <- optimized$Prediction_folds
+  fit$Resample_matrix <- optimized$Resample_matrix ## Resample matrix contains the performance per resample with tuned param conf
 
   ##### training_all[[2]] needs to be filter to return only features from training_set (not possible because we need to generalize custom_fold function so sometimes the structure will be different)
 
   return(list(Model = fit, training_set = training_set, custom_output = c(training_all[[2]], list("Parameters" = training_all[[3]]))))
 }
 
+#' Train the Best Survival Model Using Optimized Hyperparameters
+#'
+#' Fits a survival model on the full training data using the optimal
+#' hyperparameters obtained from nested cross-validation.
+#' This wrapper ensures consistent retraining for different survival
+#' model types (Cox, penalized Cox, AFT, tree-based, or ensemble models),
+#' and supports preprocessing pipelines such as CellTFusion through a
+#' user-provided fold construction function.
+#'
+#' @param train_data A data frame containing the original training data
+#'   used for cross-validation.
+#' @param optimized A list output from [`aggregate_results_survival()`] or
+#'   [`compute_k_fold_CV_survival()`], containing the best-tuned parameters
+#'   (`bestTune`) and model performance summaries.
+#' @param ml_method Character string specifying the survival model to train.
+#'   Must be one of:
+#'   \itemize{
+#'     \item `"cox_ph_survival"` — Cox proportional hazards model.
+#'     \item `"proportional_hazards_glmnet"` — Penalized Cox (elastic net).
+#'     \item `"survreg_flexsurv"` — Parametric AFT model.
+#'     \item `"rand_forest_partykit"` — Random survival forest via `partykit`.
+#'     \item `"rand_forest_aorsf"` — Oblique random survival forest.
+#'     \item `"decision_tree_partykit"` — Single survival tree.
+#'     \item `"bag_tree_rpart"` — Bagged CART-based survival trees.
+#'     \item `"boost_tree_mboost"` — Gradient boosting for censored data.
+#'   }
+#' @param fold_construction_fun A custom function used to construct folds and
+#'   preprocessed data (e.g., `prepare_CellTFusion_folds()`).
+#'   Must accept arguments `data` and optionally `bestune`.
+#' @param fold_construction_args_fixed A named list of fixed arguments to pass
+#'   to `fold_construction_fun()` (e.g., paths, deconvolution matrices, etc.).
+#' @param outcome_col Character string naming the survival time column
+#'   (default = `"time"`).
+#' @param event_col Character string naming the event indicator column
+#'   (default = `"event"`).
+#'
+#' @details
+#' This function performs the following steps:
+#' \enumerate{
+#'   \item Extracts the optimal hyperparameters from the `optimized` object.
+#'   \item Reconstructs the training dataset using the provided
+#'         `fold_construction_fun()`, including any custom preprocessing
+#'         or feature generation.
+#'   \item Applies the optimal hyperparameters to the model specification.
+#'   \item Fits the final model using the full training data.
+#' }
+#'
+#' If the selected model type has no tunable hyperparameters,
+#' the function automatically detects this and proceeds with
+#' the default model configuration.
+#'
+#' @return A named list containing:
+#' \describe{
+#'   \item{`Model`}{A list containing the fitted parsnip model object,
+#'   resampling results, and tuning information.}
+#'   \item{`training_set`}{The final preprocessed training dataset used for fitting.}
+#'   \item{`custom_output`}{Additional data returned by the custom fold construction
+#'   function (e.g., CellTFusion outputs or parameter tables).}
+#' }
+#'
+#' @seealso [compute_k_fold_CV_survival()], [aggregate_results_survival()],
+#'   [compute_ml_survival()]
+#'
+#' @export
+#'
 wrapper_train_best_hyperparams_survival <- function(train_data,
                                                     optimized,
                                                     ml_method,
@@ -3557,7 +3686,7 @@ wrapper_train_best_hyperparams_survival <- function(train_data,
                                                     event_col = "event") {
 
   # Extract optimized hyperparams
-  besttune <- optimized$Besttune
+  besttune <- optimized$bestTune
 
   # Build full training data using tuned hyperparams
   training_all <- do.call(
@@ -3608,11 +3737,21 @@ wrapper_train_best_hyperparams_survival <- function(train_data,
     stop("Unsupported survival model: ", model)
   }
 
-  model_hyperparams <- besttune %>%
-    dplyr::select(-dplyr::all_of(colnames(training_all[[3]])))
+  model_hyperparams <- if (is.data.frame(besttune)) {
+    # Case 1: besttune is a data.frame --> means it has tunable params
+    besttune %>%
+      dplyr::select(-dplyr::all_of(colnames(training_all[[3]])))
+
+  } else if (is.list(besttune)) {
+    # Case 2: besttune is a list --> means came from fixed params
+    besttune[setdiff(names(besttune), names(fold_construction_args_fixed))]
+
+  } else {
+    stop("`besttune` must be either a data.frame or a list.")
+  }
 
   # If ML model doesnt have hyperparams
-  if (ncol(model_hyperparams) == 0) {
+  if (is.null(model_hyperparams) || (is.data.frame(model_hyperparams) && ncol(model_hyperparams) == 0) || (is.list(model_hyperparams) && length(model_hyperparams) == 0)){
     model_hyperparams <- NULL
   }
 
@@ -3635,10 +3774,10 @@ wrapper_train_best_hyperparams_survival <- function(train_data,
   fit <- list()
   fit$model <- model
   fit$fitted <- fitted
-  fit$results <- optimized$Results_folds
-  fit$pred <- optimized$Prediction_folds
-  fit$resample <- optimized$Resample_matrix
-  fit$besttune <- besttune
+  fit$Results_folds <- optimized$Results_folds
+  fit$Prediction_folds <- optimized$Prediction_folds
+  fit$Resample_matrix <- optimized$Resample_matrix
+  fit$bestTune <- besttune
 
   # Return everything consistent with the classification wrapper
   return(list(
@@ -3648,248 +3787,65 @@ wrapper_train_best_hyperparams_survival <- function(train_data,
   ))
 }
 
-#' Aggregate Cross-Validation Results for Classification Models
+#' Aggregate Nested Cross-Validation Results for Classification or Survival Tasks
 #'
-#' This function aggregates the results of cross-validation runs across folds,
-#' parameter combinations, and machine learning models for classification tasks.
-#' It summarizes per-fold performance metrics (Accuracy and Kappa), computes
-#' median and variability measures (MAD), and identifies the best hyperparameter
-#' configuration for each model.
+#' Aggregates performance metrics from nested cross-validation experiments for
+#' either **classification** or **survival** models.
+#' This function reads the resampled predictions (often saved per fold and
+#' hyperparameter combination) and computes overall performance summaries,
+#' identifies the best hyperparameter configuration, and collates
+#' per-resample metrics for detailed inspection.
 #'
-#' It assumes that the input `all_loaded` structure follows the hierarchy:
-#' \enumerate{
-#'   \item Folds
-#'   \item Parameter combinations
-#'   \item Models (list per fold and parameter set)
-#' }
+#' @param all_loaded A nested list containing the results of cross-validation runs.
+#'   Each element typically corresponds to a fold and may include one or more
+#'   hyperparameter configurations and model predictions:
+#'   \itemize{
+#'     \item For classification: `all_loaded[[fold]][[param]][[model]][[1]]`
+#'       contains predictions, and `[[2]]` the corresponding hyperparameters.
+#'     \item For survival: `all_loaded[[fold]][[param]][[model]]` contains
+#'       the C-index and hyperparameter columns.
+#'   }
+#' @param task Character string specifying the task type.
+#'   Must be one of: `"classification"` or `"survival"`.
 #'
-#' Each model entry should contain:
+#' @details
+#' The function automatically detects whether the input structure includes
+#' tunable hyperparameters (`has_params`) by inspecting the nested list depth.
+#'
+#' For **classification** tasks:
 #' \itemize{
-#'   \item A data frame with predictions and observed labels.
-#'   \item A character vector of hyperparameter names.
+#'   \item Aggregates fold-level predictions and computes Accuracy and Kappa.
+#'   \item Computes the median and MAD (robust SD) across resamples.
+#'   \item Selects the hyperparameter set with the highest median Accuracy.
 #' }
 #'
-#' @param all_loaded A nested list containing model evaluation results from
-#'   cross-validation:
-#'   \itemize{
-#'     \item \code{all_loaded[[fold]][[param]][[model]][[1]]} — Data frame of predictions,
-#'       including columns `obs`, `pred`, and resample metadata.
-#'     \item \code{all_loaded[[fold]][[param]][[model]][[2]]} — Character vector of
-#'       hyperparameter column names.
-#'   }
-#'   Each prediction data frame must include columns such as:
-#'   \code{"obs"}, \code{"pred"}, \code{"Resample"}, and any hyperparameter columns.
-#'
-#' @details
-#' The function:
-#' \enumerate{
-#'   \item Concatenates predictions across folds and parameter sets.
-#'   \item Computes Accuracy and Kappa per resample using
-#'         `calculate_accuracy_kappa_resample()`.
-#'   \item Aggregates median and MAD (robust variability) of Accuracy and Kappa
-#'         across folds.
-#'   \item Identifies the hyperparameter configuration with the highest median Accuracy.
-#'   \item Extracts per-fold metrics for the best configuration.
+#' For **survival** tasks:
+#' \itemize{
+#'   \item Aggregates per-fold C-index values across hyperparameter configurations.
+#'   \item Computes the median and MAD of the C-index per configuration.
+#'   \item Identifies and returns the best-performing parameter combination.
 #' }
 #'
-#' This allows ranking models by performance stability and selecting the most
-#' reliable hyperparameter configuration.
+#' The function is compatible with results produced by
+#' [`compute_k_fold_CV_survival()`] and analogous classification CV pipelines.
 #'
-#' @return A list (one element per model), where each element includes:
+#' @return A list of length equal to the number of models evaluated.
+#' Each element contains:
 #' \describe{
-#'   \item{`Prediction_folds`}{Data frame containing all per-fold predictions and metrics.}
-#'   \item{`Results_folds`}{Summary table of median Accuracy and Kappa (and their MADs).}
-#'   \item{`Besttune`}{Data frame with the best-performing hyperparameter configuration.}
-#'   \item{`Resample_matrix`}{Per-fold Accuracy and Kappa for the best configuration.}
+#'   \item{`Prediction_folds`}{All predictions or C-index values per fold.}
+#'   \item{`Results_folds`}{Aggregated performance summaries across folds.}
+#'   \item{`bestTune`}{Best-performing hyperparameter combination.}
+#'   \item{`Resample_matrix`}{Fold-level metrics for the best configuration.}
 #' }
 #'
-#' @examples
-#' \dontrun{
-#' # Aggregate results from nested CV
-#' aggregated_results <- aggregate_results_classification(all_loaded)
+#' @seealso [compute_k_fold_CV_survival()], [calculate_accuracy_kappa_resample()]
 #'
-#' # View best hyperparameters for model 2
-#' aggregated_results[[2]]$Besttune
-#'
-#' # Inspect Accuracy and Kappa per fold for best configuration
-#' aggregated_results[[2]]$Resample_matrix
-#' }
-#'
-#' @seealso [calculate_accuracy_kappa_resample()], [compute_k_fold_CV_classification()]
 #' @export
 #'
-aggregate_results_classification <- function(all_loaded) {
+aggregate_results <- function(all_loaded, task = c("classification", "survival")) {
 
-  # Load all files (each file = one fold)
-  #all_loaded <- lapply(result_files, readRDS)
-
-  # Dimensions:
-  # all_loaded -> folds
-  # all_loaded[[fold]] -> param combinations
-  # all_loaded[[fold]][[param]] -> ML models (list of 11)
-
-  n_folds  <- length(all_loaded)
-  n_params <- length(all_loaded[[1]])
-  n_models <- length(all_loaded[[1]][[1]])
-
-  results <- vector("list", n_models)
-
-  # Iterate over models
-  for (m in seq_len(n_models)) {
-
-    all_preds   <- NULL
-    hp_cols_all <- character()
-
-    # Nested loops: avoid overcharging R list and giving error
-    for (f in seq_len(n_folds)) {
-      for (p in seq_len(n_params)) {
-        preds <- all_loaded[[f]][[p]][[m]][[1]]
-        hp    <- all_loaded[[f]][[p]][[m]][[2]]
-
-        # Bind iteratively to avoid large lists in memory
-        if (is.null(all_preds)) {
-          all_preds <- preds
-        } else {
-          all_preds <- dplyr::bind_rows(all_preds, preds)
-        }
-
-        hp_cols_all <- union(hp_cols_all, hp)
-      }
-    }
-
-
-    rownames(all_preds) <- NULL
-
-    # Add any extra columns if present
-    extra_cols <- setdiff(
-      names(all_preds),
-      c("rowIndex", "Resample", "obs", "pred", "no", "yes", hp_cols_all)
-    )
-    if (length(extra_cols) > 0) {
-      hp_cols_all <- c(hp_cols_all, extra_cols)
-    }
-
-    # Compute metrics per resample
-    results_matrix <- all_preds %>%
-      dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols_all)), Resample) %>%
-      dplyr::summarise(
-        metrics = list(calculate_accuracy_kappa_resample(obs, pred)),
-        .groups = "drop"
-      ) %>%
-      tidyr::unnest_wider(metrics) %>%
-      dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols_all))) %>%
-      dplyr::summarise(
-        Accuracy   = median(.data$Accuracy_resample),
-        Kappa      = median(.data$Kappa_resample),
-        AccuracySD = stats::mad(.data$Accuracy_resample),
-        KappaSD    = stats::mad(.data$Kappa_resample),
-        .groups = "keep"
-      )
-
-    # Select best hyperparams
-    best_row <- results_matrix %>%
-      dplyr::ungroup() %>%
-      dplyr::arrange(dplyr::desc(Accuracy)) %>%
-      dplyr::slice_max(Accuracy, n = 1, with_ties = FALSE)
-
-    besttune <- best_row %>% dplyr::select(dplyr::all_of(hp_cols_all))
-
-    # Compute resample summaries for besttune
-    resample_df <- all_preds %>%
-      dplyr::inner_join(besttune, by = hp_cols_all) %>%
-      dplyr::group_by(Resample) %>%
-      dplyr::summarise(
-        metrics = list(calculate_accuracy_kappa_resample(obs, pred)),
-        .groups = "drop"
-      ) %>%
-      tidyr::unnest_wider(metrics) %>%
-      dplyr::rename(
-        Accuracy = Accuracy_resample,
-        Kappa = Kappa_resample
-      ) %>%
-      dplyr::select(Accuracy, Kappa, Resample) %>%
-      dplyr::arrange(Resample)
-
-    # Store results for this model
-    results[[m]] <- list(
-      Prediction_folds = all_preds,
-      Results_folds = results_matrix,
-      Besttune = besttune,
-      Resample_matrix = resample_df
-    )
-  }
-
-  return(results)
-}
-
-#' Aggregate Cross-Validation Results for Survival Models
-#'
-#' This function aggregates and summarizes cross-validation results across folds
-#' (and parameter configurations, if present) for multiple survival models.
-#' It computes summary statistics such as the **median** and **median absolute deviation (MAD)**
-#' of the Concordance Index (C-index) per hyperparameter configuration and
-#' identifies the best-performing configuration for each model.
-#'
-#' The function supports two types of data structures:
-#' \enumerate{
-#'   \item Folds → Parameters → Models (when multiple parameter combinations are tested)
-#'   \item Folds → Models (when there are no parameter combinations)
-#' }
-#'
-#' @param all_loaded A nested list of model evaluation results from
-#'   cross-validation:
-#'   \itemize{
-#'     \item If parameter tuning was used:
-#'       \code{all_loaded[[fold]][[param]][[model]]} contains results for each model.
-#'     \item If no parameter tuning was used:
-#'       \code{all_loaded[[fold]][[model]]} contains the results directly.
-#'   }
-#'   Each result object must be a data frame containing columns:
-#'   \code{"Resample"}, \code{"model"}, \code{"c_index"}, and any hyperparameter columns.
-#'
-#' @details
-#' For each survival model, the function:
-#' \enumerate{
-#'   \item Concatenates results across all folds (and parameter combinations if available).
-#'   \item Groups by hyperparameter configuration to compute:
-#'         \itemize{
-#'           \item Median C-index (`c_index_median`)
-#'           \item MAD of C-index (`c_index_mad`)
-#'         }
-#'   \item Selects the best hyperparameter configuration (highest median C-index).
-#'   \item Extracts the per-fold results for the best configuration.
-#' }
-#'
-#' The output provides both a detailed and summarized view of model performance,
-#' enabling comparison of tuned configurations and stability across folds.
-#'
-#' @return A list (one element per model), where each element contains:
-#' \describe{
-#'   \item{`Prediction_folds`}{Data frame of all per-fold predictions and metrics.}
-#'   \item{`Results_folds`}{Summary table of median and MAD of C-index per configuration.}
-#'   \item{`Besttune`}{Data frame with the best hyperparameter configuration.}
-#'   \item{`Resample_matrix`}{Per-fold C-index values for the best configuration.}
-#' }
-#'
-#' @examples
-#' \dontrun{
-#' # Example: aggregate cross-validation results after nested CV
-#' aggregated <- aggregate_results_survival(all_loaded)
-#'
-#' # Access the best hyperparameters for model 1
-#' aggregated[[1]]$Besttune
-#'
-#' # View per-fold C-index for the best configuration
-#' aggregated[[1]]$Resample_matrix
-#' }
-#'
-#' @seealso [compute_k_fold_CV_survival()], [compute_cv_CINDEX()]
-#' @export
-#'
-aggregate_results_survival <- function(all_loaded) {
-
-  # Detect structure: TRUE if folds → params → models
-  has_params <- is.list(all_loaded[[1]][[1]][[1]])
+  # Detect structure (whether has tunable parameters or not)
+  has_params <-  length(all_loaded[[1]][[1]]) > 3
 
   n_folds  <- length(all_loaded)
   n_models <- if (has_params) length(all_loaded[[1]][[1]]) else length(all_loaded[[1]])
@@ -3897,62 +3853,173 @@ aggregate_results_survival <- function(all_loaded) {
 
   results <- vector("list", n_models)
 
-  # ---- Iterate over models ----
-  for (m in seq_len(n_models)) {
+  # ============================================================
+  # === CLASSIFICATION =========================================
+  # ============================================================
+  if (task == "classification") {
 
-    all_preds   <- NULL
-    hp_cols_all <- character()
+    for (m in seq_len(n_models)) {
 
-    # ---- Gather all predictions across folds (and params if exist) ----
-    for (f in seq_len(n_folds)) {
-      if (has_params) {
-        for (p in seq_len(n_params)) {
-          preds <- all_loaded[[f]][[p]][[m]]
+      all_preds   <- NULL
+      hp_cols_all <- character()
+
+      # ---- Gather predictions across folds ----
+      for (f in seq_len(n_folds)) {
+        if (has_params) {
+          for (p in seq_len(n_params)) {
+            preds <- all_loaded[[f]][[p]][[m]][[1]]
+            hp    <- all_loaded[[f]][[p]][[m]][[2]]
+
+            if (is.null(all_preds)) {
+              all_preds <- preds
+            } else {
+              all_preds <- dplyr::bind_rows(all_preds, preds)
+            }
+
+            hp_cols_all <- union(hp_cols_all, hp)
+          }
+        } else {
+          preds <- all_loaded[[f]][[m]][[1]]
+          hp    <- all_loaded[[f]][[m]][[2]]
+
+          if (is.null(all_preds)) {
+            all_preds <- preds
+          } else {
+            all_preds <- dplyr::bind_rows(all_preds, preds)
+          }
+
+          hp_cols_all <- union(hp_cols_all, hp)
+        }
+      }
+
+      rownames(all_preds) <- NULL
+
+      # Add any extra columns if present
+      extra_cols <- setdiff(
+        names(all_preds),
+        c("rowIndex", "Resample", "obs", "pred", "no", "yes", hp_cols_all)
+      )
+      if (length(extra_cols) > 0) {
+        hp_cols_all <- c(hp_cols_all, extra_cols)
+      }
+
+      # ---- Compute metrics per resample ----
+      results_matrix <- all_preds %>%
+        dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols_all)), Resample) %>%
+        dplyr::summarise(
+          metrics = list(calculate_accuracy_kappa_resample(obs, pred)),
+          .groups = "drop"
+        ) %>%
+        tidyr::unnest_wider(metrics) %>%
+        dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols_all))) %>%
+        dplyr::summarise(
+          Accuracy   = median(.data$Accuracy_resample),
+          Kappa      = median(.data$Kappa_resample),
+          AccuracySD = stats::mad(.data$Accuracy_resample),
+          KappaSD    = stats::mad(.data$Kappa_resample),
+          .groups = "keep"
+        )
+
+      # ---- Select best hyperparameters ----
+      best_row <- results_matrix %>%
+        dplyr::ungroup() %>%
+        dplyr::arrange(dplyr::desc(Accuracy)) %>%
+        dplyr::slice_max(Accuracy, n = 1, with_ties = FALSE)
+
+      besttune <- best_row %>% dplyr::select(dplyr::all_of(hp_cols_all))
+
+      # ---- Compute resample summaries for besttune ----
+      resample_df <- all_preds %>%
+        dplyr::inner_join(besttune, by = hp_cols_all) %>%
+        dplyr::group_by(Resample) %>%
+        dplyr::summarise(
+          metrics = list(calculate_accuracy_kappa_resample(obs, pred)),
+          .groups = "drop"
+        ) %>%
+        tidyr::unnest_wider(metrics) %>%
+        dplyr::rename(
+          Accuracy = Accuracy_resample,
+          Kappa = Kappa_resample
+        ) %>%
+        dplyr::select(Accuracy, Kappa, Resample) %>%
+        dplyr::arrange(Resample)
+
+      results[[m]] <- list(
+        Prediction_folds = all_preds,
+        Results_folds    = results_matrix,
+        bestTune         = besttune,
+        Resample_matrix  = resample_df
+      )
+    }
+
+    return(results)
+  }
+
+  # ============================================================
+  # === SURVIVAL ===============================================
+  # ============================================================
+  if (task == "survival") {
+
+    for (m in seq_len(n_models)) {
+
+      all_preds   <- NULL
+      hp_cols_all <- character()
+
+      # ---- Gather predictions ----
+      for (f in seq_len(n_folds)) {
+        if (has_params) {
+          for (p in seq_len(n_params)) {
+            preds <- all_loaded[[f]][[p]][[m]]
+            hp_cols <- setdiff(names(preds), c("Resample", "model", "fold", "c_index"))
+            all_preds <- dplyr::bind_rows(all_preds, preds)
+            hp_cols_all <- union(hp_cols_all, hp_cols)
+          }
+        } else {
+          preds <- all_loaded[[f]][[m]]
           hp_cols <- setdiff(names(preds), c("Resample", "model", "fold", "c_index"))
           all_preds <- dplyr::bind_rows(all_preds, preds)
           hp_cols_all <- union(hp_cols_all, hp_cols)
         }
-      } else {
-        preds <- all_loaded[[f]][[m]]
-        hp_cols <- setdiff(names(preds), c("Resample", "model", "fold", "c_index"))
-        all_preds <- dplyr::bind_rows(all_preds, preds)
-        hp_cols_all <- union(hp_cols_all, hp_cols)
+      }
+
+      rownames(all_preds) <- NULL
+
+      if(ncol(all_preds)!=0){
+        # ---- Summarize performance per hyperparameter configuration ----
+        results_matrix <- all_preds %>%
+          dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols_all))) %>%
+          dplyr::summarise(
+            c_index_median = stats::median(c_index, na.rm = TRUE),
+            c_index_mad    = stats::mad(c_index, constant = 1, na.rm = TRUE),
+            .groups = "drop"
+          ) %>%
+          dplyr::arrange(dplyr::desc(c_index_median))
+
+        # ---- Select best configuration ----
+        best_row <- results_matrix %>%
+          dplyr::slice_max(c_index_median, n = 1, with_ties = FALSE)
+
+        besttune <- best_row %>% dplyr::select(dplyr::all_of(hp_cols_all))
+
+        # ---- Compute per-fold for best config ----
+        resample_df <- all_preds %>%
+          dplyr::inner_join(besttune, by = hp_cols_all) %>%
+          dplyr::arrange(Resample)
+
+        # ---- Store results ----
+        results[[m]] <- list(
+          Prediction_folds = all_preds,
+          Results_folds    = results_matrix,
+          bestTune         = besttune,
+          Resample_matrix  = resample_df
+        )
+      }else{
+        results[[m]] <- NULL
       }
     }
 
-    rownames(all_preds) <- NULL
-
-    # ---- Summarize performance per hyperparameter configuration ----
-    results_matrix <- all_preds %>%
-      dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols_all))) %>%
-      dplyr::summarise(
-        c_index_median = stats::median(c_index, na.rm = TRUE),
-        c_index_mad    = stats::mad(c_index, constant = 1, na.rm = TRUE),
-        .groups = "drop"
-      ) %>%
-      dplyr::arrange(dplyr::desc(c_index_median))
-
-    # ---- Select best configuration ----
-    best_row <- results_matrix %>%
-      dplyr::slice_max(c_index_median, n = 1, with_ties = FALSE)
-
-    besttune <- best_row %>% dplyr::select(dplyr::all_of(hp_cols_all))
-
-    # ---- Compute per-fold for best config ----
-    resample_df <- all_preds %>%
-      dplyr::inner_join(besttune, by = hp_cols_all) %>%
-      dplyr::arrange(Resample)
-
-    # ---- Store results ----
-    results[[m]] <- list(
-      Prediction_folds = all_preds,
-      Results_folds    = results_matrix,
-      Besttune         = besttune,
-      Resample_matrix  = resample_df
-    )
+    return(results)
   }
-
-  return(results)
 }
 
 
@@ -4397,7 +4464,18 @@ compute_ml_survival <- function(df_train, df_test,
     workflows::add_formula(formula_model)
 
   # Fit model on training data
-  fitted <- parsnip::fit(wf, data = df_train)
+  fitted <- tryCatch(
+    parsnip::fit(wf, data = df_train),
+    error = function(e) {
+      warning(paste("Model fitting failed for", model, ":", e$message))
+      return(NULL)
+    }
+  )
+
+  # If fitting failed, return NULL
+  if (is.null(fitted)) {
+    return(NULL)
+  }
 
   # ---------------------------------------------------------------------------
   # Evaluate performance on test data
@@ -4414,80 +4492,76 @@ compute_ml_survival <- function(df_train, df_test,
 
 #' Nested Cross-Validation for Survival Models with Optional Custom Fold Construction
 #'
-#' This function performs *nested cross-validation* to evaluate and tune multiple
-#' survival models using the tidymodels ecosystem. It supports both standard
+#' Performs *nested cross-validation* to evaluate and tune multiple survival
+#' models using the **tidymodels** ecosystem. Supports both standard
 #' event-stratified cross-validation and *Leave-One-Domain-Out (LODO)* setups,
-#' allowing cohort-balanced performance evaluation. Hyperparameter grids are
+#' enabling cohort-balanced model evaluation. Hyperparameter grids are
 #' automatically constructed for each model type.
 #'
 #' Depending on the inputs, the function can:
 #' \enumerate{
-#'   \item Build folds internally or accept custom folds from an external function.
+#'   \item Build folds internally or accept custom folds from a user-defined function.
 #'   \item Train survival models with or without hyperparameter tuning.
-#'   \item Compute and aggregate C-index (Concordance Index) across folds.
+#'   \item Compute and aggregate the Concordance Index (C-index) across folds.
 #'   \item Identify and retrain the top-performing model using optimal parameters.
 #' }
 #'
-#' @param df_features A data frame containing predictor variables (features).
+#' @param df_features A data frame of predictor variables (features).
 #' @param df_outcome A data frame containing survival outcomes — typically including
 #'   survival time and event indicator columns.
-#' @param outcome_col Character string naming the survival time column.
-#' @param event_col Character string naming the event indicator column
+#' @param outcome_col Character string giving the name of the survival time column.
+#' @param event_col Character string giving the name of the event indicator column
 #'   (`0 = censored`, `1 = event`).
-#' @param ml_options A named list of cross-validation and parallelization options:
-#'   \describe{
-#'     \item{`nb_folds`}{Number of folds for K-fold cross-validation (default = 5).}
-#'     \item{`nb_repeats`}{Number of repeated CV iterations (default = 1).}
-#'     \item{`ncores`}{Number of CPU cores to use for parallelization.}
-#'     \item{`LODO`}{Logical; if `TRUE`, performs Leave-One-Domain-Out stratification
-#'     using `batch_id`.}
-#'     \item{`batch_id`}{Name of the batch or cohort column (required if `LODO = TRUE`).}
-#'   }
-#' @param file_name Optional string specifying the suffix of the generated
-#'   C-index summary PDF saved in `"Results/"`.
+#' @param k_folds Integer. Number of folds for K-fold cross-validation (default = 5).
+#' @param n_rep Integer. Number of repeated CV iterations (default = 1).
+#' @param ncores Integer. Number of CPU cores to use for parallelization.
+#' @param LODO Logical; if `TRUE`, performs Leave-One-Domain-Out cross-validation
+#'   using `batch_id` to stratify samples by cohort.
+#' @param batch_id Optional character string naming the column representing cohort or
+#'   batch identifiers. Required if `LODO = TRUE`.
+#' @param file_name Optional string specifying the suffix for the generated C-index
+#'   summary PDF saved in the `"Results/"` directory.
+#' @param fold_construction_fun Optional custom function for constructing data folds.
+#'   Used to interface with external preprocessing workflows (e.g., CellTFusion).
+#' @param fold_construction_args_fixed Optional list of fixed arguments passed to
+#'   `fold_construction_fun()`.
+#' @param fold_construction_args_tunable Optional list of tunable arguments passed to
+#'   `fold_construction_fun()` during hyperparameter tuning.
 #'
 #' @details
 #' Internally, the function:
 #' \itemize{
-#'   \item Combines predictors and outcomes into a unified dataset.
-#'   \item Creates stratified folds using {rsample}, either by event rate or
-#'     by cohort × event combinations (if LODO = TRUE).
+#'   \item Merges predictors and outcomes into a single dataset.
+#'   \item Creates stratified folds using **rsample**, either by event rate or by
+#'     cohort × event combinations (if `LODO = TRUE`).
 #'   \item Evaluates a predefined set of survival models:
-#'     Cox PH, penalized Cox (glmnet), AFT models, decision/bagged trees, and random forests.
-#'   \item Aggregates median and MAD of C-index across resamples.
-#'   \item Retrains the top model with its optimal hyperparameters.
+#'     Cox PH, penalized Cox (glmnet), AFT (flexsurv), decision trees, bagged trees,
+#'     and random forests.
+#'   \item Aggregates the median and MAD of the C-index across resamples.
+#'   \item Retrains the best-performing model with its optimal hyperparameters.
 #' }
 #'
-#' The function can also interface with a user-defined `fold_construction_fun()`
-#' to support custom preprocessing pipelines (e.g., CellTFusion), handling folds
-#' in parallel and storing intermediate results to disk.
+#' When a custom fold construction function is provided via `fold_construction_fun`,
+#' the function handles folds in parallel, saves intermediate results under
+#' `"Results/"`, and returns additional outputs for advanced integration.
 #'
-#' @return A named list containing:
+#' @return A named list with the following elements:
 #' \describe{
-#'   \item{`Model`}{The best-performing model retrained on full data.}
+#'   \item{`Model`}{The best-performing survival model retrained on the full dataset.}
 #'   \item{`ML_Models`}{All evaluated survival models with aggregated C-index results.}
-#'   \item{`C_index_median`}{Median C-index of the top model.}
-#'   \item{`Custom_output`}{Optional custom fold output (if applicable).}
+#'   \item{`C_index_median`}{Median C-index of the top-performing model.}
+#'   \item{`Custom_output`}{Optional list of custom outputs from fold construction.}
 #' }
 #'
-#' @seealso [aggregate_results_survival()], [compute_cv_CINDEX()],
+#' @seealso [aggregate_results()], [compute_cv_CINDEX()],
 #'   [wrapper_train_best_hyperparams_survival()]
+#'
 #' @export
 #'
-compute_k_fold_CV_survival <- function(df_features, df_outcome,
-                                    outcome_col, event_col,
-                                    ml_options = list(nb_folds = 5,
-                                                      nb_repeats = 1,
-                                                      ncores = parallel::detectCores() - 1,
-                                                      LODO = FALSE,
-                                                      batch_id = NULL),
-                                    file_name = NULL){
-
-  ### -------------------------------------------------------------------------
-  ### Step 1: Configure parallelization
-  ### -------------------------------------------------------------------------
-  # Retrieve the number of CPU cores to use for parallel processing.
-  ncores <- ml_options$ncores
+compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, event_col, k_folds, n_rep, ncores,
+                                       LODO = FALSE, batch_id = NULL, file_name = NULL, fold_construction_fun = NULL,
+                                       fold_construction_args_fixed = NULL,
+                                       fold_construction_args_tunable = NULL){
 
   # ---------------------------------------------------------------------------
   # Step 2: Merge features and outcomes
@@ -4505,12 +4579,12 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome,
   #   - If LODO = FALSE → standard stratification by event rate.
   #   - If LODO = TRUE  → stratify by cohort × event to preserve domain balance.
   #
-  if (isTRUE(ml_options$LODO)) {
-    if (is.null(ml_options$batch_id) || !ml_options$batch_id %in% names(df_all)) {
+  if (isTRUE(LODO)) {
+    if (is.null(batch_id) || !batch_id %in% names(df_all)) {
       stop("When LODO = TRUE, you must provide 'batch_id' as a column name in df_all.")
     }
 
-    batch_col <- ml_options$batch_id
+    batch_col <- batch_id
 
     # Create composite stratification variable: cohort × event
     df_all <- df_all %>%
@@ -4518,8 +4592,8 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome,
 
     folds <- rsample::vfold_cv(
       df_all,
-      v = ml_options$nb_folds,
-      repeats = ml_options$nb_repeats,
+      v = k_folds,
+      repeats = n_rep,
       strata = "strata"
     )
 
@@ -4528,8 +4602,8 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome,
 
     folds <- rsample::vfold_cv(
       df_all,
-      v = ml_options$nb_folds,
-      repeats = ml_options$nb_repeats,
+      v = k_folds,
+      repeats = n_rep,
       strata = event_col  # stratify by event indicator only
     )
   }
@@ -4628,14 +4702,16 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome,
                                            models_hyperparameters = if (is.null(hyperparams)) NULL else list(
                                              current_params %>% dplyr::select(-.config_id)))
 
-            trained_df <- trained %>%
-              data.frame() %>%
-              dplyr::mutate(
-                model = method,
-                Resample = paste0("Fold", fold_i)
-              ) %>%
-              dplyr::bind_cols(current_params %>% dplyr::select(-.config_id))%>%
-              dplyr::relocate(c_index, .after = dplyr::last_col())
+            if(!is.null(trained)){
+              trained_df <- trained %>%
+                data.frame() %>%
+                dplyr::mutate(
+                  model = method,
+                  Resample = paste0("Fold", fold_i)
+                ) %>%
+                dplyr::bind_cols(current_params %>% dplyr::select(-.config_id))%>%
+                dplyr::relocate(c_index, .after = dplyr::last_col())
+            }
 
           })
 
@@ -4647,24 +4723,26 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome,
 
     }
 
-    models = aggregate_results_survival(models_all_folds)
+    models = aggregate_results(models_all_folds, task = 'survival')
     names(models) <- model_list
 
     ## Sanity check (each param conf has to be evaluated in all resamples)
     for(i in 1:length(models)){
-      hp_cols_all = names(models[[i]][["Besttune"]]) ### Hyperparameter names
-      x = models[[i]][["Prediction_folds"]] %>%
-        dplyr::distinct(Resample, dplyr::across(all_of(hp_cols_all))) %>%
-        dplyr::count(dplyr::across(all_of(hp_cols_all)), name = "n_resamples") %>%
-        dplyr::arrange(desc(n_resamples))
+      if(!is.null(models[[i]])){
+        hp_cols_all = names(models[[i]][["bestTune"]]) ### Hyperparameter names
+        x = models[[i]][["Prediction_folds"]] %>%
+          dplyr::distinct(Resample, dplyr::across(all_of(hp_cols_all))) %>%
+          dplyr::count(dplyr::across(all_of(hp_cols_all)), name = "n_resamples") %>%
+          dplyr::arrange(desc(n_resamples))
 
-      # Expected number of resamples (folds × repeats)
-      expected_resamples <- length(unique(models[[i]][["Prediction_folds"]]$Resample))
+        # Expected number of resamples (folds × repeats)
+        expected_resamples <- length(unique(models[[i]][["Prediction_folds"]]$Resample))
 
-      # Sanity check
-      if (any(x$n_resamples != expected_resamples)) {
-        stop("Inconsistent number of resamples detected for parameter configuration\n",
-             paste0(hp_cols_all, collapse = " "))
+        # Sanity check
+        if (any(x$n_resamples != expected_resamples)) {
+          stop("Inconsistent number of resamples detected for parameter configuration\n",
+               paste0(hp_cols_all, collapse = " "))
+        }
       }
     }
 
@@ -4690,7 +4768,9 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome,
         doParallel::registerDoParallel(cl)
 
         models_all_params <- foreach::foreach(parameter_i = seq_along(result),
-                                              .packages = c("dplyr", "caret")) %dopar% {
+                                              .packages = c("dplyr", "caret", "censored")) %dopar% {
+
+                                                source("~/Documents/pipeML/R/machine_learning.R")
 
                                                 train_data_i <- result[[parameter_i]][["train_data"]]
                                                 test_data_i  <- result[[parameter_i]][["test_data"]]
@@ -4823,14 +4903,14 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome,
 
     # Step 8: Aggregate results and validate fold consistency
     # ---------------------------------------------------------------------------
-    # Combines all model results using aggregate_results_survival().
+    # Combines all model results using aggregate_results().
     # Ensures that each hyperparameter configuration was evaluated across all folds.
-    models = aggregate_results_survival(models_all_folds)
+    models = aggregate_results(models_all_folds, task = 'survival')
     names(models) <- model_list
 
     ## Sanity check (each param conf has to be evaluated in all resamples)
     for(i in 1:length(models)){
-      hp_cols_all = names(models[[i]][["Besttune"]]) ### Hyperparameter names
+      hp_cols_all = names(models[[i]][["bestTune"]]) ### Hyperparameter names
       x = models[[i]][["Prediction_folds"]] %>%
         dplyr::distinct(Resample, dplyr::across(all_of(hp_cols_all))) %>%
         dplyr::count(dplyr::across(all_of(hp_cols_all)), name = "n_resamples") %>%
@@ -4847,32 +4927,63 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome,
     }
   }
 
-  if (!is.null(fold_construction_args_tunable)){
+  if(!is.null(fold_construction_fun)){
+    if (!is.null(fold_construction_args_tunable)){
 
-    ################################ Train model with optimized hyperparameters
+      ################################ Train model with optimized hyperparameters
 
-    optimized_models <- lapply(seq_along(model_list), function(i) {
-      cat("Running model...", model_list[i])
-      wrapper_train_best_hyperparams_survival(
-        train_data = df_features,
-        optimized = models[[i]],
-        ml_method = model_list[i],
-        fold_construction_fun,
-        fold_construction_args_fixed
-      )
-    })
+      optimized_models <- lapply(seq_along(model_list), function(i) {
+        cat("\nRunning model...", model_list[i], "\n")
+        wrapper_train_best_hyperparams_survival(
+          train_data = df_features,
+          optimized = models[[i]],
+          ml_method = model_list[i],
+          fold_construction_fun,
+          fold_construction_args_fixed
+        )
+      })
 
-    # Split components across lists
-    training_sets <- lapply(optimized_models, `[[`, "training_set")
-    custom_outputs <- lapply(optimized_models, `[[`, "custom_output")
-    models           <- lapply(optimized_models, `[[`, "Model")
+      # Split components across lists
+      training_sets <- lapply(optimized_models, `[[`, "training_set")
+      custom_outputs <- lapply(optimized_models, `[[`, "custom_output")
+      models           <- lapply(optimized_models, `[[`, "Model")
 
-    # Assign pretty names
-    names(training_sets) <- model_list
-    names(custom_outputs) <- model_list
-    names(models) <- model_list
-  }else{
-    custom_outputs = NULL
+      # Assign pretty names
+      names(training_sets) <- model_list
+      names(custom_outputs) <- model_list
+      names(models) <- model_list
+    }else{
+
+      optimized_models <- lapply(seq_along(model_list), function(i) {
+        cat("\nRunning model...", model_list[i], "\n")
+
+        temp = models[[i]]$bestTune
+        models[[i]]$bestTune = c(temp, fold_construction_args_fixed)
+
+        p = wrapper_train_best_hyperparams_survival(
+            train_data = df_features,
+            optimized = models[[i]],
+            ml_method = model_list[i],
+            fold_construction_fun,
+            fold_construction_args_fixed
+          )
+
+        models[[i]]$bestTune = temp
+
+        p
+
+      })
+
+      # Split components across lists
+      training_sets <- lapply(optimized_models, `[[`, "training_set")
+      custom_outputs <- lapply(optimized_models, `[[`, "custom_output")
+      models           <- lapply(optimized_models, `[[`, "Model")
+
+      # Assign pretty names
+      names(training_sets) <- model_list
+      names(custom_outputs) <- model_list
+      names(models) <- model_list
+    }
   }
 
   # Step 9: Retrain best model on full data (if tuning performed)
@@ -4965,7 +5076,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome,
 #' compute_cv_CINDEX(models, file_name = "example")
 #' }
 #'
-#' @seealso [aggregate_results_survival()], [predict_and_evaluate_survival()]
+#' @seealso [aggregate_results()], [predict_and_evaluate_survival()]
 #' @export
 #'
 compute_cv_CINDEX = function(models, file_name = NULL, plot_results = TRUE){
@@ -5191,7 +5302,7 @@ plot_survival_performance <- function(df_test, c_index = NULL, n_groups = 3, fil
 #' results$c_index
 #' }
 #'
-#' @seealso [yardstick::concordance_survival_vec()], [aggregate_results_survival()]
+#' @seealso [yardstick::concordance_survival_vec()], [aggregate_results()]
 #' @export
 #'
 predict_and_evaluate_survival <- function(model_fit,

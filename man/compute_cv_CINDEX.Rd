@@ -71,5 +71,5 @@ compute_cv_CINDEX(models, file_name = "example")
 
 }
 \seealso{
-\code{\link[=aggregate_results_survival]{aggregate_results_survival()}}, \code{\link[=predict_and_evaluate_survival]{predict_and_evaluate_survival()}}
+\code{\link[=aggregate_results]{aggregate_results()}}, \code{\link[=predict_and_evaluate_survival]{predict_and_evaluate_survival()}}
 }

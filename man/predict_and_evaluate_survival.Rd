@@ -68,5 +68,5 @@ results$c_index
 
 }
 \seealso{
-\code{\link[yardstick:concordance_survival]{yardstick::concordance_survival_vec()}}, \code{\link[=aggregate_results_survival]{aggregate_results_survival()}}
+\code{\link[yardstick:concordance_survival]{yardstick::concordance_survival_vec()}}, \code{\link[=aggregate_results]{aggregate_results()}}
 }
