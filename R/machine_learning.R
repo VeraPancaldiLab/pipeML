@@ -3894,13 +3894,15 @@ aggregate_results <- function(all_loaded, task = c("classification", "survival")
 
       rownames(all_preds) <- NULL
 
-      # Add any extra columns if present
-      extra_cols <- setdiff(
-        names(all_preds),
-        c("rowIndex", "Resample", "obs", "pred", "no", "yes", hp_cols_all)
-      )
-      if (length(extra_cols) > 0) {
-        hp_cols_all <- c(hp_cols_all, extra_cols)
+      if(has_params){
+        # Add any extra columns if present
+        extra_cols <- setdiff(
+          names(all_preds),
+          c("rowIndex", "Resample", "obs", "pred", "no", "yes", hp_cols_all)
+        )
+        if (length(extra_cols) > 0) {
+          hp_cols_all <- c(hp_cols_all, extra_cols)
+        }
       }
 
       # ---- Compute metrics per resample ----
