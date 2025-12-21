@@ -283,7 +283,7 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
 #' }
 #'
 #'
-compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "Accuracy", file_name = NULL, LODO = FALSE,
+compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metric = "Accuracy", file_name = NULL, LODO = FALSE,
                              ncores = NULL, return = FALSE, fold_construction_fun = NULL,
                              fold_construction_args_fixed = NULL,
                              fold_construction_args_tunable = NULL){
@@ -296,19 +296,19 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     stop("The metric assigned is not supported. Choose either accuracy or AUC.")
   }
 
-  if(is.null(fold_construction_fun)){ ### Preprocessing (remove collinear variables and low variance)
-    if(LODO == TRUE){
-      train_data = preprocess_features(model %>% dplyr::select(-dataset), cor_thresh = 0.9, target_col = "target") %>%
-        dplyr::mutate(dataset = model$dataset)
-    }else{
-      train_data = preprocess_features(model, cor_thresh = 0.9, target_col = "target")
-    }
-  }else{
-    train_data = model
-  }
+  # #if(is.null(fold_construction_fun)){ ### Preprocessing (remove collinear variables and low variance)
+  #   if(LODO == TRUE){
+  #     train_data = preprocess_features(model %>% dplyr::select(-dataset), cor_thresh = 0.9, target_col = "target") %>%
+  #       dplyr::mutate(dataset = model$dataset)
+  #   }else{
+  #     train_data = preprocess_features(model, cor_thresh = 0.9, target_col = "target")
+  #   }
+  # # }else{
+  # #   train_data = model
+  # # }
 
-  rm(model) #Clean memory
-  gc()
+  #rm(model) #Clean memory
+  #gc()
 
   ######### Machine Learning models
 
