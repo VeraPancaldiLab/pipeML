@@ -5,7 +5,7 @@
 \title{Perform repeated stratified k-fold cross-validation for model training and tuning}
 \usage{
 compute_k_fold_CV(
-  model,
+  train_data,
   k_folds,
   n_rep,
   stacking = FALSE,
@@ -20,8 +20,6 @@ compute_k_fold_CV(
 )
 }
 \arguments{
-\item{model}{A data frame containing features and a target column named 'target' corresponding to the response variable to predict.}
-
 \item{k_folds}{Integer. Number of folds for k-fold cross-validation. Default is 5.}
 
 \item{n_rep}{Integer. Number of repetitions of the k-fold cross-validation. Default is 100.}
@@ -50,6 +48,8 @@ that remain fixed during both cross-validation and final training.}
 \item{fold_construction_args_tunable}{List. A list of arguments passed to \code{fold_construction_fun}
 that define the hyperparameters to be tuned during cross-validation. Each element should contain
 candidate values for tuning.}
+
+\item{model}{A data frame containing features and a target column named 'target' corresponding to the response variable to predict.}
 }
 \value{
 A list containing:

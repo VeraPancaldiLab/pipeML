@@ -16,7 +16,7 @@ compute_features.training.ML(
   k_folds = 10,
   n_rep = 5,
   LODO = FALSE,
-  batch_id = NULL,
+  batch_var = NULL,
   file_name = NULL,
   ncores = NULL,
   return = FALSE,
@@ -54,7 +54,7 @@ compute_features.training.ML(
 
 \item{LODO}{Logical. If \code{TRUE}, constructs cross-validation folds stratified by cohort (Leave-One-Dataset-Out scheme).}
 
-\item{batch_id}{Character. Column name indicating cohort or batch membership for each sample. Required if \code{LODO = TRUE}.}
+\item{batch_var}{Character. Batch membership for each sample. Required if \code{LODO = TRUE}.}
 
 \item{file_name}{Character. File name used for saving performance plots in the \code{"Results/"} directory.}
 

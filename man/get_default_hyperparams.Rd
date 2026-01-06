@@ -4,7 +4,7 @@
 \alias{get_default_hyperparams}
 \title{Get default hyperparameter grids for supported survival models}
 \usage{
-get_default_hyperparams(model_name, train_x = NULL, levels = 5)
+get_default_hyperparams(model_name, train_x = NULL, levels = 5, v = 5)
 }
 \arguments{
 \item{model_name}{Character string specifying the model name.
