@@ -1410,7 +1410,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #' @param k_folds Integer. Number of folds to use for cross-validation.
 #' @param n_rep Integer. Number of repetitions for cross-validation (repeated CV).
 #' @param LODO Logical. If \code{TRUE}, constructs cross-validation folds stratified by cohort (Leave-One-Dataset-Out scheme).
-#' @param batch_id Character. Column name indicating cohort or batch membership for each sample. Required if \code{LODO = TRUE}.
+#' @param batch_var Character. Batch membership for each sample. Required if \code{LODO = TRUE}.
 #' @param file_name Character. File name used for saving performance plots in the \code{"Results/"} directory.
 #' @param ncores Integer. Number of CPU cores to use for parallelization. Defaults to \code{parallel::detectCores() - 1}.
 #' @param return Logical. Whether to return and save the generated plots. Default is \code{FALSE}.
@@ -1464,7 +1464,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #' @export
 compute_features.training.ML = function(features_train, task_type = c("classification", "survival"), target_var = NULL, trait.positive = NULL,
                                         time_var = NULL, event_var = NULL, metric = "Accuracy", stack, k_folds = 10, n_rep = 5, LODO = FALSE,
-                                        batch_id = NULL, file_name = NULL, ncores = NULL, return = FALSE,
+                                        batch_var = NULL, file_name = NULL, ncores = NULL, return = FALSE,
                                         fold_construction_fun = NULL, fold_construction_args_fixed = NULL, fold_construction_args_tunable = NULL){
 
   # ---------------------------------------------------------------------------
@@ -1500,7 +1500,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 
     if(LODO == T){
       train_data = train_data %>%
-        dplyr::mutate(dataset = traitData_train[,batch_id])
+        dplyr::mutate(dataset = batch_var)
     }
 
     #Cross-validation training
@@ -1521,12 +1521,12 @@ compute_features.training.ML = function(features_train, task_type = c("classific
       data.frame() %>%
       dplyr::mutate(
         time  = time_var,
-        event = as.numeric(event_var == trait.positive)
+        event = as.numeric(event_var)
       )
 
     if (LODO == TRUE) {
       train_data = train_data %>%
-        dplyr::mutate(dataset = traitData_train[,batch_id])
+        dplyr::mutate(dataset = batch_var)
     }
 
     #Split into features + outcomes
@@ -1778,7 +1778,7 @@ compute_features.ML <- function(features_train, features_test, clinical,
       dplyr::filter(model == best_model_name) %>%
       dplyr::pull(.config_id)
 
-    best_hyperparams <- expand_grid(!!!get_default_hyperparams(best_model_name, train_x = df_features)) %>%
+    best_hyperparams <- expand_grid(!!!get_default_hyperparams(best_model_name, train_x = df_features, v = k_folds)) %>%
       dplyr::slice(best_config_id)
 
     cat("\nRefitting best model on full training data:", best_model_name, "\n")
@@ -4206,80 +4206,74 @@ get_tune_grid = function(method, train_data){
 #' # Example 2: Penalized Cox model with default parameter ranges
 #' get_default_hyperparams("proportional_hazards_glmnet")
 #' @export
-get_default_hyperparams <- function(model_name, train_x = NULL, levels = 5) {
+get_default_hyperparams <- function(model_name, train_x = NULL, levels = 5, v = 5) {
   stopifnot(levels >= 2)
 
   # --- helpers -----------------------------------------------------------
   vs <- function(param) dials::value_seq(param, n = levels)  # evenly spaced across default range
-  p  <- if (!is.null(train_x)) ncol(train_x) else NA_integer_
+  p  <- if (!is.null(train_x)) ncol(train_x) else NA_integer_ #number of columns (features)
+  n_total <- if (!is.null(train_x)) nrow(train_x) else NA_integer_ #number of rows (samples)
+  max_leaf <- if (!is.na(n_total)) floor(floor(n_total * (v - 1)/v) / 2) - 1 else NA_integer_
 
   # --- model-specific parameter grids -----------------------------------
   if (model_name == "cox_ph_survival") {
-    # Classic Cox model (no tunable hyperparameters)
     return(NULL)
 
   } else if (model_name == "proportional_hazards_glmnet") {
-    # Penalized Cox regression (LASSO/Elastic Net)
     return(list(
-      penalty = vs(dials::penalty()),  # regularization strength (log10 scale)
-      mixture = vs(dials::mixture())   # elastic net mixing parameter (0 = ridge, 1 = lasso)
+      penalty = vs(dials::penalty()),
+      mixture = vs(dials::mixture())
     ))
 
   } else if (model_name == "survreg_flexsurv") {
-    # Parametric accelerated failure time (AFT) model
-    # No tunable hyperparameters in parsnip interface
     return(NULL)
 
   } else if (model_name == "decision_tree_partykit") {
-    # Decision tree model hyperparameters
-    return(list(
-      cost_complexity = vs(dials::cost_complexity()),  # complexity/pruning penalty
-      tree_depth      = vs(dials::tree_depth()),       # maximum depth of the tree
-      min_n           = vs(dials::min_n())             # minimum number of samples per node
-    ))
-
-  } else if (model_name == "bag_tree_rpart") {
-    # Bagging of decision trees (rpart engine)
-    return(list(
-      trees = vs(dials::trees())  # number of bootstrap trees
-    ))
-
-  } else if (model_name == "rand_forest_partykit") {
-    # Random survival forest using the partykit engine
     vals <- list(
-      trees = vs(dials::trees()),  # number of trees in the forest
-      min_n = vs(dials::min_n())   # minimum samples per node
+      cost_complexity = vs(dials::cost_complexity()),
+      tree_depth      = vs(dials::tree_depth()),
+      min_n           = vs(dials::min_n())
     )
-    # mtry depends on number of predictors, so finalize using train_x
-    if (!is.na(p)) vals$mtry <- vs(dials::finalize(dials::mtry(), train_x))
+    if (!is.na(max_leaf)) vals$min_n <- pmin(vals$min_n, max_leaf)
     return(vals)
 
-  } else if (model_name == "rand_forest_aorsf") {
-    # Oblique random survival forest (aorsf engine)
+  } else if (model_name == "bag_tree_rpart") {
+    return(list(
+      trees = vs(dials::trees())
+    ))
+
+  } else if (model_name %in% c("rand_forest_partykit", "rand_forest_aorsf")) {
+    min_n_vals <- as.numeric(vs(dials::min_n()))
+    # Cap at fold maximum
+    if (!is.na(max_leaf)) min_n_vals <- pmin(min_n_vals, max_leaf)
+
+    # mtry sequence
+    if (!is.na(p)) mtry_vals <- as.numeric(vs(dials::finalize(dials::mtry(), train_x)))
+    if (!is.na(p)) mtry_vals <- pmin(mtry_vals, p)
+
     vals <- list(
-      trees = vs(dials::trees()),  # number of trees
-      min_n = vs(dials::min_n())   # minimum samples per node
+      trees = as.numeric(vs(dials::trees())),
+      min_n = min_n_vals,
+      mtry = mtry_vals
     )
-    # finalize mtry if training data provided
-    if (!is.na(p)) vals$mtry <- vs(dials::finalize(dials::mtry(), train_x))
     return(vals)
 
   } else if (model_name == "boost_tree_mboost") {
-    # Gradient boosting model for survival analysis
     return(list(
-      trees          = vs(dials::trees()),           # number of boosting iterations
-      min_n          = vs(dials::min_n()),           # minimum number of samples per node
-      tree_depth     = vs(dials::tree_depth()),      # depth of individual trees
-      learn_rate     = vs(dials::learn_rate()),      # learning rate (step size)
-      loss_reduction = vs(dials::loss_reduction()),  # minimum loss reduction per split
-      sample_size    = vs(dials::sample_size(range = c(0, 1))),  # fraction of samples per iteration
-      stop_iter      = vs(dials::stop_iter())        # early stopping iterations
+      trees          = vs(dials::trees()),
+      min_n          = vs(dials::min_n()),
+      tree_depth     = vs(dials::tree_depth()),
+      learn_rate     = vs(dials::learn_rate()),
+      loss_reduction = vs(dials::loss_reduction()),
+      sample_size    = vs(dials::sample_size(range = c(0, 1))),
+      stop_iter      = vs(dials::stop_iter())
     ))
 
   } else {
     stop("Unsupported model name: ", model_name)
   }
 }
+
 
 
 unregister_dopar <- function() {
@@ -4485,10 +4479,12 @@ compute_ml_survival <- function(df_train, df_test,
   # Uses predict_and_evaluate_survival() to compute the Concordance Index (C-index),
   # which measures the model’s ability to correctly rank survival outcomes.
   #
-  metric_val = predict_and_evaluate_survival(fitted, df_test)$c_index
+  prediction = predict_and_evaluate_survival(fitted, df_test)
+  preds = prediction$preds
+  metric_val = prediction$c_index
 
   # Return standardized tibble with model name and C-index
-  return(tibble::tibble(model = model, c_index = metric_val))
+  return(tibble::tibble(predictions = preds, c_index = metric_val))
 }
 
 
@@ -4644,7 +4640,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
   # Construct model-specific grids (via get_default_hyperparams()).
   # Each element corresponds to a model with tunable parameter ranges.
   #
-  model_grids <- purrr::map(model_list, ~ get_default_hyperparams(.x, train_x = df_features))
+  model_grids <- purrr::map(model_list, ~ get_default_hyperparams(.x, train_x = df_features, v = k_folds))
   names(model_grids) <- model_list
 
   # Initialize master list to store everything in memory
@@ -4660,7 +4656,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
   # Each fold produces performance results stored for later aggregation.
   if(is.null(fold_construction_fun)){
     for (fold_i in seq_along(multifolds)) { ### number of folds (k_fold x n_rep)
-
+      cat("Running fold_i", fold_i, "\n")
       train_idx <- multifolds[[fold_i]]
       test_idx <- setdiff(seq_len(nrow(df_all)), train_idx)
 
@@ -4668,7 +4664,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
       test_data <- df_all[test_idx, , drop = FALSE]
 
       #Preprocessing features (remove collinear variables and no-variance)
-      train_data <- preprocess_features(train_data, cor_thresh = 0.9, time_var = "time", event_var = "event")
+      #train_data <- preprocess_features(train_data, cor_thresh = 0.9, time_var = "time", event_var = "event")
 
       common_features <- intersect(
         colnames(train_data),
@@ -4683,7 +4679,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
         function(method) {
           # Retrieve hyperparameter grid for the current model
           hyperparams <- model_grids[[method]]
-
+          cat("Running ", method, "\n")
           # Fallback: if the model has no tunable parameters, create a single configuration
           if (is.null(hyperparams)) {
             param_grid <- tibble::tibble(.config_id = 1)
@@ -5210,13 +5206,25 @@ plot_survival_performance <- function(df_test, c_index = NULL, n_groups = 3, fil
   }
 
   # Group patients into risk categories based on predicted risk (.pred)
+  labels <- if (n_groups == 2) {
+    c("Low risk", "High risk")
+  } else if (n_groups == 3) {
+    c("Low risk", "Medium risk", "High risk")
+  } else {
+    paste0("Group ", seq_len(n_groups))
+  }
+
   df_test <- df_test %>%
     dplyr::mutate(
       risk_group = cut(
         .pred,
-        breaks = stats::quantile(.pred, probs = seq(0, 1, length.out = n_groups + 1), na.rm = TRUE),
+        breaks = stats::quantile(
+          .pred,
+          probs = seq(0, 1, length.out = n_groups + 1),
+          na.rm = TRUE
+        ),
         include.lowest = TRUE,
-        labels = paste(c("Low", "Medium", "High")[1:n_groups], "risk")
+        labels = labels
       )
     )
 
