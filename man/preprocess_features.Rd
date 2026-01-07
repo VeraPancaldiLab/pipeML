@@ -18,6 +18,12 @@ preprocess_features(
 \item{target_col}{A character string specifying the name of the target column
 in \code{data}. Default is \code{"target"}.}
 
+\item{time_var}{A character string specifying the name of the time-to-event
+column in \code{data}. Used only for survival analysis.}
+
+\item{event_var}{A character string specifying the name of the event indicator
+column in \code{data} (e.g., 0/1). Used only for survival analysis.}
+
 \item{cor_thresh}{A numeric value between 0 and 1 specifying the correlation
 threshold for removing highly correlated features. Default is \code{0.9}.}
 }

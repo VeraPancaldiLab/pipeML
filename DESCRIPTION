@@ -27,13 +27,8 @@ Imports:
     tidyr,
     rlang,
     Boruta,
-    censored,
     survival,
-    survminer,
-    tidyverse,
-    tidymodels,
-    cowplot,
-    recipes
+    survminer
 Remotes: 
     VeraPancaldiLab/multideconv,
 Suggests: 
@@ -45,7 +40,12 @@ Suggests:
     glmnet,
     xgboost,
     kernlab,
-    rmarkdown
+    rmarkdown,
+    tidyverse,
+    tidymodels,
+    cowplot,
+    recipes,
+    censored
 LazyData: true
 LazyDataCompression: bzip2
 VignetteBuilder: knitr

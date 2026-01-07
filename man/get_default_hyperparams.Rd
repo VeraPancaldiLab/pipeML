@@ -27,6 +27,8 @@ sampled at each split in tree-based models.}
 
 \item{levels}{Integer specifying how many values to generate per hyperparameter.
 Defaults to \code{5}. Must be at least 2.}
+
+\item{v}{Integer. Number of folds for K-fold cross-validation (default = 5).}
 }
 \value{
 A named list of hyperparameter grids.

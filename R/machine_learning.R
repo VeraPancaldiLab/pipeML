@@ -14,7 +14,17 @@ utils::globalVariables(c(
   "Kappa_resample",
   "MAD_AUROC",
   "MAD_AUPRC",
-  "MAD_Accuracy"
+  "MAD_Accuracy",
+  "c_index",
+  "c_index_median",
+  "Median_CINDEX",
+  "MAD_CINDEX",
+  "time",
+  "event",
+  ".config_id",
+  ".pred",
+  "n_resamples",
+  "parameter_i"
 ))
 
 #' Compute Boruta algorithm
@@ -248,7 +258,7 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
 #'
 #' This function performs repeated stratified k-fold cross-validation on a dataset to train and tune hyperparameters for 13 machine learning methods. Optionally, it can also perform model stacking and Boruta-based feature selection. Performance is evaluated using user-specified metrics such as Accuracy, AUROC, or AUPRC.
 #'
-#' @param model A data frame containing features and a target column named 'target' corresponding to the response variable to predict.
+#' @param train_data A data frame containing features and a target column named 'target' corresponding to the response variable to predict.
 #' @param k_folds Integer. Number of folds for k-fold cross-validation. Default is 5.
 #' @param n_rep Integer. Number of repetitions of the k-fold cross-validation. Default is 100.
 #' @param stacking Logical. Whether to perform model stacking. Default is FALSE.
@@ -395,8 +405,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metri
     #If both are ON it can slower performance (lead to over-parallelization and CPU contention)
     trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = F, classProbs = TRUE, savePredictions=T)
 
-    #invisible(utils::capture.output({fit.xgbTree <- caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)}, type = "output"))
-    fit.xgbTree <- caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)
+    invisible(utils::capture.output({fit.xgbTree <- caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)}, type = "output"))
 
     parallel::stopCluster(cl)  # stop the cluster after parallel execution
     unregister_dopar() #Stop Dopar from running in the background
@@ -3401,6 +3410,10 @@ model_boruta_selection <- function(model,
 #'   in \code{data}. Default is \code{"target"}.
 #' @param cor_thresh A numeric value between 0 and 1 specifying the correlation
 #'   threshold for removing highly correlated features. Default is \code{0.9}.
+#' @param time_var A character string specifying the name of the time-to-event
+#'   column in \code{data}. Used only for survival analysis.
+#' @param event_var A character string specifying the name of the event indicator
+#'   column in \code{data} (e.g., 0/1). Used only for survival analysis.
 #'
 #' @details
 #' The preprocessing steps include:
@@ -3513,18 +3526,14 @@ preprocess_features <- function(data,
 #'
 #' @param train_data A data frame containing the full training dataset,
 #'   including predictors and the target variable.
-#' @param fold_data A list or object containing pre-constructed folds for
-#'   cross-validation, typically created by \code{fold_construction_fun}.
+#' @param optimized An object returned by \code{compute_custom_k_fold_CV}
+#'   containing the optimized hyperparameters and cross-validation results.
 #' @param ml_method A character string specifying the machine learning method
 #'   to be passed to \code{caret::train}.
 #' @param fold_construction_fun A function used to (re)construct training
 #'   data partitions given the best hyperparameters.
 #' @param fold_construction_args_fixed A named list of additional fixed arguments
 #'   to pass to \code{fold_construction_fun}.
-#' @param tuneGrid (optional) A data frame of hyperparameter values to evaluate.
-#'   If \code{NULL}, defaults are used.
-#' @param ncores (optional) Integer specifying the number of cores for parallel
-#'   processing during cross-validation. If \code{NULL}, defaults to serial execution.
 #'
 #' @details
 #' The workflow proceeds in the following steps:
@@ -3674,9 +3683,6 @@ wrapper_train_best_hyperparams_classification <- function(train_data, optimized,
 #'   \item{`custom_output`}{Additional data returned by the custom fold construction
 #'   function (e.g., CellTFusion outputs or parameter tables).}
 #' }
-#'
-#' @seealso [compute_k_fold_CV_survival()], [aggregate_results_survival()],
-#'   [compute_ml_survival()]
 #'
 #' @export
 #'
@@ -3841,7 +3847,6 @@ wrapper_train_best_hyperparams_survival <- function(train_data,
 #'   \item{`Resample_matrix`}{Fold-level metrics for the best configuration.}
 #' }
 #'
-#' @seealso [compute_k_fold_CV_survival()], [calculate_accuracy_kappa_resample()]
 #'
 #' @export
 #'
@@ -4191,6 +4196,7 @@ get_tune_grid = function(method, train_data){
 #'   sampled at each split in tree-based models.
 #' @param levels Integer specifying how many values to generate per hyperparameter.
 #'   Defaults to \code{5}. Must be at least 2.
+#' @param v Integer. Number of folds for K-fold cross-validation (default = 5).
 #'
 #' @return A named list of hyperparameter grids.
 #'   Each element is a numeric vector of sampled values for that parameter.
@@ -4553,9 +4559,6 @@ compute_ml_survival <- function(df_train, df_test,
 #'   \item{`C_index_median`}{Median C-index of the top-performing model.}
 #'   \item{`Custom_output`}{Optional list of custom outputs from fold construction.}
 #' }
-#'
-#' @seealso [aggregate_results()], [compute_cv_CINDEX()],
-#'   [wrapper_train_best_hyperparams_survival()]
 #'
 #' @export
 #'

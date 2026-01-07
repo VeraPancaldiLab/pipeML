@@ -16,6 +16,9 @@ wrapper_train_best_hyperparams_classification(
 \item{train_data}{A data frame containing the full training dataset,
 including predictors and the target variable.}
 
+\item{optimized}{An object returned by \code{compute_custom_k_fold_CV}
+containing the optimized hyperparameters and cross-validation results.}
+
 \item{ml_method}{A character string specifying the machine learning method
 to be passed to \code{caret::train}.}
 
@@ -24,15 +27,6 @@ data partitions given the best hyperparameters.}
 
 \item{fold_construction_args_fixed}{A named list of additional fixed arguments
 to pass to \code{fold_construction_fun}.}
-
-\item{fold_data}{A list or object containing pre-constructed folds for
-cross-validation, typically created by \code{fold_construction_fun}.}
-
-\item{tuneGrid}{(optional) A data frame of hyperparameter values to evaluate.
-If \code{NULL}, defaults are used.}
-
-\item{ncores}{(optional) Integer specifying the number of cores for parallel
-processing during cross-validation. If \code{NULL}, defaults to serial execution.}
 }
 \value{
 A list with the following components:

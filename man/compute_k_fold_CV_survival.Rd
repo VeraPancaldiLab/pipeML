@@ -96,7 +96,3 @@ When a custom fold construction function is provided via \code{fold_construction
 the function handles folds in parallel, saves intermediate results under
 \code{"Results/"}, and returns additional outputs for advanced integration.
 }
-\seealso{
-\code{\link[=aggregate_results]{aggregate_results()}}, \code{\link[=compute_cv_CINDEX]{compute_cv_CINDEX()}},
-\code{\link[=wrapper_train_best_hyperparams_survival]{wrapper_train_best_hyperparams_survival()}}
-}

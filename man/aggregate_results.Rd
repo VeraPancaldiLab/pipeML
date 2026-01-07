@@ -59,6 +59,3 @@ For \strong{survival} tasks:
 The function is compatible with results produced by
 \code{\link[=compute_k_fold_CV_survival]{compute_k_fold_CV_survival()}} and analogous classification CV pipelines.
 }
-\seealso{
-\code{\link[=compute_k_fold_CV_survival]{compute_k_fold_CV_survival()}}, \code{\link[=calculate_accuracy_kappa_resample]{calculate_accuracy_kappa_resample()}}
-}
