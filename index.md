@@ -23,7 +23,7 @@ integrates all essential steps — from preprocessing to feature
 selection, cross-validation, hyperparameter tuning, and model
 interpretation — into a single, consistent framework (Figure 1).
 
-![](reference/figures/MLpipeline.png?raw=true)
+![ML pipeline diagram](reference/figures/MLpipeline.png)
 
 *Figure 1. General structure of the `pipeML` machine learning pipeline.*
 

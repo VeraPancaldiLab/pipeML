@@ -9,7 +9,7 @@ hyperparameter.
 ## Usage
 
 ``` r
-get_default_hyperparams(model_name, train_x = NULL, levels = 5)
+get_default_hyperparams(model_name, train_x = NULL, levels = 5, v = 5)
 ```
 
 ## Arguments
@@ -46,6 +46,10 @@ get_default_hyperparams(model_name, train_x = NULL, levels = 5)
 
   Integer specifying how many values to generate per hyperparameter.
   Defaults to `5`. Must be at least 2.
+
+- v:
+
+  Integer. Number of folds for K-fold cross-validation (default = 5).
 
 ## Value
 

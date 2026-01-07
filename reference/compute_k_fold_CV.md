@@ -10,7 +10,7 @@ such as Accuracy, AUROC, or AUPRC.
 
 ``` r
 compute_k_fold_CV(
-  model,
+  train_data,
   k_folds,
   n_rep,
   stacking = FALSE,
@@ -27,7 +27,7 @@ compute_k_fold_CV(
 
 ## Arguments
 
-- model:
+- train_data:
 
   A data frame containing features and a target column named 'target'
   corresponding to the response variable to predict.

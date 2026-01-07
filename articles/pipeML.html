@@ -6,6 +6,11 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>pipeML • pipeML</title>
+<!-- favicons --><link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
+<link rel="icon" type="”image/svg+xml”" href="../favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<link rel="icon" sizes="any" href="../favicon.ico">
+<link rel="manifest" href="../site.webmanifest">
 <script src="../deps/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="../deps/bootstrap-5.3.1/bootstrap.min.css" rel="stylesheet">
 <script src="../deps/bootstrap-5.3.1/bootstrap.bundle.min.js"></script><link href="../deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
@@ -36,7 +41,6 @@
 <li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json">
 </form></li>
-<li class="nav-item"><a class="external-link nav-link" href="https://github.com/VeraPancaldiLab/pipeML/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul>
 </div>
 
@@ -52,14 +56,14 @@
       <img src="../logo.png" class="logo" alt=""><h1>pipeML</h1>
             
       
-      <small class="dont-index">Source: <a href="https://github.com/VeraPancaldiLab/pipeML/blob/main/vignettes/pipeML.Rmd" class="external-link"><code>vignettes/pipeML.Rmd</code></a></small>
+
       <div class="d-none name"><code>pipeML.Rmd</code></div>
     </div>
 
     
     
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/VeraPancaldiLab/pipeML" class="external-link">pipeML</a></span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://verapancaldilab.github.io/pipeML">pipeML</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/topepo/caret/" class="external-link">caret</a></span><span class="op">)</span></span>
 <span><span class="co">#&gt; Loading required package: ggplot2</span></span>
 <span><span class="co">#&gt; Loading required package: lattice</span></span>
@@ -155,12 +159,9 @@ cross-validation:</p>
 <span>                                    k_folds <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                    n_rep <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                    LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>                                    batch_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
 <span>                                    ncores <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>                                    return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Best ML model found:  XGboost </span></span>
-<span><span class="co">#&gt; Returning model trained</span></span></code></pre></div>
+<span>                                    return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 <p>Access the best-trained model:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span><span class="op">[[</span><span class="fl">1</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">Model</span></span></code></pre></div>
@@ -185,19 +186,12 @@ Figure 1. Models training performance.
 <span>                                    k_folds <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                    n_rep <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                    LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>                                    batch_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
 <span>                                    ncores <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>                                    return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Models chosen are: GLMNET, SVM_radial, XGboost </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Meta-learners ML model based on GLM</span></span></code></pre></div>
+<span>                                    return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 <p>Inspect the base models used in stacking:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">res</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">Base_models</span></span>
-<span><span class="co">#&gt; NULL</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">res</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">Base_models</span></span></code></pre></div>
 <p>Access the meta-learner:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">Meta_learner</span></span></code></pre></div>
@@ -242,7 +236,6 @@ can also be retrieved with the following function</p>
 <span>                                    k_folds <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                                    n_rep <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                                    LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>                                    batch_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
 <span>                                    ncores <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                    return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
@@ -273,7 +266,6 @@ Precision.</p>
 <span>                           k_folds <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                           n_rep <span class="op">=</span> <span class="fl">3</span>,</span>
 <span>                           LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>                           batch_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>                           file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
 <span>                           maximize <span class="op">=</span> <span class="st">"F1"</span>,</span>
 <span>                           return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
@@ -305,7 +297,7 @@ a flexible approach to perform Leave-One-Dataset-Out (LODO) analysis.
 This is achieved by applying k-fold stratified sampling across batches,
 ensuring that each fold preserves the batch structure while maintaining
 class balance. For this set <code>LODO = TRUE</code> and provided column
-name containing the batch information in the <code>batch_id</code>
+name containing the batch information in the <code>batch_var</code>
 variable</p>
 <p>Below, we demonstrate how to perform a LODO analysis using simulated
 datasets:</p>
@@ -350,8 +342,8 @@ datasets:</p>
 <span>  <span class="va">features_train</span> <span class="op">=</span> <span class="va">features_all</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">features_all</span><span class="op">)</span><span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">traitData_train</span><span class="op">)</span>,<span class="op">]</span></span>
 <span></span>
 <span>  <span class="co">#### ML Training</span></span>
-<span>  <span class="va">res</span> <span class="op">=</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span><span class="va">features_train</span>, </span>
-<span>                                     <span class="va">traitData_train</span><span class="op">$</span><span class="va">Response</span>, </span>
+<span>  <span class="va">res</span> <span class="op">=</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">features_train</span>, </span>
+<span>                                     target_var <span class="op">=</span> <span class="va">traitData_train</span><span class="op">$</span><span class="va">Response</span>, </span>
 <span>                                     task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
 <span>                                     trait.positive <span class="op">=</span> <span class="st">"R"</span>, </span>
 <span>                                     metric <span class="op">=</span> <span class="st">"AUROC"</span>, </span>
@@ -359,7 +351,7 @@ datasets:</p>
 <span>                                     k_folds <span class="op">=</span> <span class="fl">2</span>, </span>
 <span>                                     n_rep <span class="op">=</span> <span class="fl">3</span>, </span>
 <span>                                     LODO <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>                                     batch_id <span class="op">=</span> <span class="st">"Cohort"</span>, </span>
+<span>                                     batch_var <span class="op">=</span> <span class="va">traitData_train</span><span class="op">$</span><span class="va">Cohort</span>, </span>
 <span>                                     ncores <span class="op">=</span> <span class="fl">2</span>, </span>
 <span>                                     return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span>
 <span></span>
@@ -382,86 +374,7 @@ datasets:</p>
 <span>  <span class="va">prediction</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span> <span class="op">=</span> <span class="va">pred</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">prediction</span><span class="op">)</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">=</span> <span class="va">cohort</span></span>
 <span>  <span class="va">i</span> <span class="op">=</span> <span class="va">i</span> <span class="op">+</span> <span class="fl">1</span></span>
-<span><span class="op">}</span></span>
-<span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Models chosen are: CART, KNN, RIDGE </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Meta-learners ML model based on GLM</span></span>
-<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
-<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
-<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
-<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
-<span><span class="co">#&gt; Warning in compute_shap_values(ml_models[[base_models[i]]], train_data, :</span></span>
-<span><span class="co">#&gt; Trivial predictions were found in some resamples. SHAP values cannot be</span></span>
-<span><span class="co">#&gt; calculated</span></span>
-<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
-<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
-<span><span class="co">#&gt; Predicting target variable using provided ML model.................................................</span></span>
-<span><span class="co">#&gt; Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................</span></span>
-<span><span class="co">#&gt; Best threshold:  0.1561723 </span></span>
-<span><span class="co">#&gt; Accuracy:  60 </span></span>
-<span><span class="co">#&gt; Sensitivity:  100 </span></span>
-<span><span class="co">#&gt; Specificity:  7.692 </span></span>
-<span><span class="co">#&gt; F1 score:  73.913 </span></span>
-<span><span class="co">#&gt; MCC score:  21.235 </span></span>
-<span><span class="co">#&gt; Recall:  100 </span></span>
-<span><span class="co">#&gt; Precision:  58.621 </span></span>
-<span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Models chosen are: C50, KNN, RIDGE </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Meta-learners ML model based on GLM</span></span>
-<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
-<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
-<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
-<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): Trivial</span></span>
-<span><span class="co">#&gt; predictions were found in some resamples. SHAP values cannot be calculated</span></span>
-<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
-<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
-<span><span class="co">#&gt; Predicting target variable using provided ML model.................................................</span></span>
-<span><span class="co">#&gt; Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................</span></span>
-<span><span class="co">#&gt; Best threshold:  0.1080667 </span></span>
-<span><span class="co">#&gt; Accuracy:  63.333 </span></span>
-<span><span class="co">#&gt; Sensitivity:  100 </span></span>
-<span><span class="co">#&gt; Specificity:  0 </span></span>
-<span><span class="co">#&gt; F1 score:  77.551 </span></span>
-<span><span class="co">#&gt; MCC score:  0 </span></span>
-<span><span class="co">#&gt; Recall:  100 </span></span>
-<span><span class="co">#&gt; Precision:  63.333 </span></span>
-<span><span class="co">#&gt; Choosing base models for stacking.......................................</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Models chosen are: KNN, RIDGE, XGboost </span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Meta-learners ML model based on GLM</span></span>
-<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
-<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): Trivial</span></span>
-<span><span class="co">#&gt; predictions were found in some resamples. SHAP values cannot be calculated</span></span>
-<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
-<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
-<span><span class="co">#&gt; Computing SHAP values for feature importance...............................................................</span></span>
-<span><span class="co">#&gt; Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already</span></span>
-<span><span class="co">#&gt; exporting variable(s): trivial_predictions_found</span></span>
-<span><span class="co">#&gt; Predicting target variable using provided ML model.................................................</span></span>
-<span><span class="co">#&gt; Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................</span></span>
-<span><span class="co">#&gt; Best threshold:  0.4392626 </span></span>
-<span><span class="co">#&gt; Accuracy:  56.667 </span></span>
-<span><span class="co">#&gt; Sensitivity:  93.75 </span></span>
-<span><span class="co">#&gt; Specificity:  14.286 </span></span>
-<span><span class="co">#&gt; F1 score:  69.767 </span></span>
-<span><span class="co">#&gt; MCC score:  13.363 </span></span>
-<span><span class="co">#&gt; Recall:  93.75 </span></span>
-<span><span class="co">#&gt; Precision:  55.556</span></span></code></pre></div>
+<span><span class="op">}</span></span></code></pre></div>
 <p>For plotting we will make use of our <code>get_curves</code> function
 adapted in a case for multiple cohorts.</p>
 <div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
@@ -480,9 +393,7 @@ adapted in a case for multiple cohorts.</p>
 <span></span>
 <span><span class="fu"><a href="../reference/get_curves.html">get_curves</a></span><span class="op">(</span><span class="va">metrics</span>, <span class="st">"Specificity"</span>, <span class="st">"Sensitivity"</span>, </span>
 <span>           <span class="st">"Recall"</span>, <span class="st">"Precision"</span>, <span class="st">"Cohort"</span>, </span>
-<span>           <span class="va">metrics</span><span class="op">$</span><span class="va">AUROC</span>, <span class="va">metrics</span><span class="op">$</span><span class="va">AUPRC</span>, <span class="st">"Test"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; agg_png </span></span>
-<span><span class="co">#&gt;       2</span></span></code></pre></div>
+<span>           <span class="va">metrics</span><span class="op">$</span><span class="va">AUROC</span>, <span class="va">metrics</span><span class="op">$</span><span class="va">AUPRC</span>, <span class="st">"Test"</span><span class="op">)</span></span></code></pre></div>
 <div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">knitr</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/knitr/man/include_graphics.html" class="external-link">include_graphics</a></span><span class="op">(</span><span class="st">"figures/ROC.png"</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">

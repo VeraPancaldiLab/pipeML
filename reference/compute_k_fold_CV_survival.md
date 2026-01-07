@@ -140,9 +140,3 @@ When a custom fold construction function is provided via
 `fold_construction_fun`, the function handles folds in parallel, saves
 intermediate results under `"Results/"`, and returns additional outputs
 for advanced integration.
-
-## See also
-
-[`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md),
-[`compute_cv_CINDEX()`](https://verapancaldilab.github.io/pipeML/reference/compute_cv_CINDEX.md),
-[`wrapper_train_best_hyperparams_survival()`](https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_survival.md)

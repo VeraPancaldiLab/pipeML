@@ -25,6 +25,11 @@ wrapper_train_best_hyperparams_classification(
   A data frame containing the full training dataset, including
   predictors and the target variable.
 
+- optimized:
+
+  An object returned by `compute_custom_k_fold_CV` containing the
+  optimized hyperparameters and cross-validation results.
+
 - ml_method:
 
   A character string specifying the machine learning method to be passed
@@ -39,22 +44,6 @@ wrapper_train_best_hyperparams_classification(
 
   A named list of additional fixed arguments to pass to
   `fold_construction_fun`.
-
-- fold_data:
-
-  A list or object containing pre-constructed folds for
-  cross-validation, typically created by `fold_construction_fun`.
-
-- tuneGrid:
-
-  (optional) A data frame of hyperparameter values to evaluate. If
-  `NULL`, defaults are used.
-
-- ncores:
-
-  (optional) Integer specifying the number of cores for parallel
-  processing during cross-validation. If `NULL`, defaults to serial
-  execution.
 
 ## Value
 

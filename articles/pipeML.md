@@ -110,12 +110,9 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     k_folds = 2,
                                     n_rep = 2,
                                     LODO = FALSE,
-                                    batch_id = NULL,
                                     file_name = "Test",
                                     ncores = 2,
                                     return = FALSE)
-#> Best ML model found:  XGboost 
-#> Returning model trained
 ```
 
 Access the best-trained model:
@@ -150,22 +147,15 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     k_folds = 2,
                                     n_rep = 2,
                                     LODO = FALSE,
-                                    batch_id = NULL,
                                     file_name = "Test",
                                     ncores = 2,
                                     return = FALSE)
-#> Choosing base models for stacking.......................................
-#> 
-#> Models chosen are: GLMNET, SVM_radial, XGboost 
-#> 
-#> Meta-learners ML model based on GLM
 ```
 
 Inspect the base models used in stacking:
 
 ``` r
 res$Model$Base_models
-#> NULL
 ```
 
 Access the meta-learner:
@@ -220,7 +210,6 @@ res <- compute_features.training.ML(features_train = deconvolution,
                                     k_folds = 3,
                                     n_rep = 3,
                                     LODO = FALSE,
-                                    batch_id = NULL,
                                     file_name = "Test",
                                     ncores = 2,
                                     return = FALSE)
@@ -249,7 +238,6 @@ res <- compute_features.ML(features_train = data_train,
                            k_folds = 3,
                            n_rep = 3,
                            LODO = FALSE,
-                           batch_id = NULL,
                            file_name = "Test",
                            maximize = "F1",
                            return = FALSE)
@@ -290,7 +278,7 @@ flexible approach to perform Leave-One-Dataset-Out (LODO) analysis. This
 is achieved by applying k-fold stratified sampling across batches,
 ensuring that each fold preserves the batch structure while maintaining
 class balance. For this set `LODO = TRUE` and provided column name
-containing the batch information in the `batch_id` variable
+containing the batch information in the `batch_var` variable
 
 Below, we demonstrate how to perform a LODO analysis using simulated
 datasets:
@@ -340,8 +328,8 @@ for (cohort in unique(traitData$Cohort)) {
   features_train = features_all[rownames(features_all)%in%rownames(traitData_train),]
 
   #### ML Training
-  res = compute_features.training.ML(features_train, 
-                                     traitData_train$Response, 
+  res = compute_features.training.ML(features_train = features_train, 
+                                     target_var = traitData_train$Response, 
                                      task_type = "classification",
                                      trait.positive = "R", 
                                      metric = "AUROC", 
@@ -349,7 +337,7 @@ for (cohort in unique(traitData$Cohort)) {
                                      k_folds = 2, 
                                      n_rep = 3, 
                                      LODO = TRUE,
-                                     batch_id = "Cohort", 
+                                     batch_var = traitData_train$Cohort, 
                                      ncores = 2, 
                                      return = F)
 
@@ -373,85 +361,6 @@ for (cohort in unique(traitData$Cohort)) {
   names(prediction)[i] = cohort
   i = i + 1
 }
-#> Choosing base models for stacking.......................................
-#> 
-#> Models chosen are: CART, KNN, RIDGE 
-#> 
-#> Meta-learners ML model based on GLM
-#> Computing SHAP values for feature importance...............................................................
-#> Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already
-#> exporting variable(s): trivial_predictions_found
-#> Computing SHAP values for feature importance...............................................................
-#> Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already
-#> exporting variable(s): trivial_predictions_found
-#> Warning in compute_shap_values(ml_models[[base_models[i]]], train_data, :
-#> Trivial predictions were found in some resamples. SHAP values cannot be
-#> calculated
-#> Computing SHAP values for feature importance...............................................................
-#> Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already
-#> exporting variable(s): trivial_predictions_found
-#> Predicting target variable using provided ML model.................................................
-#> Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................
-#> Best threshold:  0.1561723 
-#> Accuracy:  60 
-#> Sensitivity:  100 
-#> Specificity:  7.692 
-#> F1 score:  73.913 
-#> MCC score:  21.235 
-#> Recall:  100 
-#> Precision:  58.621 
-#> Choosing base models for stacking.......................................
-#> 
-#> Models chosen are: C50, KNN, RIDGE 
-#> 
-#> Meta-learners ML model based on GLM
-#> Computing SHAP values for feature importance...............................................................
-#> Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already
-#> exporting variable(s): trivial_predictions_found
-#> Computing SHAP values for feature importance...............................................................
-#> Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already
-#> exporting variable(s): trivial_predictions_found
-#> Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): Trivial
-#> predictions were found in some resamples. SHAP values cannot be calculated
-#> Computing SHAP values for feature importance...............................................................
-#> Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already
-#> exporting variable(s): trivial_predictions_found
-#> Predicting target variable using provided ML model.................................................
-#> Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................
-#> Best threshold:  0.1080667 
-#> Accuracy:  63.333 
-#> Sensitivity:  100 
-#> Specificity:  0 
-#> F1 score:  77.551 
-#> MCC score:  0 
-#> Recall:  100 
-#> Precision:  63.333 
-#> Choosing base models for stacking.......................................
-#> 
-#> Models chosen are: KNN, RIDGE, XGboost 
-#> 
-#> Meta-learners ML model based on GLM
-#> Computing SHAP values for feature importance...............................................................
-#> Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already
-#> exporting variable(s): trivial_predictions_found
-#> Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): Trivial
-#> predictions were found in some resamples. SHAP values cannot be calculated
-#> Computing SHAP values for feature importance...............................................................
-#> Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already
-#> exporting variable(s): trivial_predictions_found
-#> Computing SHAP values for feature importance...............................................................
-#> Warning in e$fun(obj, substitute(ex), parent.frame(), e$data): already
-#> exporting variable(s): trivial_predictions_found
-#> Predicting target variable using provided ML model.................................................
-#> Choosing the threshold that maximizes Accuracy for calculating the confusion matrix...................................................
-#> Best threshold:  0.4392626 
-#> Accuracy:  56.667 
-#> Sensitivity:  93.75 
-#> Specificity:  14.286 
-#> F1 score:  69.767 
-#> MCC score:  13.363 
-#> Recall:  93.75 
-#> Precision:  55.556
 ```
 
 For plotting we will make use of our `get_curves` function adapted in a
@@ -474,8 +383,6 @@ metrics$Cohort = as.factor(metrics$Cohort)
 get_curves(metrics, "Specificity", "Sensitivity", 
            "Recall", "Precision", "Cohort", 
            metrics$AUROC, metrics$AUPRC, "Test")
-#> agg_png 
-#>       2
 ```
 
 ``` r

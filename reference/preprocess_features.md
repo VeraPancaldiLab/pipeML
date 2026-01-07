@@ -28,6 +28,16 @@ preprocess_features(
   A character string specifying the name of the target column in `data`.
   Default is `"target"`.
 
+- time_var:
+
+  A character string specifying the name of the time-to-event column in
+  `data`. Used only for survival analysis.
+
+- event_var:
+
+  A character string specifying the name of the event indicator column
+  in `data` (e.g., 0/1). Used only for survival analysis.
+
 - cor_thresh:
 
   A numeric value between 0 and 1 specifying the correlation threshold

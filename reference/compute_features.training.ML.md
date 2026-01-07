@@ -26,7 +26,7 @@ compute_features.training.ML(
   k_folds = 10,
   n_rep = 5,
   LODO = FALSE,
-  batch_id = NULL,
+  batch_var = NULL,
   file_name = NULL,
   ncores = NULL,
   return = FALSE,
@@ -99,10 +99,10 @@ compute_features.training.ML(
   Logical. If `TRUE`, constructs cross-validation folds stratified by
   cohort (Leave-One-Dataset-Out scheme).
 
-- batch_id:
+- batch_var:
 
-  Character. Column name indicating cohort or batch membership for each
-  sample. Required if `LODO = TRUE`.
+  Character. Batch membership for each sample. Required if
+  `LODO = TRUE`.
 
 - file_name:
 

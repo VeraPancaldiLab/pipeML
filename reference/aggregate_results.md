@@ -79,8 +79,3 @@ For **survival** tasks:
 The function is compatible with results produced by
 [`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md)
 and analogous classification CV pipelines.
-
-## See also
-
-[`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md),
-`calculate_accuracy_kappa_resample()`

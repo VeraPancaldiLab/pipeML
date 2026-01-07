@@ -3,7 +3,7 @@ pkgdown: 2.2.0
 pkgdown_sha: ~
 articles:
   pipeML: pipeML.html
-last_built: 2025-12-02T13:13Z
+last_built: 2026-01-07T15:53Z
 urls:
   reference: https://verapancaldilab.github.io/pipeML/reference
   article: https://verapancaldilab.github.io/pipeML/articles
