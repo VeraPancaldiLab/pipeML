@@ -30,11 +30,10 @@ selection, cross-validation, hyperparameter tuning, and model
 interpretation — into a single, consistent framework (Figure 1).
 
 <p align="center">
-<img src="man/figures/MLpipeline.png?raw=true" />
+  <img src="man/figures/MLpipeline.png" alt="ML pipeline diagram" />
 </p>
 <p align="center">
-<i> Figure 1. General structure of the `pipeML` machine learning
-pipeline. </i>
+  <i>Figure 1. General structure of the `pipeML` machine learning pipeline.</i>
 </p>
 
 ## Key Features
