@@ -1768,7 +1768,9 @@ compute_features.ML <- function(features_train, features_test, clinical,
       df_outcome  = df_outcome,
       outcome_col = "time",
       event_col   = "event",
-      ml_options  = list(nb_folds = k_folds, nb_repeats = n_rep, ncores = ncores),
+      k_folds = k_folds,
+      n_rep = n_rep,
+      ncores = ncores,
       file_name   = file_name
     )
 
