@@ -84,7 +84,7 @@ res_boruta <- feature.selection.boruta(
 ## **Train Machine Learning models**
 
 Train and tune models using repeated stratified k-fold cross-validation:
-```{r}
+```{r, eval = FALSE}
 deconvolution = pipeML::deconvolution
 traitData = pipeML::traitData
 res <- compute_features.training.ML(features_train = deconvolution, 
@@ -116,7 +116,7 @@ knitr::include_graphics("figures/Training.png")
 ```
 
 To apply model stacking, set `stack = TRUE`:
-```{r}
+```{r, eval = FALSE}
 res <- compute_features.training.ML(features_train = deconvolution, 
                                     target_var = traitData$Best.Confirmed.Overall.Response,
                                     task_type = "classification",
@@ -132,7 +132,7 @@ res <- compute_features.training.ML(features_train = deconvolution,
 ```
 
 Inspect the base models used in stacking:
-```{r}
+```{r, eval = FALSE}
 res$Model$Base_models
 ```
 
@@ -273,8 +273,8 @@ for (cohort in unique(traitData$Cohort)) {
   features_train = features_all[rownames(features_all)%in%rownames(traitData_train),]
 
   #### ML Training
-  res = compute_features.training.ML(features_train, 
-                                     traitData_train$Response, 
+  res = compute_features.training.ML(features_train = features_train, 
+                                     target_var = traitData_train$Response, 
                                      task_type = "classification",
                                      trait.positive = "R", 
                                      metric = "AUROC", 
@@ -282,7 +282,7 @@ for (cohort in unique(traitData$Cohort)) {
                                      k_folds = 2, 
                                      n_rep = 3, 
                                      LODO = TRUE,
-                                     batch_var = "Cohort", 
+                                     batch_var = traitData_train$Cohort, 
                                      ncores = 2, 
                                      return = F)
 
