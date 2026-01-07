@@ -255,7 +255,7 @@ colnames(features_all) <- paste0("Feature", 1:15)
 ```
 
 Perform LODO analysis
-```{r}
+```{r, eval = FALSE}
 prediction = list()
 i = 1
 for (cohort in unique(traitData$Cohort)) {
@@ -309,7 +309,7 @@ for (cohort in unique(traitData$Cohort)) {
 ```
 
 For plotting we will make use of our `get_curves` function adapted in a case for multiple cohorts.
-```{r}
+```{r, eval = FALSE}
 metrics = list()
 auroc = c() 
 auprc = c()
