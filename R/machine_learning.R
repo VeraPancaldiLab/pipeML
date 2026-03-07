@@ -1473,7 +1473,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #'
 #' @export
 compute_features.training.ML = function(features_train, task_type = c("classification", "survival"), target_var = NULL, trait.positive = NULL,
-                                        time_var = NULL, event_var = NULL, metric = "Accuracy", stack, k_folds = 10, n_rep = 5, LODO = FALSE,
+                                        time_var = NULL, event_var = NULL, metric = NULL, stack = FALSE, k_folds = 10, n_rep = 5, LODO = FALSE,
                                         batch_var = NULL, file_name = NULL, ncores = NULL, return = FALSE,
                                         fold_construction_fun = NULL, fold_construction_args_fixed = NULL, fold_construction_args_tunable = NULL){
 
@@ -1483,14 +1483,19 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 
   if (task_type == "classification") {
     if (is.null(target_var) || is.null(trait.positive)) {
-      stop("For classification, both `target_var` and `trait.positive` must be provided.")
+      stop("For classification, both `target_var` and `trait.positive` must be provided.\n")
     }
   } else if (task_type == "survival") {
     if (is.null(time_var) || is.null(event_var)) {
-      stop("For survival, both `time_var` and `event_var` must be provided.")
+      stop("For survival, both `time_var` and `event_var` must be provided.\n")
     }
+
+    if (!is.null(metric)) {
+      warning("`metric` was set, but the task is survival. The metric argument will be ignored.\n")
+    }
+
   } else {
-    stop("Invalid task_type. Must be either 'classification' or 'survival'.")
+    stop("Invalid task_type. Must be either 'classification' or 'survival'.\n")
   }
 
   # ---------------------------------------------------------------------------
@@ -2081,16 +2086,16 @@ compute_cv_accuracy = function(models, file_name = NULL, base_models = FALSE, re
   if(return){
     grDevices::pdf(paste0("Results/Accuracy_CV_methods_", file_name, ".pdf"), width = 10)
 
-    plot(ggplot2::ggplot(res_accuracy, ggplot2::aes(x = model, y = Mean_Accuracy, fill = model)) +
-      ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6) +
-      ggplot2::geom_errorbar(ggplot2::aes(ymin = Mean_Accuracy - MAD_Accuracy, ymax = Mean_Accuracy + MAD_Accuracy),
-                    width = 0.2, position = position_dodge(0.6)) +
-      ggplot2::labs(title = "Performance of Models",
-           x = "Model",
-           y = "Median Accuracy") +
-      ggplot2::theme_minimal() +
-      ggplot2::theme(legend.position = "none") +
-      ggplot2::scale_y_continuous(breaks = seq(0, 1, by = 0.05)))
+    plot(ggplot2::ggplot(res_accuracy, ggplot2::aes(x = model, y = Mean_Accuracy)) +
+           ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6, fill = "#1f78b4") + # professional blue
+           ggplot2::geom_errorbar(ggplot2::aes(ymin = Mean_Accuracy - MAD_Accuracy, ymax = Mean_Accuracy + MAD_Accuracy),
+                                  width = 0.2, position = position_dodge(0.6)) +
+           ggplot2::labs(title = "Performance of Models",
+                         x = "Model",
+                         y = "Median Accuracy") +
+           ggplot2::theme_minimal() +
+           ggplot2::theme(legend.position = "none") +
+           ggplot2::scale_y_continuous(breaks = seq(0, 1, by = 0.05)))
 
     grDevices::dev.off()
   }
@@ -2181,26 +2186,26 @@ compute_cv_AUC = function(models, file_name = NULL, base_models = FALSE, AUC_typ
 
   if(return){
     grDevices::pdf(paste0("Results/AUROC_CV_methods_", file_name, ".pdf"), width = 10)
-    plot(ggplot2::ggplot(res_auroc, ggplot2::aes(x = model, y = Mean_AUROC, fill = model)) +
-           ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6) +
+    plot(ggplot2::ggplot(res_auroc, ggplot2::aes(x = model, y = Mean_AUROC)) +
+           ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6, fill = "#1f78b4") + # professional blue
            ggplot2::geom_errorbar(aes(ymin = Mean_AUROC - MAD_AUROC, ymax = Mean_AUROC + MAD_AUROC),
-                         width = 0.2, position = position_dodge(0.6)) +
+                                  width = 0.2, position = position_dodge(0.6)) +
            ggplot2::labs(title = "Performance of Models",
-                x = "Model",
-                y = "Median AUROC") +
+                         x = "Model",
+                         y = "Median AUROC") +
            ggplot2::theme_minimal() +
            ggplot2::theme(legend.position = "none") +
            ggplot2::scale_y_continuous(breaks = seq(0, 1, by = 0.05)))
     grDevices::dev.off()
 
     grDevices::pdf(paste0("Results/AUPRC_CV_methods_", file_name, ".pdf"), width = 10)
-    plot(ggplot2::ggplot(res_auprc, ggplot2::aes(x = model, y = Mean_AUPRC, fill = model)) +
-           ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6) +
+    plot(ggplot2::ggplot(res_auprc, ggplot2::aes(x = model, y = Mean_AUPRC)) +
+           ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6, fill = "#1f78b4") + # same professional blue
            ggplot2::geom_errorbar(aes(ymin = Mean_AUPRC - MAD_AUPRC, ymax = Mean_AUPRC + MAD_AUPRC),
-                         width = 0.2, position = ggplot2::position_dodge(0.6)) +
+                                  width = 0.2, position = ggplot2::position_dodge(0.6)) +
            ggplot2::labs(title = "Performance of Models",
-                x = "Model",
-                y = "Median AUPRC") +
+                         x = "Model",
+                         y = "Median AUPRC") +
            ggplot2::theme_minimal() +
            ggplot2::theme(legend.position = "none") +
            ggplot2::scale_y_continuous(breaks = seq(0, 1, by = 0.05)))
@@ -2644,7 +2649,7 @@ calculate_feature_importance_stacking = function(base_importance, base_models, m
 #' @import reshape2
 #' @import grDevices
 #' @export
-compute_prediction = function(model, test_data, target_var, trait.positive, stack = FALSE, file.name = NULL, maximize = "Accuracy", return = F){
+compute_prediction = function(model, test_data, target_var, trait.positive, stack = FALSE, file.name = NULL, maximize = "Accuracy", bootstrap = T, return = F){
 
   target = as.factor(ifelse(target_var == trait.positive, 'yes', 'no'))
   target <- factor(target, levels = c("no", "yes"))  # Order (just in case) to ensure positive class is not well defined
@@ -2690,6 +2695,18 @@ compute_prediction = function(model, test_data, target_var, trait.positive, stac
   auroc = calculate_auroc(sens_spec$fpr, sens_spec$Sensitivity)
   auprc = calculate_auprc(sens_spec$Recall, sens_spec$Precision)
 
+  #Bootstrap confidence intervals
+  if(bootstrap){
+    boot_auc <- bootstrap_auc(
+      predict = predict,
+      target = target,
+      method = method,
+      B = 1000
+    )
+  } else {
+    boot_auc <- NULL
+  }
+
   ## Calculate confusion matrix based on best threshold
   cat("Choosing the threshold that maximizes", maximize ,"for calculating the confusion matrix...................................................\n")
   max_ind = which.max(sens_spec[,maximize])
@@ -2724,7 +2741,17 @@ compute_prediction = function(model, test_data, target_var, trait.positive, stac
     grDevices::dev.off()
   }
 
-  return(list(Metrics = sens_spec, AUC = list("AUROC" = auroc, "AUPRC" = auprc), Predictions = predict))
+  return(list(
+    Metrics = sens_spec,
+    AUC = list(
+      AUROC = auroc,
+      AUPRC = auprc,
+      Bootstrap = boot_auc
+    ),
+    Predictions = predict
+  ))
+
+  return(list(Metrics = sens_spec, AUC = list("AUROC" = auroc, "AUPRC" = auprc, "Bootstrap" = boot_auc), Predictions = predict))
 
 }
 
@@ -2867,23 +2894,103 @@ get_curves = function(data, spec, sens, reca, prec, color, auc_roc, auc_prc, fil
                   precision = data[,prec],
                   color = data[,color])
 
+  ## ---- Handle AUROC input (scalar OR CI) ----
+  if(is.list(auc_roc)){
+    auc_roc_mean  <- auc_roc$mean
+    auc_roc_lower <- auc_roc$lower
+    auc_roc_upper <- auc_roc$upper
+  } else {
+    auc_roc_mean  <- auc_roc
+    auc_roc_lower <- NA
+    auc_roc_upper <- NA
+  }
+
+  ## ---- Handle AUPRC input ----
+  if(is.list(auc_prc)){
+    auc_prc_mean  <- auc_prc$mean
+    auc_prc_lower <- auc_prc$lower
+    auc_prc_upper <- auc_prc$upper
+  } else {
+    auc_prc_mean  <- auc_prc
+    auc_prc_lower <- NA
+    auc_prc_upper <- NA
+  }
+
   #Add AUC scores to data frame
-  data$color.roc <- paste(data$color, "\n(AUC-ROC =", round(auc_roc, 2), ")\n")
+  data$color.roc <- paste(
+    data$color,
+    "\n(AUC-ROC =",
+    round(auc_roc_mean, 2),
+    if(!is.na(auc_roc_lower))
+      paste0(" [", round(auc_roc_lower,2), "-", round(auc_roc_upper,2), "]")
+    else "",
+    ")\n"
+  )
 
   # Plot the ROC curves
-  roc = ggplot2::ggplot(data = data, ggplot2::aes(x = 1- specificity, y = sensitivity, color = color.roc)) +
-    ggplot2::geom_line() +
+  roc = ggplot2::ggplot(
+    data = data,
+    ggplot2::aes(x = 1 - specificity, y = sensitivity, color = color.roc)
+  ) +
+    ggplot2::geom_line()
+
+  ## ---- Add shadow if CI exists ----
+  if(!is.na(auc_roc_lower)){
+    delta <- auc_roc_upper - auc_roc_mean
+
+    roc = roc +
+      ggplot2::geom_ribbon(
+        ggplot2::aes(
+          ymin = pmax(sensitivity - delta, 0),
+          ymax = pmin(sensitivity + delta, 1)
+        ),
+        inherit.aes = TRUE,
+        alpha = 0.2,
+        color = NA
+      )
+  }
+
+  roc = roc +
     ggplot2::geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey") +
     ggplot2::labs(title = "ROC Curve", x = "1 - Specificity", y = "Sensitivity") +
     ggplot2::theme_minimal() +
     ggplot2::theme(legend.title = ggplot2::element_blank())
 
-  #Add AUC scores to data frame
-  data$color.prc <- paste(data$color, "\n(AUC-PRC =", round(auc_prc, 2), ")\n")
-
   # Plot recall curves
-  recall = ggplot2::ggplot(data = data, aes(x = recall, y = precision, color = color.prc)) +
-    ggplot2::geom_line() +
+  data$color.prc <- paste(
+    data$color,
+    "\n(AUC-PRC =",
+    round(auc_prc_mean, 2),
+    if(!is.na(auc_prc_lower))
+      paste0(" [", round(auc_prc_lower,2), "-", round(auc_prc_upper,2), "]")
+    else "",
+    ")\n"
+  )
+
+  ## ---- PR curve ----
+  recall_plot = ggplot2::ggplot(
+    data = data,
+    ggplot2::aes(x = recall, y = precision, color = color.prc)
+  ) +
+    ggplot2::geom_line()
+
+  ## ---- Add shadow if CI exists ----
+  if(!is.na(auc_prc_lower)){
+    delta <- auc_prc_upper - auc_prc_mean
+
+    recall_plot = recall_plot +
+      ggplot2::geom_ribbon(
+        ggplot2::aes(
+          ymin = pmax(precision - delta, 0),
+          ymax = pmin(precision + delta, 1)
+        ),
+        inherit.aes = TRUE,
+        alpha = 0.2,
+        color = NA
+      )
+  }
+
+  recall_plot = recall_plot +
     ggplot2::labs(title = "Precision-Recall Curve", x = "Recall", y = "Precision") +
     ggplot2::ylim(0, 1) +
     ggplot2::theme_minimal() +
@@ -2894,7 +3001,7 @@ get_curves = function(data, spec, sens, reca, prec, color, auc_roc, auc_prc, fil
   grDevices::dev.off()
 
   grDevices::pdf(paste0("Results/Recall_curve_", file.name, ".pdf"))
-  print(recall)
+  print(recall_plot)
   grDevices::dev.off()
 
 }
@@ -3131,96 +3238,163 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 }
 
 
-compute_shap_values <- function(model_trained, data_train, method, n_cores = 2) {
+compute_shap_values <- function(model_trained, data_train, task_type = "classification", target_col = NULL,
+                                time_col = NULL, event_col = NULL, n_cores = 2, file.name = NULL) {
+
+  if(task_type == "classification"){
+    if(is.null(target_col)) stop("target_col must be provided for classification tasks")
+    data_train = data_train %>%
+      dplyr::mutate(target = factor(data_train[[target_col]], levels = c("0", "1"), labels = c("no", "yes")))
+
+    X = data_train %>%
+      dplyr::select(-dplyr::all_of(target_col))
+
+    pred_fun = function(object, newdata){
+      predict(object, newdata, type = "prob")[,yes]
+    }
+
+    # Determine resamples from the model object
+    resamples <- unique(model_trained$pred$Resample)
+
+    # Extract ML model
+    method = model_trained$method
+
+  }else if(task_type == "survival"){
+    if(is.null(time_col) || is.null(event_col)) stop("time_col and event_col must be provided for survival tasks")
+    X = data_train %>%
+      dplyr::select(-dplyr::all_of(c(time_col, event_col)))
+
+    # Determine resamples from the model object
+    resamples <- unique(model_trained$Resample_matrix$Resample)
+
+    # Extract ML model
+    method = unique(model_trained$Resample_matrix$model)
+
+    pred_fun <- function(object, newdata){
+
+      preds <- tryCatch({
+
+        # Try linear predictor first
+        stats::predict(object, newdata, type = "linear_pred")
+
+      }, error = function(e1){
+
+          # Try predicted survival time: we invert to be large prediction = high risk!!
+          -as.numeric(stats::predict(object, newdata, type = "time")$.pred_time)
+
+      })
+
+      return(as.numeric(preds))
+    }
+
+  }
+
   gc() #clean memory before start
 
-  cat("Computing SHAP values for feature importance...............................................................\n\n")
+  cat("Computing SHAP values...\n\n")
 
   # Get tuned hyperparameters
   filter_conditions <- model_trained$bestTune[1, , drop = FALSE]
 
   # Filter predictions for best tune
-  if (any(filter_conditions != "none")) {
-    for (col in names(filter_conditions)) {
-      model_trained$pred <- model_trained$pred[model_trained$pred[[col]] == filter_conditions[[col]], ]
-    }
-  }
-
-  resamples <- unique(model_trained$pred$Resample)
+  # if (any(filter_conditions != "none")) {
+  #   for (col in names(filter_conditions)) {
+  #     model_trained$pred <- model_trained$pred[model_trained$pred[[col]] == filter_conditions[[col]], ]
+  #   }
+  # }
 
   # Register parallel backend
   cl <- parallel::makeCluster(n_cores)
   doParallel::registerDoParallel(cl)
 
-  # Flag to track trivial predictions
-  trivial_predictions_found <- FALSE
+  importance_list <- foreach::foreach(resample = resamples, .packages = c("dplyr", "caret", "censored")) %dopar% {
 
-  importance_list <- foreach::foreach(resample = resamples, .export = c('trivial_predictions_found')) %dopar% {
+      source("~/Documents/pipeML/R/machine_learning.R")
 
-    if (trivial_predictions_found) {
-      return(NULL)  # Skip further iterations if trivial predictions were found in any previous resample
-    }
+      if(task_type == "classification"){
 
-    tryCatch({
-      library(pipeML)
-      test_index <- model_trained$pred %>%
-        dplyr::filter(Resample == resample) %>%
-        dplyr::pull(rowIndex)
+        test_index <- model_trained$pred %>%
+          dplyr::filter(Resample == resample) %>%
+          dplyr::pull(rowIndex)
 
-      train_data_fold <- data_train[-test_index, ]
-      test_data_fold  <- data_train[test_index, ]
+        train_data_fold <- data_train[-test_index, ]
+        test_data_fold  <- data_train[test_index, ]
 
-      fit <- if (any(filter_conditions != "none")) {
-        caret::train(
-          target ~ .,
-          data = train_data_fold,
-          method = method,
-          trControl = caret::trainControl(method = "none", classProbs = TRUE),
-          tuneGrid = filter_conditions,
-          metric = "Accuracy"
-        )
-      } else {
-        caret::train(
-          target ~ .,
-          data = train_data_fold,
-          method = method,
-          trControl = caret::trainControl(method = "none", classProbs = TRUE),
-          metric = "Accuracy"
-        )
+        fit <- if (any(filter_conditions != "none")) {
+
+          caret::train(
+            target ~ .,
+            data = train_data_fold,
+            method = method,
+            trControl = caret::trainControl(method = "none", classProbs = TRUE),
+            tuneGrid = filter_conditions,
+            metric = "Accuracy"
+          )
+
+        } else {
+          caret::train(
+            target ~ .,
+            data = train_data_fold,
+            method = method,
+            trControl = caret::trainControl(method = "none", classProbs = TRUE),
+            metric = "Accuracy"
+          )
+        }
+
+        # Separating features from target
+        X_train <- train_data_fold[, setdiff(names(train_data_fold), "target")]
+        X_test  <- test_data_fold[, setdiff(names(test_data_fold), "target")]
+
+        pred_probs <- pred_fun(fit, X_test)
+
+      }else if(task_type == "survival"){
+
+        test_index <- model_trained$Resample_matrix %>%
+          dplyr::filter(Resample == resample) %>%
+          dplyr::pull(rowIndex)
+
+        train_data_fold <- data_train[-test_index, ]
+        test_data_fold  <- data_train[test_index, ]
+
+        res = compute_ml_survival(train_data_fold, test_data_fold, outcome_col = time_col,
+                                  event_col = event_col, model = method,
+                                  models_hyperparameters = if (is.null(filter_conditions)) NULL else
+                                    list(filter_conditions),
+                                  return_model = T)
+
+        fit = res$Model
+
+        # Separating features from target
+        X_test <- test_data_fold %>% select(-all_of(c(time_col, event_col)))
+        X_train <- train_data_fold %>% select(-all_of(c(time_col, event_col)))
+
+        pred_probs = res$Metrics$predictions
       }
 
-      X_test <- test_data_fold[, setdiff(colnames(test_data_fold), "target")]
 
-      # Get predicted probabilities
-      pred_probs <- stats::predict(fit, newdata = X_test, type = "prob")
 
       # Check for trivial predictions (same for all "yes"/"no")
-      if (length(unique(round(pred_probs[, 2], 5))) > 1) {
+      if (length(unique(round(pred_probs, 5))) > 1) { ## equal prob in all the samples
         # If predictions are not trivial, compute SHAP values
-        shap_values <- kernelshap::kernelshap(
-          fit,
-          X = X_test,
-          bg_X = train_data_fold[, setdiff(colnames(train_data_fold), "target")],
-          exact = F,
-          type = "prob",
-          parallel = F
+        shap_values <- fastshap::explain(
+          object = fit,
+          X = X_train,
+          pred_wrapper = pred_fun,
+          newdata = X_test,
+          nsim = 1000,
+          adjust = TRUE
         )
 
-        # Return importance dataframe for positive class ("yes")
-        shap_values$S$yes %>%
-          data.frame() %>%
-          dplyr::mutate(Samples = rownames(X_test))
+        shap_values <- as.data.frame(shap_values)
+        shap_values$Samples <- rownames(X_test)
+
+        shap_values
 
       } else {
-        # Set the flag for trivial predictions found
-        trivial_predictions_found = TRUE
-        stop("Error on SHAP: model predictions are constant!")  # Stop further computation for this worker
+        message("Skipping resample ", resample, " (constant predictions)")
+        NULL
       }
-    }, error = function(e) {
-      # Handle any errors here and print them to help with debugging
-      message("Error encountered in resample: ", resample, " - ", e$message)
-      return(NULL)  # Return NULL in case of an error, so the loop continues
-    })
+
   }
 
   # Stop the cluster after parallel execution
@@ -3229,71 +3403,78 @@ compute_shap_values <- function(model_trained, data_train, method, n_cores = 2) 
 
   gc()
 
+  importance_list = importance_list[!sapply(importance_list, is.null)]
+
   # Check if trivial predictions were found
-  if (any(sapply(importance_list, is.null))) {
+  if (length(importance_list)==0) {
     warning("Trivial predictions were found in some resamples. SHAP values cannot be calculated")
     return(NULL)
   }
 
   # Combine and summarize importance results
-  importance_df <- do.call(rbind, importance_list) %>%
-    dplyr::group_by(Samples) %>%
-    dplyr::summarise(dplyr::across(dplyr::where(is.numeric), mean), .groups = "drop") %>%
-    dplyr::arrange(match(Samples, rownames(data_train))) %>%
-    tibble::column_to_rownames("Samples")
+  shap_df <- dplyr::bind_rows(importance_list)
 
-  return(importance_df)
+  plot_shap_stability(shap_df, file.name = file.name)
+
+  shap_df <- shap_df %>%
+    dplyr::group_by(Samples) %>%
+    dplyr::summarise(
+      dplyr::across(where(is.numeric), \(x) median(x, na.rm = TRUE)),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(match(Samples, rownames(data_train))) %>%
+    data.frame()
+
+  rownames(shap_df) <- shap_df$Samples
+  shap_df$Samples <- NULL
+
+  cat("SHAP analisis finished! \n\n")
+
+  return(shap_df)
 }
 
-#' Plot SHAP values
-#'
-#' Plots the variable importance based on SHAP (SHapley Additive exPlanations) values
-#' and saves the plot to the `Results/` directory.
-#'
-#' @param shap_df A data frame or matrix containing SHAP values where rows represent samples and columns represent features.
-#' @param ml_model A character string representing the name of the machine learning model.
-#' @param file_name A character string representing the name of the file to save the plot in the `Results/` directory.
-#' @param width A numeric value specifying the width of the plot in inches (default is 10).
-#' @param height A numeric value specifying the height of the plot in inches (default is 10).
-#'
-#' @return A plot saved as a PDF file in the `Results/` directory showing the variable importance of the machine learning model.
-#'
-#' @details This function generates a bar plot of the SHAP values, where the features are sorted by their mean SHAP value. The plot distinguishes
-#' between features that increase the predicted outcome (colored in red) and those that decrease the predicted outcome (colored in blue).
-#' The plot is saved as a PDF file in the `Results/` directory, with the filename specified by the user.
-#'
-#' @export
-#'
-plot_shap_values = function(shap_df, ml_model, file_name, width = 10, height = 10){
-
-  #shap_df : shap values (samples as rows and features as columns)
+plot_shap_stability <- function(shap_df, file.name){
 
   shap_long <- shap_df %>%
-    tidyr::pivot_longer(cols = dplyr::everything(), names_to = "feature", values_to = "shap_value")
+    tidyr::pivot_longer(
+      cols = -Samples,
+      names_to = "feature",
+      values_to = "shap_value"
+    )
 
-  ### Average SHAP values per feature across samples
+  # mean |SHAP| per feature per sample occurrence
   shap_summary <- shap_long %>%
+    dplyr::mutate(abs_shap = abs(shap_value)) %>%
     dplyr::group_by(feature) %>%
-    dplyr::summarise(mean_shap = mean(shap_value, na.rm = TRUE)) %>%
-    dplyr::filter(abs(mean_shap) > summary(abs(mean_shap))[3]) %>%
-    dplyr::mutate(direction = ifelse(mean_shap > 0, "Increase", "Decrease"))
+    dplyr::summarise(
+      mean_importance = mean(abs_shap, na.rm = TRUE),
+      sd_importance   = stats::sd(abs_shap, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    dplyr::arrange(mean_importance)
 
-  p = ggplot2::ggplot(shap_summary, ggplot2::aes(x = stats::reorder(feature, mean_shap), y = mean_shap, fill = direction)) +
-    ggplot2::geom_col() +
+  p <- ggplot2::ggplot(shap_summary,
+              ggplot2::aes(x = stats::reorder(feature, mean_importance),
+                           y = mean_importance)) +
+    ggplot2::geom_col(fill = "steelblue") +
+    ggplot2::geom_errorbar(
+      ggplot2::aes(
+        ymin = mean_importance - sd_importance,
+        ymax = mean_importance + sd_importance
+      ),
+      width = 0.2
+    ) +
     ggplot2::coord_flip() +
-    ggplot2::scale_fill_manual(values = c("Increase" = "red", "Decrease" = "blue")) +
     ggplot2::theme_minimal(base_size = 14) +
     ggplot2::labs(
-      title = paste0("Variable importance for ML model ", ml_model),
-      x = NULL,
-      y = NULL,
-      fill = NULL
-    ) +
-    ggplot2::geom_hline(yintercept = 0, color = "black")
+      title = "SHAP feature importance stability across resamples",
+      x = "Feature",
+      y = "Mean |SHAP| importance"
+    )
 
-  grDevices::pdf(paste0("Results/Feature_importance_", ml_model, "_", file_name, ".pdf"), width = width, height = height)
+  grDevices::pdf(paste0("Results/SHAP_stability_resample_", file.name, ".pdf"))
   print(p)
-  grDevices::dev.off()
+  dev.off()
 
 }
 
@@ -3853,7 +4034,11 @@ wrapper_train_best_hyperparams_survival <- function(train_data,
 aggregate_results <- function(all_loaded, task = c("classification", "survival")) {
 
   # Detect structure (whether has tunable parameters or not)
-  has_params <-  length(all_loaded[[1]][[1]]) > 3
+  if(task == "classification"){
+    has_params <-  length(all_loaded[[1]][[1]]) > 3
+  }else{
+    has_params <-  length(all_loaded[[1]][[1]]) > 5
+  }
 
   n_folds  <- length(all_loaded)
   n_models <- if (has_params) length(all_loaded[[1]][[1]]) else length(all_loaded[[1]])
@@ -3980,13 +4165,13 @@ aggregate_results <- function(all_loaded, task = c("classification", "survival")
         if (has_params) {
           for (p in seq_len(n_params)) {
             preds <- all_loaded[[f]][[p]][[m]]
-            hp_cols <- setdiff(names(preds), c("Resample", "model", "fold", "c_index"))
+            hp_cols <- setdiff(names(preds), c("predictions", "Resample", "rowIndex", "model", "c_index"))
             all_preds <- dplyr::bind_rows(all_preds, preds)
             hp_cols_all <- union(hp_cols_all, hp_cols)
           }
         } else {
           preds <- all_loaded[[f]][[m]]
-          hp_cols <- setdiff(names(preds), c("Resample", "model", "fold", "c_index"))
+          hp_cols <- setdiff(names(preds), c("predictions", "Resample",  "rowIndex", "model", "c_index"))
           all_preds <- dplyr::bind_rows(all_preds, preds)
           hp_cols_all <- union(hp_cols_all, hp_cols)
         }
@@ -4001,7 +4186,7 @@ aggregate_results <- function(all_loaded, task = c("classification", "survival")
           dplyr::summarise(
             c_index_median = stats::median(c_index, na.rm = TRUE),
             c_index_mad    = stats::mad(c_index, constant = 1, na.rm = TRUE),
-            .groups = "drop"
+            .groups = "drop" ## keep only c_index and mad
           ) %>%
           dplyr::arrange(dplyr::desc(c_index_median))
 
@@ -4012,9 +4197,14 @@ aggregate_results <- function(all_loaded, task = c("classification", "survival")
         besttune <- best_row %>% dplyr::select(dplyr::all_of(hp_cols_all))
 
         # ---- Compute per-fold for best config ----
-        resample_df <- all_preds %>%
-          dplyr::inner_join(besttune, by = hp_cols_all) %>%
-          dplyr::arrange(Resample)
+        if(length(hp_cols_all)>0){
+          resample_df <- all_preds %>%
+            dplyr::inner_join(besttune, by = hp_cols_all) %>%
+            dplyr::arrange(Resample)
+        }else{
+          resample_df = all_preds %>%
+            dplyr::arrange(Resample)
+        }
 
         # ---- Store results ----
         results[[m]] <- list(
@@ -4356,7 +4546,7 @@ unregister_dopar <- function() {
 #'
 compute_ml_survival <- function(df_train, df_test,
                                 outcome_col, event_col = NULL,
-                                model, models_hyperparameters){
+                                model, models_hyperparameters, return_model = F){
   # ---------------------------------------------------------------------------
   # Define the model specification based on the chosen model
   # ---------------------------------------------------------------------------
@@ -4488,12 +4678,17 @@ compute_ml_survival <- function(df_train, df_test,
   # Uses predict_and_evaluate_survival() to compute the Concordance Index (C-index),
   # which measures the model’s ability to correctly rank survival outcomes.
   #
-  prediction = predict_and_evaluate_survival(fitted, df_test)
-  preds = prediction$preds
+  prediction = predict_and_evaluate_survival(fitted, df_test, outcome_col, event_col)
+  preds = as.numeric(unlist(prediction$preds))
   metric_val = prediction$c_index
 
-  # Return standardized tibble with model name and C-index
-  return(tibble::tibble(predictions = preds, c_index = metric_val))
+  if(return_model){
+    res = list(Model = fitted, Metrics = tibble::tibble(predictions = preds, c_index = metric_val))
+  }else{
+    res = tibble::tibble(predictions = preds, c_index = metric_val)
+  }
+
+  return(res)
 }
 
 
@@ -4608,7 +4803,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
       df_all,
       v = k_folds,
       repeats = n_rep,
-      strata = event_col  # stratify by event indicator only
+      strata = all_of(event_col) # stratify by event indicator only
     )
   }
 
@@ -4711,7 +4906,8 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
                 data.frame() %>%
                 dplyr::mutate(
                   model = method,
-                  Resample = paste0("Fold", fold_i)
+                  Resample = paste0("Fold", fold_i),
+                  rowIndex = test_idx,
                 ) %>%
                 dplyr::bind_cols(current_params %>% dplyr::select(-.config_id))%>%
                 dplyr::relocate(c_index, .after = dplyr::last_col())
@@ -4994,7 +5190,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
   # using wrapper_train_best_hyperparams_survival().
 
   #Top model with best accuracy or AUC
-  metrics <- compute_cv_CINDEX(models, file_name = "MySurvivalModels")
+  metrics <- compute_cv_CINDEX(models, plot_results = TRUE, file_name = file_name)
 
   top_model = metrics[["Top_model"]]
   c_index_median = metrics[["CINDEX_summary"]] %>%
@@ -5081,7 +5277,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
 #' @seealso [aggregate_results()], [predict_and_evaluate_survival()]
 #' @export
 #'
-compute_cv_CINDEX = function(models, file_name = NULL, plot_results = TRUE){
+compute_cv_CINDEX <- function(models, file_name = NULL, plot_results = TRUE){
   # Step 1: Extract C-index values per fold from all models
   # ---------------------------------------------------------------------------
   # Each element in `models` must contain $Resample_matrix with columns:
@@ -5122,29 +5318,37 @@ compute_cv_CINDEX = function(models, file_name = NULL, plot_results = TRUE){
   if (plot_results) {
 
     grDevices::pdf(paste0("Results/CINDEX_CV_methods_", file_name, ".pdf"), width = 10)
+
     print(
       ggplot2::ggplot(summary_cindex,
-                      ggplot2::aes(x = model, y = Median_CINDEX, fill = model)) +
-        ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6) +
+                      ggplot2::aes(x = model, y = Median_CINDEX)) +
+        ggplot2::geom_bar(
+          stat = "identity",
+          width = 0.9,
+          fill = "#1f78b4"
+        ) +
         ggplot2::geom_errorbar(
           ggplot2::aes(
             ymin = Median_CINDEX - MAD_CINDEX,
             ymax = Median_CINDEX + MAD_CINDEX
           ),
-          width = 0.2,
-          position = ggplot2::position_dodge(0.6)
+          width = 0.15
         ) +
         ggplot2::labs(
-          title = "Cross-Validation Performance (C-index)",
-          x = "Model",
+          title = "Cross-Validation performance (C-index)",
+          x = "ML Model",
           y = "Median C-index ± MAD"
         ) +
-        ggplot2::theme_minimal() +
+        ggplot2::scale_x_discrete(expand = ggplot2::expansion(mult = c(0, 0))) +
+        ggplot2::scale_y_continuous(breaks = seq(0, 1, by = 0.05)) +
+        ggplot2::theme_minimal(base_size = 16) +
         ggplot2::theme(
           legend.position = "none",
-          axis.text.x = ggplot2::element_text(angle = 45, hjust = 1)
-        ) +
-        ggplot2::scale_y_continuous(breaks = seq(0, 1, by = 0.05))
+          axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 14),
+          axis.text.y = ggplot2::element_text(size = 14),
+          axis.title = ggplot2::element_text(size = 16),
+          plot.title = ggplot2::element_text(size = 18, face = "bold")
+        )
     )
 
     grDevices::dev.off()
@@ -5421,3 +5625,52 @@ predict_and_evaluate_survival <- function(model_fit,
   #
   return(list(preds = preds, c_index = metric_val))
 }
+
+bootstrap_auc <- function(predict, target, method, B = 1000, seed = 123){
+
+  set.seed(seed)
+  n <- length(target)
+
+  auroc_vals <- numeric(B)
+  auprc_vals <- numeric(B)
+
+  for(b in seq_len(B)){
+
+    idx <- sample(seq_len(n), replace = TRUE)
+
+    predict_b <- predict[idx, , drop = FALSE]
+    target_b  <- target[idx]
+
+    sens_spec_b <- get_sensitivity_specificity(
+      predictions = predict_b,
+      observed = target_b,
+      ml.model = method
+    )
+
+    auroc_vals[b] <- calculate_auroc(
+      sens_spec_b$fpr,
+      sens_spec_b$Sensitivity
+    )
+
+    auprc_vals[b] <- calculate_auprc(
+      sens_spec_b$Recall,
+      sens_spec_b$Precision
+    )
+  }
+
+  list(
+    AUROC = list(
+      mean  = mean(auroc_vals),
+      lower = quantile(auroc_vals, 0.025),
+      upper = quantile(auroc_vals, 0.975),
+      values = auroc_vals
+    ),
+    AUPRC = list(
+      mean  = mean(auprc_vals),
+      lower = quantile(auprc_vals, 0.025),
+      upper = quantile(auprc_vals, 0.975),
+      values = auprc_vals
+    )
+  )
+}
+
