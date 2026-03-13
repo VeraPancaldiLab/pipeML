@@ -106,8 +106,8 @@ res <- compute_features.training.ML(features_train = X_train,
                                      trait.positive = "1",
                                      metric = "AUROC",
                                      stack = F,
-                                     k_folds = 5,
-                                     n_rep = 10,
+                                     k_folds = 2,
+                                     n_rep = 1,
                                      file_name = "Example_classification",
                                      ncores = 4,
                                      return = TRUE)
@@ -299,7 +299,7 @@ knitr::include_graphics("figures/cindex_survival.png")
 ## **Compute SHAP Values**
 
 We will used the same function `compute_shap_values` computed before but this time with the `task_type = "survival"`.
-```{r}
+```{r, eval = FALSE}
 shap_survival <- compute_shap_values(
   model_trained = res_survival$Model,
   data_train = df,
