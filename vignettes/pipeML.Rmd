@@ -846,8 +846,6 @@ prepare_custom_folds_with_tuning <- function(
   data,
   folds = NULL,
   bestune = NULL,
-  compute_features_function,
-  hyperparams = list(),  # Named list of hyperparameter vectors for grid search
   ncores = NULL,
   ...
 ) {
