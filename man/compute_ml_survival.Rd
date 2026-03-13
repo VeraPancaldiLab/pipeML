@@ -2,36 +2,33 @@
 % Please edit documentation in R/machine_learning.R
 \name{compute_ml_survival}
 \alias{compute_ml_survival}
-\title{Train and Evaluate a Survival Model}
+\title{Train and Evaluate a Survival Model (Internal)}
 \usage{
 compute_ml_survival(
   df_train,
-  df_test,
+  df_test = NULL,
   outcome_col,
-  event_col = NULL,
+  event_col,
   model,
-  models_hyperparameters
+  models_hyperparameters,
+  return_model = F
 )
 }
 \arguments{
-\item{df_train}{A data frame containing the training data, including
-survival time, event indicator, and predictor variables.}
+\item{df_train}{A data frame containing training data including survival time,
+event indicator, and predictors.}
 
-\item{df_test}{A data frame containing the test data with the same structure
-and columns as \code{df_train}.}
+\item{df_test}{Optional data frame for testing. Must contain the same columns as \code{df_train}.}
 
-\item{outcome_col}{Character string specifying the name of the survival
-time column.}
+\item{outcome_col}{Character. Name of the survival time column.}
 
-\item{event_col}{Character string specifying the name of the event indicator
-column (\verb{1 = event occurred}, \code{0 = censored}).}
+\item{event_col}{Character. Name of the event indicator column (1 = event occurred, 0 = censored).}
 
-\item{model}{Character string specifying which survival model to train.
-Supported values include:
+\item{model}{Character. The type of survival model to train. Options:
 \itemize{
-\item \code{"cox_ph_survival"} – Cox proportional hazards model ({survival})
-\item \code{"proportional_hazards_glmnet"} – Penalized Cox model (LASSO/Elastic Net)
-\item \code{"survreg_flexsurv"} – Parametric AFT model ({flexsurv})
+\item \code{"cox_ph_survival"} – Cox proportional hazards model
+\item \code{"proportional_hazards_glmnet"} – Penalized Cox (LASSO/Elastic Net)
+\item \code{"survreg_flexsurv"} – Parametric AFT model
 \item \code{"rand_forest_partykit"} – Random survival forest (ctree engine)
 \item \code{"rand_forest_aorsf"} – Oblique random survival forest
 \item \code{"decision_tree_partykit"} – Single survival tree
@@ -39,44 +36,45 @@ Supported values include:
 \item \code{"boost_tree_mboost"} – Gradient boosting for survival data
 }}
 
-\item{models_hyperparameters}{A list containing model hyperparameter values
-to apply. Typically created from a tuning grid or optimization step, e.g.:
-\code{list(list(trees = 500, min_n = 10))}. If \code{NULL}, default parameters are used.}
+\item{models_hyperparameters}{Optional list of hyperparameter values to apply.
+Example: \code{list(list(trees = 500, min_n = 10))}. Defaults to \code{NULL} (use engine defaults).}
+
+\item{return_model}{Logical. If \code{TRUE}, returns the fitted model along with predictions.
+Default is \code{FALSE}.}
 }
 \value{
-A tibble with two columns:
-\describe{
-\item{\code{model}}{The model name as a character string.}
-\item{\code{c_index}}{Numeric value of the computed C-index on the test data.}
+If \code{df_test} is provided:
+\itemize{
+\item A tibble with columns \code{predictions} (predicted risk scores) and \code{c_index} (Concordance Index).
+\item If \code{return_model = TRUE}, a list with elements:
+\itemize{
+\item \code{Model} – fitted tidymodels workflow
+\item \code{Metrics} – tibble with \code{predictions} and \code{c_index}.
+If \code{df_test} is \code{NULL}, the function returns only the fitted model object.
+}
 }
 }
 \description{
-This function trains and evaluates a single survival model using the
-\strong{tidymodels} framework. It supports a range of survival model types,
-including Cox, penalized Cox, AFT, random forests, bagged trees, and
-gradient boosting models.
+This internal function trains and evaluates a survival model using the \strong{tidymodels}
+framework. It supports Cox, penalized Cox, AFT, random forests, bagged trees, and
+gradient boosting survival models.
 }
 \details{
-The function automatically applies user-specified hyperparameters,
-standardizes predictions from different engines, and evaluates model
-performance using the \strong{Concordance Index (C-index)} as the primary metric.
-It ensures a consistent risk-score direction across models (higher values
-indicate higher risk).
+The function standardizes predictions across different engines and evaluates model
+performance using the Concordance Index (C-index). Risk scores are aligned such that
+higher values indicate higher risk.
 
-The function uses the \strong{parsnip} interface from tidymodels to define,
-train, and evaluate models.
-
+The function uses the \strong{parsnip} interface to define and fit survival models.
 Workflow:
 \enumerate{
-\item Defines the model specification (\code{parsnip::model_spec}).
-\item Optionally applies user-specified hyperparameters via
-\code{parsnip::set_args()}.
-\item Constructs a survival formula of the form \code{Surv(time, event) ~ .}.
-\item Fits the model using \code{parsnip::fit()} on the training data.
-\item Evaluates model performance using
-\code{\link[=predict_and_evaluate_survival]{predict_and_evaluate_survival()}}, which computes the C-index.
+\item Create model specification (\code{parsnip::model_spec}) based on \code{model} type.
+\item Apply optional hyperparameters via \code{parsnip::set_args()}.
+\item Construct survival formula: \code{Surv(time, event) ~ .}.
+\item Fit model using \code{parsnip::fit()} on \code{df_train}.
+\item Evaluate performance using \code{predict_and_evaluate_survival()} (C-index).
 }
 }
 \seealso{
 \code{\link[=predict_and_evaluate_survival]{predict_and_evaluate_survival()}}
 }
+\keyword{internal}

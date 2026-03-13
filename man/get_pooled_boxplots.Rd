@@ -2,35 +2,32 @@
 % Please edit documentation in R/machine_learning.R
 \name{get_pooled_boxplots}
 \alias{get_pooled_boxplots}
-\title{Plot Pooled AUROC and AUPRC Boxplots Across Multiple Folders}
+\title{Internal: Plot Pooled AUROC and AUPRC Boxplots Across Multiple Folders}
 \usage{
 get_pooled_boxplots(folder_paths, file_name, width = 12, height = 8)
 }
 \arguments{
-\item{folder_paths}{Character vector. Paths to folders containing \code{.rds} files with ML model performance results.}
+\item{folder_paths}{Character vector. Paths to folders containing \code{.rds} files with ML model results.}
 
-\item{file_name}{Character. Prefix for the saved PDF files containing the plots.}
+\item{file_name}{Character. Prefix used when saving the resulting PDF plots.}
 
 \item{width}{Numeric. Width of the saved plots in inches. Default is 12.}
 
 \item{height}{Numeric. Height of the saved plots in inches. Default is 8.}
 }
-\value{
-Saves two PDF files in the \code{Results/} directory:
+\description{
+Internal function to aggregate AUROC and AUPRC metrics from multiple folders (e.g., different cohorts or models),
+and generate comparative boxplots showing model performance across groups.
+}
+\details{
+Each \code{.rds} file should contain a list with a \code{result$AUC} element including numeric values
+for both \code{AUROC} and \code{AUPRC}. Folder names are used as grouping labels in the plots.
+Red dashed horizontal lines are drawn at a reference value (0.7) for visual interpretation.
+Two PDF files are saved in the \verb{Results/} directory:
 \itemize{
-\item \code{Boxplots_AUROC_performance_<file_name>.pdf}
-\item \code{Boxplots_AUPRC_performance_<file_name>.pdf}
+\item \verb{Boxplots_AUROC_performance_<file_name>.pdf}
+\item \verb{Boxplots_AUPRC_performance_<file_name>.pdf}
 }
 No object is returned to the R environment.
 }
-\description{
-This function aggregates AUROC and AUPRC metrics from multiple folders (typically corresponding to different cohorts or models),
-and generates boxplots comparing model performance across groups.
-}
-\details{
-Each \code{.rds} file is expected to contain a list object with a \code{result$AUC} element,
-which includes numeric values for both \code{AUROC} and \code{AUPRC}.
-Folder names are used as grouping labels in the plots.
-
-Red dashed lines are drawn at a fixed reference value (e.g., 0.7) for visual interpretation.
-}
+\keyword{internal}

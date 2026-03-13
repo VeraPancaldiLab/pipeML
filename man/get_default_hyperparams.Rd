@@ -52,10 +52,4 @@ to generate evenly spaced sequences of parameter values across their default ran
 For data-dependent parameters (like \code{mtry}), \code{dials::finalize()}
 is used to compute appropriate limits based on \code{train_x}.
 }
-\examples{
-# Example 1: Random forest with feature-dependent hyperparameter
-get_default_hyperparams("rand_forest_partykit", train_x = iris[, 1:4])
-
-# Example 2: Penalized Cox model with default parameter ranges
-get_default_hyperparams("proportional_hazards_glmnet")
-}
+\keyword{internal}

@@ -11,8 +11,8 @@ compute_features.training.ML(
   trait.positive = NULL,
   time_var = NULL,
   event_var = NULL,
-  metric = "Accuracy",
-  stack,
+  metric = NULL,
+  stack = FALSE,
   k_folds = 10,
   n_rep = 5,
   LODO = FALSE,
@@ -26,19 +26,19 @@ compute_features.training.ML(
 )
 }
 \arguments{
-\item{features_train}{A data frame containing the features used for training (samples in rows, features in columns).}
+\item{features_train}{A data frame with samples in rows and features in columns.}
 
-\item{task_type}{Character. Specifies the type of prediction task. Either \code{"classification"} or \code{"survival"}.}
+\item{task_type}{Character. Prediction task type: \code{"classification"} or \code{"survival"}.}
 
-\item{target_var}{Vector. The target variable to predict (required for classification tasks).}
+\item{target_var}{Vector. Target variable for classification tasks.}
 
-\item{trait.positive}{Value in \code{target_var} that represents the positive class (used for metrics like AUROC and AUPRC).}
+\item{trait.positive}{Value in \code{target_var} representing the positive class.}
 
-\item{time_var}{Character. The name of the survival time variable (required for survival models).}
+\item{time_var}{Character. Name of the survival time variable (required for survival tasks).}
 
-\item{event_var}{Character. The name of the event indicator variable (required for survival models; 1 = event occurred, 0 = censored).}
+\item{event_var}{Character. Name of the event indicator (1 = event occurred, 0 = censored) for survival tasks.}
 
-\item{metric}{Character. Performance metric used for model selection and tuning. Supported values are:
+\item{metric}{Character. Performance metric for model selection and tuning. Supported values:
 \itemize{
 \item \code{"Accuracy"} — classification accuracy
 \item \code{"AUROC"} — area under the ROC curve
@@ -46,50 +46,44 @@ compute_features.training.ML(
 \item \code{"C-index"} — concordance index (for survival tasks)
 }}
 
-\item{stack}{Logical. Whether to perform model stacking (ensemble meta-learning). Default is \code{FALSE}.}
+\item{stack}{Logical. Perform model stacking (ensemble meta-learning). Default: \code{FALSE}.}
 
-\item{k_folds}{Integer. Number of folds to use for cross-validation.}
+\item{k_folds}{Integer. Number of folds for cross-validation. Default: 10.}
 
-\item{n_rep}{Integer. Number of repetitions for cross-validation (repeated CV).}
+\item{n_rep}{Integer. Number of repetitions for repeated CV. Default: 5.}
 
-\item{LODO}{Logical. If \code{TRUE}, constructs cross-validation folds stratified by cohort (Leave-One-Dataset-Out scheme).}
+\item{LODO}{Logical. If \code{TRUE}, constructs folds stratified by cohort (LODO scheme).}
 
 \item{batch_var}{Character. Batch membership for each sample. Required if \code{LODO = TRUE}.}
 
-\item{file_name}{Character. File name used for saving performance plots in the \code{"Results/"} directory.}
+\item{file_name}{Character. File name prefix used to save performance plots in \code{"Results/"}.}
 
-\item{ncores}{Integer. Number of CPU cores to use for parallelization. Defaults to \code{parallel::detectCores() - 1}.}
+\item{ncores}{Integer. Number of CPU cores for parallelization. Default: \code{parallel::detectCores() - 1}.}
 
-\item{return}{Logical. Whether to return and save the generated plots. Default is \code{FALSE}.}
+\item{return}{Logical. Whether to return the trained models and plots. Default: \code{FALSE}.}
 
-\item{fold_construction_fun}{Function. Optional user-defined function to construct cross-validation folds.
-This enables full control over how data splits and feature transformations are created.
-The function must accept a \code{bestune} argument:
+\item{fold_construction_fun}{Function. Optional user-defined function for fold construction. Must accept a \code{bestune} argument:
 \itemize{
-\item If \code{bestune = NULL}, the function explores a parameter grid across folds
-(executed in parallel via \code{foreach}).
-\item If \code{bestune} is provided, optimized parameters are applied to the full dataset
-to rebuild features before final training.
+\item \code{bestune = NULL} — explore parameter grid across folds (parallelized via \code{foreach}).
+\item \code{bestune provided} — rebuild features on the full dataset using optimized parameters.
 }
-The fold constructor should save individual folds as \code{"Results/fold_*.rds"} objects containing:
+The function should save individual folds as \code{"Results/fold_*.rds"} with:
 \itemize{
-\item \code{train_data} — training data for that fold
-\item \code{test_data} — testing data for that fold
-\item \code{obs_test} — observed target or survival outcomes
-\item \code{params} — parameter combination used (if applicable)
+\item \code{train_data} — training data
+\item \code{test_data} — testing data
+\item \code{obs_test} — observed outcomes
+\item \code{params} — parameters used (if applicable)
 }}
 
-\item{fold_construction_args_fixed}{List. Arguments passed to \code{fold_construction_fun} that remain fixed
-during both cross-validation and final training (e.g., annotation files, normalization flags, etc.).}
+\item{fold_construction_args_fixed}{List of arguments passed to \code{fold_construction_fun} that remain fixed across CV and final training.}
 
-\item{fold_construction_args_tunable}{List. Arguments passed to \code{fold_construction_fun} that define
-hyperparameters to tune during cross-validation. Each element should contain one or more candidate values.}
+\item{fold_construction_args_tunable}{List of arguments passed to \code{fold_construction_fun} for hyperparameter tuning.}
 }
 \value{
 A list containing:
 \itemize{
 \item Trained model(s) or meta-learner (if \code{stack = TRUE})
-\item Feature set used for model training
+\item Features used for training
 \item Cross-validation performance results and plots
 \item Best hyperparameter configuration (if applicable)
 }
@@ -105,22 +99,17 @@ It allows flexible cross-validation schemes, including:
 }
 }
 \details{
-The function supports both classification and survival analysis pipelines by setting
+The function supports both classification and survival analysis pipelines via
 \code{task_type = "classification"} or \code{task_type = "survival"}.
 
-The function supports:
+The function provides:
 \itemize{
-\item Automatic feature preprocessing (e.g., correlation filtering, low-variance removal).
-\item Parallelized cross-validation across folds and repetitions.
-\item Integration with custom model pipelines (e.g., CellTFusion, pathway-based deconvolution).
-\item Unified handling of both survival and classification models.
+\item Automatic feature preprocessing (e.g., correlation filtering, low-variance removal)
+\item Parallelized cross-validation across folds and repetitions
+\item Integration with custom model pipelines (e.g., CellTFusion, pathway-based deconvolution)
+\item Unified handling of both survival and classification models
 }
 
-When a custom fold constructor is provided via \code{fold_construction_fun}, the default stratified k-fold
-logic is bypassed, and the function will instead iterate through all \code{Results/fold_*.rds} files generated
-by the custom routine. This allows hybrid pipelines combining biological preprocessing (e.g., CellTFusion)
-with downstream model fitting.
-}
-\seealso{
-\code{\link[=compute_k_fold_CV_survival]{compute_k_fold_CV_survival()}}, \code{\link[=compute_ml_survival]{compute_ml_survival()}}, \code{\link[=compute_cv_CINDEX]{compute_cv_CINDEX()}}
+When a custom fold constructor is provided, default k-fold logic is bypassed, and
+results are computed using the pre-generated folds.
 }

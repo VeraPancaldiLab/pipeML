@@ -21,3 +21,4 @@ Precision is the fraction of true positive predictions among all positive predic
 This function calculates the precision of a model based on the provided metrics and the true target values.
 Precision is defined as the ratio of true positive predictions to all positive predictions (true positives + false positives).
 }
+\keyword{internal}

@@ -20,36 +20,46 @@ compute_k_fold_CV(
 )
 }
 \arguments{
-\item{train_data}{A data frame containing features and a target column named 'target' corresponding to the response variable to predict.}
+\item{train_data}{A data frame containing predictor variables and a column
+named \code{target} corresponding to the response variable.}
 
-\item{k_folds}{Integer. Number of folds for k-fold cross-validation. Default is 5.}
+\item{k_folds}{Integer. Number of folds used for k-fold cross-validation.
+Default is 5.}
 
-\item{n_rep}{Integer. Number of repetitions of the k-fold cross-validation. Default is 100.}
+\item{n_rep}{Integer. Number of repetitions of the k-fold cross-validation.
+Default is 100.}
 
-\item{stacking}{Logical. Whether to perform model stacking. Default is FALSE.}
+\item{stacking}{Logical. Whether to perform model stacking. Default is \code{FALSE}.}
 
-\item{metric}{Character. Metric used for hyperparameter tuning and model evaluation. Supported values are "Accuracy", "AUROC", and "AUPRC".}
+\item{metric}{Character. Performance metric used for hyperparameter tuning
+and model evaluation. Supported values include \code{"Accuracy"},
+\code{"AUROC"}, and \code{"AUPRC"}.}
 
-\item{file_name}{Character. File name used for saving output plots in the \verb{Results/} directory.}
+\item{file_name}{Character. File name used when saving output plots in the
+\code{Results/} directory.}
 
-\item{LODO}{Logical. If TRUE, performs Leave-One-Dataset-Out (LODO) cross-validation by stratifying folds based on cohort membership.}
+\item{LODO}{Logical. If \code{TRUE}, performs Leave-One-Dataset-Out (LODO)
+cross-validation by stratifying folds based on cohort membership.}
 
-\item{ncores}{Integer. Number of cores to use for parallelization. If not given, detectCores() - 1 will be used.}
+\item{ncores}{Integer. Number of cores used for parallel computation.
+If \code{NULL}, \code{parallel::detectCores() - 1} will be used.}
 
 \item{return}{Logical. Whether to return the results and generated plots.}
 
-\item{fold_construction_fun}{Function. A custom function used to construct the cross-validation folds.
-This function must accept a \code{bestune} argument, which is used internally to inject optimized parameters
-after hyperparameter tuning. If \code{bestune = NULL}, the function will explore a parameter grid across folds
-(parallelized with \code{foreach}); if \code{bestune} is provided, the optimized parameters will be applied
-to rebuild the features on the full training data.}
+\item{fold_construction_fun}{Function used to construct cross-validation folds.
+The function must accept a \code{bestune} argument, which is used internally
+to inject optimized parameters after hyperparameter tuning. If
+\code{bestune = NULL}, the function explores a parameter grid across folds
+(parallelized with \code{foreach}). If \code{bestune} is provided, the
+optimized parameters are applied to rebuild features on the full training data.}
 
-\item{fold_construction_args_fixed}{List. A list of arguments passed to \code{fold_construction_fun}
-that remain fixed during both cross-validation and final training.}
+\item{fold_construction_args_fixed}{List of arguments passed to
+\code{fold_construction_fun} that remain fixed during both cross-validation
+and final training.}
 
-\item{fold_construction_args_tunable}{List. A list of arguments passed to \code{fold_construction_fun}
-that define the hyperparameters to be tuned during cross-validation. Each element should contain
-candidate values for tuning.}
+\item{fold_construction_args_tunable}{List of arguments passed to
+\code{fold_construction_fun} that define hyperparameters to be tuned during
+cross-validation. Each element should contain candidate values.}
 }
 \value{
 A list containing:
@@ -63,9 +73,15 @@ If \code{stacking = TRUE}, the list will also include:
 \itemize{
 \item Base models
 \item Meta-learner
-\item Matrix of weighted feature importance (see \code{calculate_feature_importance_stacking()})
+\item Matrix of weighted feature importance (see
+\code{calculate_feature_importance_stacking()})
 }
 }
 \description{
-This function performs repeated stratified k-fold cross-validation on a dataset to train and tune hyperparameters for 13 machine learning methods. Optionally, it can also perform model stacking and Boruta-based feature selection. Performance is evaluated using user-specified metrics such as Accuracy, AUROC, or AUPRC.
+Internal function that performs repeated stratified k-fold cross-validation
+to train and tune hyperparameters across multiple machine learning models.
+Optionally, it can perform model stacking and Boruta-based feature selection.
+Model performance is evaluated using user-specified metrics such as Accuracy,
+AUROC, or AUPRC.
 }
+\keyword{internal}

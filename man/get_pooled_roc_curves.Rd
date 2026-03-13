@@ -2,28 +2,28 @@
 % Please edit documentation in R/machine_learning.R
 \name{get_pooled_roc_curves}
 \alias{get_pooled_roc_curves}
-\title{Plot Pooled AUROC and AUPRC Performance Curves}
+\title{Internal: Plot Pooled AUROC and AUPRC Performance Curves}
 \usage{
 get_pooled_roc_curves(file.name, folder_path)
 }
 \arguments{
-\item{file.name}{Character. Name to use when saving the plots (used as a prefix in the output file names).}
+\item{file.name}{Character. Name used as a prefix when saving output plots.}
 
 \item{folder_path}{Character. Path to the directory containing the \code{.rds} files with ML model results.}
 }
-\value{
-Saves two PDF files in the \code{Results/} directory:
+\description{
+Internal function to read multiple \code{.rds} files containing machine learning results,
+pool the AUROC and AUPRC metrics, and generate boxplots summarizing performance
+across iterations. Median values are annotated on the plots.
+}
+\details{
+Each \code{.rds} file is expected to contain a list with a \code{result$AUC} element,
+including both \code{AUROC} and \code{AUPRC} values. The function saves two PDF files in the
+\verb{Results/} directory:
 \itemize{
 \item Boxplot of AUROC values with median annotation
 \item Boxplot of AUPRC values with median annotation
 }
 No value is returned to the R environment.
 }
-\description{
-This function reads multiple \code{.rds} files containing machine learning results, pools the AUROC and AUPRC metrics,
-and generates boxplots summarizing performance across iterations. Median values are annotated on the plots.
-}
-\details{
-Each \code{.rds} file is expected to contain a list with a \code{result$AUC} element that includes
-both \code{AUROC} and \code{AUPRC} values.
-}
+\keyword{internal}

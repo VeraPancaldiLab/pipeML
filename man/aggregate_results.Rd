@@ -59,3 +59,4 @@ For \strong{survival} tasks:
 The function is compatible with results produced by
 \code{\link[=compute_k_fold_CV_survival]{compute_k_fold_CV_survival()}} and analogous classification CV pipelines.
 }
+\keyword{internal}

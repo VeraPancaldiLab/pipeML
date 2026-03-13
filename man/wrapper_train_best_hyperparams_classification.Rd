@@ -87,3 +87,4 @@ result$Model
 \code{\link{compute_custom_k_fold_CV}},
 \code{\link{preprocess_features}}
 }
+\keyword{internal}

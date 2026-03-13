@@ -2,37 +2,53 @@
 % Please edit documentation in R/machine_learning.R
 \name{compute_custom_k_fold_CV}
 \alias{compute_custom_k_fold_CV}
-\title{Train and evaluate machine learning models on previously constructed k folds}
+\title{Train and evaluate machine learning models on custom cross-validation folds}
 \usage{
 compute_custom_k_fold_CV(processed_folds, ml_method, tuneGrid)
 }
 \arguments{
-\item{processed_folds}{A list of folds. Each fold contains processed training and test data with features.}
+\item{processed_folds}{A list of folds. Each fold should contain processed
+training and test datasets with features.}
 
-\item{ml_method}{A character string indicating the machine learning model to use, as supported by the \code{caret} package (e.g., \code{"rf"}, \code{"svmRadial"}, \code{"glmnet"}).}
+\item{ml_method}{Character string specifying the machine learning model to use,
+as supported by the \code{caret} package (e.g., \code{"rf"}, \code{"svmRadial"},
+\code{"glmnet"}).}
 
-\item{tuneGrid}{Optional. A data frame specifying the grid of hyperparameters to evaluate. If \code{NULL}, a default grid of length 3 is generated using caret's \code{getModelInfo()}.}
+\item{tuneGrid}{Optional. A data frame specifying the grid of hyperparameters
+to evaluate. If \code{NULL}, a default grid of length 3 is generated using
+\code{caret::getModelInfo()}.}
 }
 \value{
-A list with the following components:
+A list containing:
 \itemize{
-\item \code{Results_folds}: A data frame summarizing average cross-validated Accuracy, Kappa, and their standard deviations for each hyperparameter combination.
-\item \code{Prediction_folds}: A data frame of predictions from each fold, including class probabilities, observed and predicted labels, and hyperparameter values.
-\item \code{Resample_matrix}: A data frame summarizing Accuracy and Kappa per fold for the best-tuned model.
+\item \code{Results_folds}: Data frame summarizing average cross-validated
+Accuracy, Kappa, and standard deviations for each hyperparameter combination.
+\item \code{Prediction_folds}: Data frame of predictions from each fold,
+including class probabilities, observed and predicted labels, and
+hyperparameter values.
+\item \code{Resample_matrix}: Data frame summarizing Accuracy and Kappa
+per fold for the best-tuned model.
 \item \code{Besttune}: List of optimized hyperparameters.
 }
 }
 \description{
-This function performs k-fold cross-validation using custom folds created from custom functions to be used for cohort-dependent algorithms (see vignette for more information about this).
-It supports hyperparameter tuning over a grid and returns a model object that mimicks the caret's training output, including performance metrics and predictions.
+Internal function that trains and evaluates machine learning models using
+pre-constructed k-folds. This function is intended for \strong{cohort-aware or
+custom fold strategies} (see package vignette for details). It supports
+hyperparameter tuning over a grid and returns a model object that mimics
+the structure of caret's \code{train()} output, including performance metrics
+and predictions.
 }
 \details{
-This function performs the following:
+The function performs the following steps:
 \enumerate{
-\item Trains models for each fold and hyperparameter combination.
-\item Predicts on the held-out test data of each fold.
-\item Aggregates prediction results and evaluates Accuracy and Kappa for each fold and hyperparameter set.
-\item Selects the best-performing hyperparameter set based on mean Accuracy across folds.
-\item Trains the final model on the full dataset using the selected hyperparameters.
+\item Train models for each fold and hyperparameter combination.
+\item Predict on the held-out test data for each fold.
+\item Aggregate predictions and evaluate Accuracy and Kappa for each
+fold and hyperparameter set.
+\item Select the best-performing hyperparameter set based on mean Accuracy
+across folds.
+\item Train the final model on the full dataset using the selected hyperparameters.
 }
 }
+\keyword{internal}

@@ -18,3 +18,4 @@ The AUC score, a numeric value between 0 and 1.
 This function calculates the Area Under the Receiver Operating Characteristic (ROC) curve.
 It uses the trapezoidal rule to compute the AUC from the false positive rate (FPR) and sensitivity (true positive rate).
 }
+\keyword{internal}

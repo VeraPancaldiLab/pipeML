@@ -18,7 +18,7 @@ wrapper_train_best_hyperparams_survival(
 \item{train_data}{A data frame containing the original training data
 used for cross-validation.}
 
-\item{optimized}{A list output from \code{\link[=aggregate_results_survival]{aggregate_results_survival()}} or
+\item{optimized}{A list output from \code{\link[=aggregate_results]{aggregate_results()}} or
 \code{\link[=compute_k_fold_CV_survival]{compute_k_fold_CV_survival()}}, containing the best-tuned parameters
 (\code{bestTune}) and model performance summaries.}
 
@@ -81,7 +81,4 @@ If the selected model type has no tunable hyperparameters,
 the function automatically detects this and proceeds with
 the default model configuration.
 }
-\seealso{
-\code{\link[=compute_k_fold_CV_survival]{compute_k_fold_CV_survival()}}, \code{\link[=aggregate_results_survival]{aggregate_results_survival()}},
-\code{\link[=compute_ml_survival]{compute_ml_survival()}}
-}
+\keyword{internal}

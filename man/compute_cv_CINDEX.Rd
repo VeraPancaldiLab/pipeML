@@ -2,74 +2,47 @@
 % Please edit documentation in R/machine_learning.R
 \name{compute_cv_CINDEX}
 \alias{compute_cv_CINDEX}
-\title{Summarize and Visualize C-index Results from Survival Model Cross-Validation}
+\title{Summarize and Visualize C-index from Survival Model Cross-Validation (Internal)}
 \usage{
 compute_cv_CINDEX(models, file_name = NULL, plot_results = TRUE)
 }
 \arguments{
-\item{models}{A named list of survival model objects, where each element
-corresponds to one fitted model. Each model must contain a
-\code{Resample_matrix} data frame with columns:
+\item{models}{Named list of survival model objects. Each element must contain
+a \code{Resample_matrix} data frame with columns:
 \describe{
-\item{\code{c_index}}{C-index value per resample (numeric).}
-\item{\code{Resample}}{Fold or resample identifier (e.g., "Fold1", "Fold2").}
+\item{\code{c_index}}{Numeric C-index per fold/resample.}
+\item{\code{Resample}}{Fold or resample identifier (e.g., "Fold1").}
 }}
 
-\item{file_name}{Optional character string used to name the output PDF file
-saved under \code{"Results/CINDEX_CV_methods_<file_name>.pdf"}. If \code{NULL}, the
-file is not named explicitly.}
+\item{file_name}{Optional character string to name the output PDF saved under
+\code{"Results/CINDEX_CV_methods_<file_name>.pdf"}. If \code{NULL}, the file uses
+a default naming convention.}
 
-\item{plot_results}{Logical; if \code{TRUE} (default), generates and saves a PDF
-bar plot showing median C-index ± MAD per model.}
+\item{plot_results}{Logical (default = TRUE). If \code{TRUE}, generates a PDF bar plot
+showing median C-index ± MAD per model.}
 }
 \value{
-A list with the following elements:
+A list with:
 \describe{
-\item{\code{CINDEX_summary}}{A tibble summarizing median and MAD per model.}
-\item{\code{All_folds}}{A tibble with raw C-index values from all folds and models.}
-\item{\code{Top_model}}{Character string naming the model with the highest median C-index.}
+\item{\code{CINDEX_summary}}{Tibble summarizing median and MAD per model.}
+\item{\code{All_folds}}{Tibble of raw C-index values for all models and folds.}
+\item{\code{Top_model}}{Character string of the model with highest median C-index.}
 }
 }
 \description{
-This function aggregates and visualizes the C-index (concordance index)
-results obtained from cross-validation of multiple survival models.
-Each model should contain a \code{Resample_matrix} element with per-fold C-index
-values. The function computes the median and MAD (median absolute deviation)
-of the C-index for each model, identifies the top-performing model, and
-optionally generates a bar plot summarizing model performance.
+Aggregates and visualizes C-index (concordance index) results from
+cross-validation of multiple survival models. Computes median and MAD
+(median absolute deviation) per model, identifies the top-performing model,
+and optionally generates a bar plot summarizing performance.
 }
 \details{
-For each model:
 \itemize{
-\item The \strong{median C-index} represents the typical discrimination
-performance across folds.
-\item The \strong{MAD (Median Absolute Deviation)} measures variability
-in C-index values (robust equivalent of standard deviation).
+\item Median C-index represents typical discrimination performance across folds.
+\item MAD provides robust variability estimation of C-index values.
+\item The optional plot displays model performance with error bars ± MAD.
 }
-
-The plot helps visualize and compare models based on survival prediction
-performance, with error bars representing ± MAD.
-}
-\examples{
-\dontrun{
-models <- list(
-  cox_ph_survival = list(
-    Resample_matrix = tibble::tibble(
-      c_index = c(0.72, 0.75, 0.70),
-      Resample = c("Fold1", "Fold2", "Fold3")
-    )
-  ),
-  rand_forest_aorsf = list(
-    Resample_matrix = tibble::tibble(
-      c_index = c(0.80, 0.82, 0.78),
-      Resample = c("Fold1", "Fold2", "Fold3")
-    )
-  )
-)
-compute_cv_CINDEX(models, file_name = "example")
-}
-
 }
 \seealso{
 \code{\link[=aggregate_results]{aggregate_results()}}, \code{\link[=predict_and_evaluate_survival]{predict_and_evaluate_survival()}}
 }
+\keyword{internal}

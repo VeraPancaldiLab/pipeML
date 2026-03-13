@@ -26,3 +26,4 @@ A list containing four elements:
 This function computes the confusion matrix values (True Positives, False Negatives,
 True Negatives, and False Positives) based on the given metrics and the true target values.
 }
+\keyword{internal}

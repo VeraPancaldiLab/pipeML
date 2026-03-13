@@ -21,3 +21,4 @@ Recall is the fraction of actual positive instances that were correctly predicte
 This function calculates the recall (also known as sensitivity) of a model based on the provided metrics and the true target values.
 Recall is defined as the ratio of true positive predictions to all actual positive instances (true positives + false negatives).
 }
+\keyword{internal}

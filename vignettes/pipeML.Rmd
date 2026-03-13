@@ -22,21 +22,36 @@ library(dplyr)
 
 This tutorial demonstrates how to use the `pipeML` package for training and testing machine learning models. It introduces the main functions of the pipeline and guides you through additional functions for visualization. 
 
-Load data
+# **Classification tasks**
+
+Load example data 
 ```{r}
-raw.counts = pipeML::raw.counts
-traitData = pipeML::traitData
-deconvolution = pipeML::deconvolution
+data = pipeML::data_example_classification
+X <- data %>% dplyr::select(-target)
+y <- data$target
+```
+
+For example purposes we make a Train/Test split
+```{r}
+set.seed(123)
+
+train_idx <- caret::createDataPartition(y, p = 0.8, list = FALSE)
+
+X_train <- X[train_idx, ]
+X_test  <- X[-train_idx, ]
+
+y_train <- y[train_idx]
+y_test  <- y[-train_idx]
 ```
 
 ## **Feature selection**
 
 Apply repeated feature selection using the Boruta algorithm:
 ```{r}
-deconvolution$target = as.factor(traitData$Best.Confirmed.Overall.Response)
+y = as.factor(y)
 res_boruta <- feature.selection.boruta(
-  data = deconvolution,
-  iterations = 5,
+  data = data,
+  iterations = 20,
   fix = FALSE,
   doParallel = FALSE,
   threshold = 0.8,
@@ -57,8 +72,8 @@ cat("Tentative features:\n", res_boruta$Tentative)
 To further assess tentative features, set `fix = TRUE` to rerun the selection and confirm or reject them:
 ```{r, eval = FALSE}
 res_boruta <- feature.selection.boruta(
-  data = deconvolution,
-  iterations = 5,
+  data = data,
+  iterations = 20,
   fix = TRUE,
   doParallel = FALSE,
   threshold = 0.8,
@@ -70,8 +85,8 @@ res_boruta <- feature.selection.boruta(
 For faster execution, enable parallelization (ensure parameters `doParallel` and `workers` are set):
 ```{r, eval = FALSE}
 res_boruta <- feature.selection.boruta(
-  data = deconvolution,
-  iterations = 10,
+  data = data,
+  iterations = 20,
   fix = FALSE,
   doParallel = FALSE,
   workers = 2,
@@ -81,38 +96,35 @@ res_boruta <- feature.selection.boruta(
 )
 ```
 
-## **Train Machine Learning models**
+## **Train Machine Learning models for classification tasks**
 
 Train and tune models using repeated stratified k-fold cross-validation:
-```{r, eval = FALSE}
-deconvolution = pipeML::deconvolution
-traitData = pipeML::traitData
-res <- compute_features.training.ML(features_train = deconvolution, 
-                                    target_var = traitData$Best.Confirmed.Overall.Response,
-                                    task_type = "classification",
-                                    trait.positive = "CR",
-                                    metric = "AUROC",
-                                    stack = FALSE,
-                                    k_folds = 2,
-                                    n_rep = 2,
-                                    LODO = FALSE,
-                                    file_name = "Test",
-                                    ncores = 2,
-                                    return = FALSE)
+```{r}
+res <- compute_features.training.ML(features_train = X_train, 
+                                     target_var = y_train,
+                                     task_type = "classification",
+                                     trait.positive = "1",
+                                     metric = "AUROC",
+                                     stack = F,
+                                     k_folds = 5,
+                                     n_rep = 10,
+                                     file_name = "Example_classification",
+                                     ncores = 4,
+                                     return = TRUE)
 ```
 
 Access the best-trained model:
-```{r, eval = FALSE}
-res[[1]]$Model
+```{r}
+res$Model
 ```
 
 View all trained and tuned machine learning models:
-```{r, eval = FALSE}
-res[[1]]$ML_Models
+```{r}
+names(res$ML_Models)
 ```
 
 ```{r fig1, fig.cap="Figure 1. Models training performance.", fig.align='center', out.width='80%'}
-knitr::include_graphics("figures/Training.png")
+knitr::include_graphics("figures/AUROC_classification.png")
 ```
 
 To apply model stacking, set `stack = TRUE`:
@@ -144,49 +156,201 @@ res$Model$Meta_learner
 ## **Model prediction**
 
 After training, users can predict on new data by using the `compute_prediction()` function. You can specify which metric to maximize when determining the optimal classification threshold. Supported values for maximize include: "Accuracy", "Precision", "Recall", "Specificity", "Sensitivity", "F1", and "MCC".
-```{r, eval = FALSE}
-pred = pipeML::compute_prediction(model = res, 
-                                  test_data = testing_set, 
-                                  target_var = traitData$Best.Confirmed.Overall.Response, 
-                                  trait.positive = "CR", 
-                                  file.name = "Test", 
-                                  maximize = "Accuracy", 
-                                  return = F)
+```{r}
+pred = compute_prediction(model = res$Model, 
+                          test_data = X_test, 
+                          target_var = y_test, 
+                          task_type = "classification",
+                          trait.positive = "1", 
+                          file.name = "Example_classification", 
+                          return = T)
 ```
 
-If `return = TRUE`, `compute_prediction()` will saved the RO and PR curves in the `Results/` directory. It can also be retrieved with the following function
-```{r, eval = FALSE}
-get_curves(pred$Metrics, spec = "Specificity", 
-           sens = "Sensitivity", reca = "Recall", 
-           prec = "Precision", color = "Cohort", 
-           auc_roc = pred$AUC$AUROC, 
-           auc_prc = pred$AUC$AUPRC, 
-           file.name = "Test")
+Check predicitions
+```{r}
+head(pred$Predictions)
 ```
 
-To enable parallelization, specify the number of cores via the `ncores` parameter (default is `detectCores() - 1`).
+Verify threshold-based predictions metrics
+```{r}
+head(pred$Metrics)
+```
+
+If `return = TRUE`, `compute_prediction()` will saved the RO and PR curves in the `Results/` directory.
+
+```{r fig2, fig.cap="Figure 2. ROC curve.", fig.align='center', out.width='80%'}
+knitr::include_graphics("figures/ROC.png")
+```
+
+```{r fig3, fig.cap="Figure 3. PR curve.", fig.align='center', out.width='80%'}
+knitr::include_graphics("figures/PR.png")
+```
+
+## **Compute SHAP Values**
+
+SHAP values help interpret machine learning predictions by quantifying feature contributions.
 ```{r, eval = FALSE}
-res <- compute_features.training.ML(features_train = deconvolution, 
-                                    target_var = traitData$Best.Confirmed.Overall.Response,
-                                    task_type = "classification",
-                                    trait.positive = "CR",
-                                    metric = "AUROC",
-                                    stack = TRUE,
-                                    k_folds = 3,
-                                    n_rep = 3,
-                                    LODO = FALSE,
-                                    file_name = "Test",
-                                    ncores = 2,
-                                    return = FALSE)
+df = cbind(X_train, target = as.numeric(y_train)) ## compute_shap_values expects predictors and target in a single data.frame
+
+shap_classification <- compute_shap_values(
+  model_trained = res$Model, 
+  data_train = df, 
+  task_type = "classification", 
+  target_col = "target", 
+  trait.positive = "2", # Notice here that because of as.numeric() our target variable changed to 1 and 2 so we will consider 2 as our new 1.
+  n_cores = 2,  
+  file.name = "Example_classification"
+)
+```
+
+Visualize feature importance and interactions using shapviz:
+```{r, eval = FALSE}
+sv <- shapviz::shapviz(
+  shap = as.matrix(shap_classification$shap_values),
+  X = df[, setdiff(colnames(df), "target")]
+)
+
+# Global feature importance (bar plot)
+shapviz::sv_importance(sv, kind = "bar") +
+  ggplot2::ggtitle("Global Feature Importance")
+
+# Beeswarm plot
+shapviz::sv_importance(sv, kind = "beeswarm") +
+  ggplot2::ggtitle("SHAP Beeswarm Summary")
+
+# Feature dependence plots for top 6 features
+top_features <- names(sort(colMeans(abs(shap_classification$shap_values)), decreasing = TRUE))[1:6]
+
+for (f in top_features) {
+  print(
+    shapviz::sv_dependence(sv, v = f) +
+    ggplot2::ggtitle(paste0("Dependence: ", f))
+  )
+}
+```
+
+# **Survival tasks**
+
+In addition to classification and regression tasks, `pipeML` supports survival analysis, allowing users to train machine learning models that predict time-to-event outcomes.
+
+In survival analysis, the response variable is defined by two components:
+
+- Time: follow-up or survival time
+- Event: indicator of whether the event occurred (1) or the observation was censored (0)
+
+`pipeML` automates the training, evaluation, and interpretation of survival models using cross-validation and SHAP-based explanations.
+
+Load example dataset for survival
+```{r}
+library(survival)
+library(censored)
+data = pipeML::data_example_survival
+X <- data %>% dplyr::select(-time, -status)
+time <- data$time
+event <- data$status
+```
+
+Similar to the previous example, we will split our data in Train/Test
+```{r}
+set.seed(123)
+train_idx <- caret::createDataPartition(event, p = 0.7, list = FALSE)
+
+X_train <- X[train_idx, ]
+X_test  <- X[-train_idx, ]
+
+time_train <- time[train_idx]
+time_test  <- time[-train_idx]
+
+event_train <- event[train_idx]
+event_test  <- event[-train_idx]
+```
+
+## **Train Machine Learning models for survival tasks**
+
+The function ` compute_features.training.ML()`  can also train survival models by setting task_type = "survival".
+```{r}
+res_survival <- compute_features.training.ML(
+  features_train = X_train, 
+  task_type = "survival",
+  time_var = time_train,
+  event_var = event_train,
+  k_folds = 2,
+  n_rep = 1,
+  file_name = "Example_survival",
+  ncores = 4,
+  return = TRUE
+)
+```
+
+Access to the best model 
+```{r}
+res_survival$Model$Model_object
+```
+
+Check training metrics
+```{r}
+head(res_survival$Model$Prediction_folds)
+```
+
+```{r fig4, fig.cap="Figure 4. Models training performance.", fig.align='center', out.width='80%'}
+knitr::include_graphics("figures/cindex_survival.png")
+```
+
+## **Compute SHAP Values**
+
+We will used the same function `compute_shap_values` computed before but this time with the `task_type = "survival"`.
+```{r}
+shap_survival <- compute_shap_values(
+  model_trained = res_survival$Model,
+  data_train = df,
+  task_type = "survival",
+  time_col = "time",
+  event_col = "status",
+  n_cores = 2,
+  file.name = "Example_survival"
+)
+```
+
+## **Predict Survival Risk**
+
+After training, predictions can be generated using `compute_prediction()`.
+```{r}
+pred <- compute_prediction(
+  model = res_survival$Model,
+  test_data = X_test,
+  task_type = "survival",
+  time_var = time_test,
+  event_var = event_test,
+  file.name = "Example_survival",
+  return = TRUE
+)
+```
+
+Unlike classification models, survival models may return different types of predictions depending on the model used. Some models predict a risk score, while others predict expected survival time or survival probability.
+
+The `compute_prediction()` function automatically handles these differences. Internally, it attempts several prediction types and converts them into a standardized risk score so that results can be compared across models:
+
+- Risk score (**linear_pred**) – typically produced by Cox models.
+Higher values indicate higher predicted risk.
+- Predicted survival time (**time**) – produced by some parametric survival models.
+Higher values indicate longer survival, so the values are internally reversed to represent risk.
+- Survival probability (**survival**) – probability of surviving at a given time point.
+Higher probabilities correspond to lower risk, so these values are also internally reversed.
+
+After this standardization step, predictions are always interpreted in the same way:
+
+**Higher prediction values correspond to higher predicted risk**
+
+This allows `pipeML` to compute performance metrics such as the concordance index (C-index) and to stratify patients into risk groups for Kaplan–Meier visualization.
+
+```{r fig5, fig.cap="Figure 5. KM plot.", fig.align='center', out.width='80%'}
+knitr::include_graphics("figures/KM.png")
 ```
 
 ## **Train and predict using the machine learning models**
 
 If you already have a separate testing dataset, you can directly train the model and perform predictions using the following function. You can also choose to optimize a specific metric to select a decision threshold and return detailed prediction performance metrics such as Accuracy, Sensitivity, Specificity, F1 score, MCC, Recall, and Precision.
 ```{r, eval = FALSE}
-deconvolution = pipeML::deconvolution
-data_train = deconvolution[1:100,]
-data_test = deconvolution[!rownames(deconvolution) %in% rownames(data_train),]
 res <- compute_features.ML(features_train = data_train, 
                            features_test = data_test, 
                            clinical = traitData,
@@ -201,27 +365,6 @@ res <- compute_features.ML(features_train = data_train,
                            file_name = "Test",
                            maximize = "F1",
                            return = FALSE)
-```
-
-Access the prediction metrics:
-```{r, eval = FALSE}
-head(res$Prediction_metrics)
-```
-
-To compute variable importance:
-```{r, eval = FALSE}
-importance = compute_variable.importance(res$Model, 
-                                         stacking = FALSE, 
-                                         n_cores = 2)
-```
-
-And to visualize SHAP values:
-```{r, eval = FALSE}
-plot_shap_values(importance, "glm", "shap_plot")
-```
-
-```{r fig2, fig.cap="Figure 2. Variable importance.", fig.align='center', out.width='80%'}
-knitr::include_graphics("figures/var_importance.png")
 ```
 
 ## **Leaving one dataset out (LODO) analysis**
@@ -286,9 +429,6 @@ for (cohort in unique(traitData$Cohort)) {
                                      ncores = 2, 
                                      return = F)
 
-  ## Feature importance
-  importance = compute_variable.importance(res, stacking = T, n_cores = 2)
-
   #### ML predicting
   
   #### Testing
@@ -328,27 +468,32 @@ get_curves(metrics, "Specificity", "Sensitivity",
            metrics$AUROC, metrics$AUPRC, "Test")
 ```
 
-```{r fig3, fig.cap="Figure 3. RO curves.", fig.align='center', out.width='80%'}
-knitr::include_graphics("figures/ROC.png")
-```
+## **Leakage-aware custom cross-validation**
 
-```{r fig4, fig.cap="Figure 4. PR curves.", fig.align='center', out.width='80%'}
-knitr::include_graphics("figures/PR.png")
-```
+A central design principle of `pipeML` is to prevent information leakage during model training and evaluation. In many machine learning workflows, feature engineering steps are applied to the full dataset before cross-validation, which can inadvertently introduce information from the test folds into the training process. This leads to overoptimistic performance estimates.
 
-## **Custom k-fold cross validation**
+To address this, `pipeML` provides built-in support for custom fold construction through the fold_construction_fun argument in `compute_features.training.ML()`. This mechanism allows feature engineering and preprocessing steps to be recomputed independently within each cross-validation fold, ensuring that test samples never influence the training process.
 
-In certain use cases it is essential to carefully design how the training and test splits are created to prevent data leakage. `pipeML` supports the use of custom fold construction functions via the `fold_construction_fun` argument in the `compute_features.training.ML()` function. This allows you to preprocess your features within each fold, ensuring that information from the test set is never used during training.
+This capability is a core component of the `pipeML` pipeline, enabling leakage-aware model development for datasets where features depend on the full sample structure.
 
-#### Why use custom folds?
+#### Why custom fold construction is important?
 
-By default, cross-validation splits are performed directly on the feature matrix. However, if your features are generated through a process that uses correlations (e.g., clustering, dimensionality reduction, aggregation), gene set enrichment or other features that are sample-dependent, applying that process to the full dataset before splitting can leak test-set information into the training set, overfitting the models.
+In many biological and high-dimensional datasets, features are not independent variables but are derived from the data itself. Examples include:
 
-Using a custom fold construction function ensures that:
-- Test samples are projected onto the learned space without influencing it.
-- Fold-level processing mimics how the model would behave on truly unseen data.
+- correlation-based clustering
+- dimensionality reduction (e.g., PCA)
+- gene set enrichment or pathway scoring
+- transcription factor activity inference
+- aggregation of features across samples
 
-Below you can find an example of a custom fold function created to compute TF activity in samples using the viper algorithm. This approach is based on a TF-target set enrichment analysis similar to GSEA and thus, the scores will be sample-dependent. It needs normalized counts as input.
+If these transformations are applied to the entire dataset before cross-validation, the test samples influence how the feature space is constructed. As a result, the model indirectly “sees” information from the test data during training.
+
+By recomputing these steps within each fold, `pipeML` ensures that: 
+- training data are used to define the feature space
+- test samples are projected onto the learned space without influencing it
+- model evaluation reflects true out-of-sample performance
+
+This approach closely mimics how the model would behave when applied to completely unseen data, producing more realistic performance estimates.
 
 ```{r, eval = FALSE}
 # These parameters are taking care inside pipeML automatically once `fold_construction_fun` is set. Be sure to not change the parameteres names.
@@ -414,31 +559,37 @@ In order to create your own custom fold function, user can follow the same struc
 ```{r, eval=FALSE}
 ## counts_train: Normalized counts to compute the features from the training samples
 ## traitData_train: Target variable from the training samples
-
-res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), 
-                                           traitData_train$Response, 
-                                           trait.positive = "R", 
-                                           metric = "AUROC", 
-                                           stack = F, k_folds = 5, 
-                                           n_rep = 10, LODO = F, 
-                                           ncores = 2, return = F, 
-                                           fold_construction_fun = prepare_TFs_folds)
+res_customCV = compute_features.training.ML(features_train = t(counts_train),
+                                            target_var     = traitData_train$Response,
+                                            task_type      = "classification",
+                                            trait.positive = "R",
+                                            metric         = "AUROC",
+                                            k_folds        = 5,
+                                            n_rep          = 10,
+                                            return         = FALSE,
+                                            fold_construction_fun = prepare_TFs_folds)
 ```
 
 In order to predict, user needs to calculate the same type of features on the test set
 ```{r, eval = FALSE}
-## counts_test: Normalized counts to compute the features from the testing samples
-
 tf_activities_test <- compute_TF_activity(RNA_tpm = counts_test)
-
-# Predict in TFs
-pred = compute_prediction(res, tf_activities_test, traitData_test$Response, trait.positive = "R", 
-                          stack = FALSE, maximize = "Accuracy", return = F)
 ```
 
-#### What if `fold_construction_fun` has multiple parameters?
+Prediction
+```{r, eval = FALSE}
+pred <- compute_prediction(res_customCV$Model,
+                           test_features,
+                           traitData_test[,"Response"],
+                           trait.positive = "R",
+                           return = FALSE)
+```
 
-Sometimes the feature construction function requires additional arguments. For example, `compute_TF_activity()` may need the TF collection, a minimum target size, and whether TFs should be pruned. These can be exposed in your custom function:
+#### What if `fold_construction_fun` requires additional parameters?
+
+In some cases, the feature construction function may require extra arguments. For example, the function `compute_TF_activity()` may need parameters specifying the transcription factor (TF) collection to use, the minimum number of targets required for each TF, or whether TFs should be pruned.
+
+These parameters can simply be exposed and passed through your custom fold function, allowing you to control how features are computed within each cross-validation fold
+
 ```{r, eval = FALSE}
 tfs = compute.TFs.activity(counts.norm, TF.collection = "CollecTRI", min_targets_size = 5, tfs.pruned = FALSE)
 ```
@@ -529,10 +680,22 @@ res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)),
                                                                                tfs.pruned = FALSE))
 ```
 
-#### Tunable hyperparameters during custom function
+#### Tunable hyperparameters within custom fold functions
 
-There will be cases when user will have parameters that can change value and thus, affect the performance during training. pipeML implements a custom hyperparameter tuning for these type of cases where the goal is to find which value of a certain parameter maximizes the performance of the model. Briefly, it takes a grid of values propose by the user and compute custom k-folds for each combination of values, testing the performance across different ML models and their corresponding hyperparameters. It then returns the optimized parameters that return the best performance across a certain number of iterations defined by the user. For this, user needs to defined the parameter `fold_construction_args_tunable` with the different values that should be test. Here we want to test the performance using 5, 10, 15, 20 as different values for this parameter.
+In some scenarios, the feature construction step may include parameters whose values can influence model performance. For example, when computing transcription factor activity, parameters such as the minimum number of targets per TF may affect the resulting features and therefore the downstream model performance.
 
+To address this, `pipeML` supports hyperparameter tuning within custom fold functions. This allows users to identify which parameter values lead to the best predictive performance.
+
+Briefly, the user provides a grid of candidate parameter values, and `pipeML` will:
+
+- construct custom cross-validation folds for each parameter combination
+- train and evaluate machine learning models for each configuration
+- compare the resulting performance across folds and repetitions
+- return the parameter values that maximize the selected performance metric
+
+To enable this functionality, the user must specify the argument `fold_construction_args_tunable`, which contains the set of parameter values to be evaluated.
+
+In the example below, we test the model performance using four possible values (5, 10, 15, and 20) for a tunable parameter.
 ```{r, eval = FALSE}
 res = pipeML::compute_features.training.ML(as.data.frame(t(counts_train)), 
                                            traitData_train$Response, 
@@ -665,6 +828,8 @@ prepare_TFs_folds <- function(data, folds, TF.collection = "CollecTRI", min_targ
 }
 ```
 
+**NOTE:** `pipeML` is built on top of existing frameworks and makes extensive use of the R packages `caret`, `parnsip`, `tidymodels`, `parsnip` and `censored`. If you use `pipeML` in your work, please cite our package along with these foundational packages. 
 
+# References
 
 

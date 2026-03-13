@@ -2,7 +2,7 @@
 % Please edit documentation in R/machine_learning.R
 \name{compute_cv_accuracy}
 \alias{compute_cv_accuracy}
-\title{Compute Cross-Validation Accuracy for ML Models}
+\title{Internal: Compute Cross-Validation Accuracy for ML Models}
 \usage{
 compute_cv_accuracy(
   models,
@@ -12,31 +12,31 @@ compute_cv_accuracy(
 )
 }
 \arguments{
-\item{models}{A named list of trained ML models, each with a \code{resample} element containing cross-validated accuracy.}
+\item{models}{Named list of trained ML models. Each model must contain a \code{$resample} data frame
+with a column named \code{Accuracy}.}
 
-\item{file_name}{(Optional) Character string specifying the filename prefix for the saved accuracy plot (PDF format).}
+\item{file_name}{Optional character. Prefix for saving the accuracy barplot as a PDF in the \code{Results/} directory.}
 
-\item{base_models}{Logical. If \code{TRUE}, the function selects and returns base models using \code{choose_base_models()} for stacking.}
+\item{base_models}{Logical. If \code{TRUE}, selects base models using \code{choose_base_models()} for stacking.}
 
-\item{return}{Logical. If \code{TRUE}, the function saves a barplot of the model accuracy values in the \code{Results/} directory.}
+\item{return}{Logical. If \code{TRUE}, saves a barplot of model accuracy values in the \code{Results/} directory.}
 }
 \value{
 A list containing:
 \itemize{
-\item \code{Accuracy}: A data frame with the median and standard deviation of accuracy for each model.
-\item \code{Top_model}: A character string naming the model with the highest median accuracy.
-\item \code{Base_models} (optional): A character vector of selected base models if \code{base_models = TRUE}.
+\item \code{Accuracy}: Data frame summarizing the median and MAD of accuracy for each model.
+\item \code{Top_model}: Character string with the model name having the highest median accuracy.
+\item \code{Base_models} (optional): Character vector of selected base models if \code{base_models = TRUE}.
 }
 }
 \description{
-This function extracts cross-validated accuracy values from a list of trained machine learning models,
-summarizes their median and standard deviation, and optionally plots a bar chart or selects base models for stacking.
+Internal function to extract cross-validated accuracy from a list of trained machine learning models,
+summarize their median and variability, optionally generate a barplot, and select base models for stacking.
 }
 \details{
-This function assumes that each model in the list has a \code{$resample} component containing
-a column named \code{Accuracy}. It calculates the median and standard deviation of accuracy
-for each model and creates a barplot (if \code{return = TRUE}) with error bars.
-
-If \code{base_models = TRUE}, it calls a helper function \code{choose_base_models()} to select
-models for use in stacking.
+The function assumes that each model contains a \code{$resample} component with an \code{Accuracy} column.
+Median and MAD (median absolute deviation) of accuracy are computed for each model.
+If \code{return = TRUE}, a PDF barplot with error bars is created.
+When \code{base_models = TRUE}, \code{choose_base_models()} is called to select models for stacking.
 }
+\keyword{internal}

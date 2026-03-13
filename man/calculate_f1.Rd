@@ -18,3 +18,4 @@ The F1 score, a numeric value between 0 and 1.
 The F1 score is the harmonic mean of precision and recall, and is used to evaluate the balance between the two metrics.
 It is particularly useful when the class distribution is imbalanced.
 }
+\keyword{internal}

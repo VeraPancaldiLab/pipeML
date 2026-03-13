@@ -7,56 +7,68 @@
 compute_prediction(
   model,
   test_data,
-  target_var,
-  trait.positive,
+  target_var = NULL,
+  trait.positive = NULL,
+  task_type = "classification",
+  time_var = NULL,
+  event_var = NULL,
   stack = FALSE,
   file.name = NULL,
-  maximize = "Accuracy",
-  return = F
+  return = FALSE
 )
 }
 \arguments{
-\item{model}{The trained machine learning model returned from \code{compute_features.training.ML()} or \code{compute_features.ML()}.}
+\item{model}{The trained machine learning model returned from \code{compute_features.ML()} or
+\code{compute_features.training.ML()}.}
 
-\item{test_data}{A matrix or data frame containing the testing dataset (features only).}
+\item{test_data}{A data frame or matrix of predictor variables for the test set.}
 
-\item{target_var}{A character vector of true target values for the test data (the observed labels).}
+\item{target_var}{Vector of true labels for the test set (classification only).}
 
-\item{trait.positive}{Value in \code{target_var} to be considered as the positive class.}
+\item{trait.positive}{Value in \code{target_var} representing the positive class (classification only).}
 
-\item{stack}{Logical. If stacking was used during model training, this parameter should be set to TRUE in order to use the meta-learner for prediction. Default is FALSE.}
+\item{task_type}{Character. Either \code{"classification"} or \code{"survival"}.}
 
-\item{file.name}{A character string to specify the filename for saving the confusion matrix plot
-(optional). If \code{NULL}, the plot is not saved.}
+\item{time_var}{Column or vector of survival/follow-up times (required for survival tasks).}
 
-\item{maximize}{A character string indicating which metric to maximize when selecting the best
-threshold for the confusion matrix. Options include "Accuracy", "Precision",
-"Recall", "Specificity", "Sensitivity", "F1", or "MCC". Default is "Accuracy".}
+\item{event_var}{Column or vector of event indicators (1 = event, 0 = censored; required for survival tasks).}
 
-\item{return}{Logical. Whether to return the results and generated plots.}
+\item{stack}{Logical. If TRUE, uses meta-learner predictions for stacked models (classification only).}
+
+\item{file.name}{Character. Filename prefix for saving plots (optional). If NULL, plots are not saved.}
+
+\item{return}{Logical. Whether to return metrics, predictions, and plots. Default = FALSE.}
 }
 \value{
 A list containing:
-\item{Metrics}{A data frame with various performance metrics (Accuracy, Sensitivity, Specificity,
-Precision, Recall, F1 score, MCC) for each threshold.}
-\item{AUC}{A list containing the AUROC and AUPRC values.}
-\item{Predictions}{A data frame with the predicted probabilities for each class (e.g., \code{yes} or \code{no}).}
+\describe{
+\item{\code{Metrics}}{Data frame of performance metrics (Accuracy, Sensitivity, Specificity,
+Precision, Recall, F1 score, MCC) for each threshold (classification only).}
+\item{\code{AUC}}{List containing AUROC and AUPRC values with optional bootstrap confidence intervals (classification only).}
+\item{\code{Predictions}}{Data frame of predicted probabilities for each class (classification) or risk scores (survival).}
+}
 }
 \description{
-This function computes prediction metrics for a given machine learning model, including
-the confusion matrix, AUROC, AUPRC, and other performance metrics such as Accuracy, Sensitivity,
-Specificity, Precision, Recall, F1 score, and MCC. The function also determines the optimal
-classification threshold based on a chosen metric (e.g., Accuracy, F1, or AUROC) and generates
-a confusion matrix plot.
+Computes prediction metrics for a trained machine learning model, including the confusion matrix,
+AUROC, AUPRC, Accuracy, Sensitivity, Specificity, Precision, Recall, F1 score, and MCC. For
+classification tasks, it also determines the optimal classification threshold and generates
+ROC, PRC, and confusion matrix plots. For survival analysis tasks, it predicts risk scores and
+optionally generates Kaplan–Meier plots.
 }
 \details{
-This function first generates predictions for the test dataset using the trained machine learning model.
-It then calculates performance metrics for a range of threshold values and selects the threshold that maximizes
-the chosen metric (e.g., Accuracy, F1 score, etc.). The function returns the metrics for the best threshold,
-including AUROC and AUPRC, and produces a confusion matrix plot that compares predicted versus actual labels.
+For \strong{classification}, the function:
+\enumerate{
+\item Uses the trained model (or meta-learner if \code{stack = TRUE}) to predict probabilities for the test data.
+\item Computes performance metrics across thresholds and selects the optimal threshold based on a chosen metric.
+\item Calculates AUROC and AUPRC and optionally bootstrapped confidence intervals.
+\item Generates ROC, PRC, and confusion matrix plots if \code{return = TRUE} and \code{file.name} is provided.
+}
 
-The confusion matrix plot is saved as a PDF with the name \verb{Confusion_Matrix_<file.name>.pdf} if a valid
-\code{file.name} is provided.
+For \strong{survival analysis}, the function:
+\enumerate{
+\item Predicts risk scores using the trained survival model.
+\item Optionally generates Kaplan–Meier plots stratified by predicted risk groups.
+}
 }
 \seealso{
 \code{\link[caret]{confusionMatrix}}, \code{\link[caret]{varImp}}, \code{\link[ggplot2]{ggplot}}

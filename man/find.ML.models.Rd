@@ -22,3 +22,4 @@ This function searches a directory for machine learning models and filters them 
 specified AUC threshold for either the ROC or Precision-Recall curves. It returns a list of
 model file names that meet the specified AUC criteria.
 }
+\keyword{internal}

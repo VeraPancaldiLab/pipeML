@@ -2,71 +2,48 @@
 % Please edit documentation in R/machine_learning.R
 \name{predict_and_evaluate_survival}
 \alias{predict_and_evaluate_survival}
-\title{Predict and Evaluate Survival Model Performance}
+\title{Predict and Evaluate Survival Model Performance (Internal)}
 \usage{
 predict_and_evaluate_survival(
   model_fit,
   data,
-  outcome_col = "time",
-  event_col = "event"
+  outcome_col = NULL,
+  event_col = NULL
 )
 }
 \arguments{
-\item{model_fit}{A fitted survival model object (typically created via
-a \code{parsnip} or \code{workflow} model specification).}
+\item{model_fit}{A fitted survival model object (typically from \code{parsnip} or \code{workflow}).}
 
-\item{data}{A data frame containing the predictors and survival outcome
-variables used for prediction and evaluation.}
+\item{data}{Data frame containing predictors and survival outcome variables.}
 
-\item{outcome_col}{Character string specifying the name of the survival time
-column in \code{data}. Default is \code{"time"}.}
+\item{outcome_col}{Character string specifying the survival time column (default = \code{"time"}).}
 
-\item{event_col}{Character string specifying the name of the event indicator
-column in \code{data}. Default is \code{"event"}.}
+\item{event_col}{Character string specifying the event indicator column (default = \code{"event"}).}
 }
 \value{
-A list with two elements:
+A list containing:
 \describe{
-\item{\code{preds}}{A tibble containing standardized numeric predictions.}
-\item{\code{c_index}}{Numeric value representing the computed C-index.}
+\item{\code{preds}}{Tibble with standardized numeric predictions \code{.pred}.}
+\item{\code{c_index}}{Numeric value of the computed C-index.}
+\item{\code{c_index_lower}}{Lower bound of 95\% CI for the C-index.}
+\item{\code{c_index_upper}}{Upper bound of 95\% CI for the C-index.}
 }
 }
 \description{
-This function generates predictions from a fitted survival model and evaluates
-its performance using the Concordance Index (C-index). It automatically
-handles different prediction output types supported by various survival
-modeling engines and standardizes predictions into a comparable numeric format.
+Generates predictions from a fitted survival model and evaluates
+performance using the Concordance Index (C-index). Handles multiple
+prediction output types from different survival engines and standardizes
+predictions into a comparable numeric format.
 }
 \details{
-The function attempts to generate predictions using multiple possible
-prediction types, depending on what the model supports:
+The function attempts predictions using multiple types depending on model support:
 \itemize{
-\item \code{"linear_pred"} — Linear predictor or log hazard (e.g., Cox models),
-where higher values indicate higher risk.
-\item \code{"time"} — Expected survival time (e.g., AFT models),
-where higher values imply longer survival (automatically reversed).
-\item \code{"survival"} — Survival probability at a specific evaluation time,
-where higher values indicate better survival (automatically reversed).
+\item \code{"linear_pred"} — Linear predictor/log hazard (higher = higher risk).
+\item \code{"time"} — Expected survival time (higher = longer survival, reversed internally).
+\item \code{"survival"} — Survival probability at a median evaluation time (higher = better survival, reversed internally).
 }
 
-It standardizes the prediction output into a tibble with one numeric column
-\code{.pred}, ensuring consistency across engines.
-The function then computes the Concordance Index (C-index) using
-\code{yardstick::concordance_survival_vec()} to assess how well the model ranks
-predicted survival relative to actual outcomes.
+Standardizes output into a tibble with a single numeric \code{.pred} column.
+Computes C-index using \code{compute_cindex_ci()} if outcome/event columns are provided.
 }
-\examples{
-\dontrun{
-fitted_model <- parsnip::fit(
-  parsnip::proportional_hazards(engine = "survival"),
-  Surv(time, event) ~ .,
-  data = lung
-)
-results <- predict_and_evaluate_survival(fitted_model, lung)
-results$c_index
-}
-
-}
-\seealso{
-\code{\link[yardstick:concordance_survival]{yardstick::concordance_survival_vec()}}, \code{\link[=aggregate_results]{aggregate_results()}}
-}
+\keyword{internal}

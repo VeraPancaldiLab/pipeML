@@ -22,3 +22,4 @@ This function calculates the accuracy of a model based on the provided metrics a
 The accuracy is computed as the ratio of correct predictions (both true positives and true negatives)
 to the total number of predictions.
 }
+\keyword{internal}

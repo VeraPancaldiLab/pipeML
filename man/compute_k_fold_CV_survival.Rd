@@ -2,7 +2,7 @@
 % Please edit documentation in R/machine_learning.R
 \name{compute_k_fold_CV_survival}
 \alias{compute_k_fold_CV_survival}
-\title{Nested Cross-Validation for Survival Models with Optional Custom Fold Construction}
+\title{Nested Cross-Validation for Survival Models (Internal)}
 \usage{
 compute_k_fold_CV_survival(
   df_features,
@@ -21,78 +21,70 @@ compute_k_fold_CV_survival(
 )
 }
 \arguments{
-\item{df_features}{A data frame of predictor variables (features).}
+\item{df_features}{Data frame of predictor variables (features).}
 
-\item{df_outcome}{A data frame containing survival outcomes — typically including
-survival time and event indicator columns.}
+\item{df_outcome}{Data frame of survival outcomes (time and event columns).}
 
-\item{outcome_col}{Character string giving the name of the survival time column.}
+\item{outcome_col}{Character. Name of the survival time column.}
 
-\item{event_col}{Character string giving the name of the event indicator column
-(\code{0 = censored}, \code{1 = event}).}
+\item{event_col}{Character. Name of the event indicator column (\code{0 = censored}, \code{1 = event}).}
 
-\item{k_folds}{Integer. Number of folds for K-fold cross-validation (default = 5).}
+\item{k_folds}{Integer. Number of folds for K-fold CV (default = 5).}
 
 \item{n_rep}{Integer. Number of repeated CV iterations (default = 1).}
 
-\item{ncores}{Integer. Number of CPU cores to use for parallelization.}
+\item{ncores}{Integer. Number of CPU cores for parallelization.}
 
-\item{LODO}{Logical; if \code{TRUE}, performs Leave-One-Domain-Out cross-validation
-using \code{batch_id} to stratify samples by cohort.}
+\item{LODO}{Logical. If \code{TRUE}, performs Leave-One-Domain-Out CV using \code{batch_id}.}
 
-\item{batch_id}{Optional character string naming the column representing cohort or
-batch identifiers. Required if \code{LODO = TRUE}.}
+\item{batch_id}{Character. Name of column representing cohort/batch. Required if \code{LODO = TRUE}.}
 
-\item{file_name}{Optional string specifying the suffix for the generated C-index
-summary PDF saved in the \code{"Results/"} directory.}
+\item{file_name}{Optional string. Suffix for generated C-index summary PDF saved in \code{"Results/"}.}
 
-\item{fold_construction_fun}{Optional custom function for constructing data folds.
-Used to interface with external preprocessing workflows (e.g., CellTFusion).}
+\item{fold_construction_fun}{Optional custom function to construct data folds.}
 
-\item{fold_construction_args_fixed}{Optional list of fixed arguments passed to
-\code{fold_construction_fun()}.}
+\item{fold_construction_args_fixed}{Optional list of fixed arguments passed to \code{fold_construction_fun}.}
 
-\item{fold_construction_args_tunable}{Optional list of tunable arguments passed to
-\code{fold_construction_fun()} during hyperparameter tuning.}
+\item{fold_construction_args_tunable}{Optional list of tunable arguments passed to \code{fold_construction_fun} during hyperparameter tuning.}
 }
 \value{
-A named list with the following elements:
+A named list containing:
 \describe{
 \item{\code{Model}}{The best-performing survival model retrained on the full dataset.}
 \item{\code{ML_Models}}{All evaluated survival models with aggregated C-index results.}
 \item{\code{C_index_median}}{Median C-index of the top-performing model.}
-\item{\code{Custom_output}}{Optional list of custom outputs from fold construction.}
+\item{\code{Custom_output}}{Optional outputs from the custom fold construction function.}
 }
 }
 \description{
-Performs \emph{nested cross-validation} to evaluate and tune multiple survival
-models using the \strong{tidymodels} ecosystem. Supports both standard
-event-stratified cross-validation and \emph{Leave-One-Domain-Out (LODO)} setups,
-enabling cohort-balanced model evaluation. Hyperparameter grids are
-automatically constructed for each model type.
+Performs nested cross-validation for survival models using the \strong{tidymodels}
+ecosystem. Supports both standard event-stratified K-fold CV and
+Leave-One-Domain-Out (LODO) setups. Hyperparameter grids are automatically
+generated for each model type.
 }
 \details{
-Depending on the inputs, the function can:
+The function can:
 \enumerate{
-\item Build folds internally or accept custom folds from a user-defined function.
-\item Train survival models with or without hyperparameter tuning.
+\item Build folds internally or accept a custom fold construction function.
+\item Train multiple survival models with optional hyperparameter tuning.
 \item Compute and aggregate the Concordance Index (C-index) across folds.
-\item Identify and retrain the top-performing model using optimal parameters.
+\item Retrain the top-performing model using its optimal hyperparameters.
 }
 
-Internally, the function:
+The function internally:
 \itemize{
-\item Merges predictors and outcomes into a single dataset.
-\item Creates stratified folds using \strong{rsample}, either by event rate or by
-cohort × event combinations (if \code{LODO = TRUE}).
-\item Evaluates a predefined set of survival models:
-Cox PH, penalized Cox (glmnet), AFT (flexsurv), decision trees, bagged trees,
-and random forests.
-\item Aggregates the median and MAD of the C-index across resamples.
-\item Retrains the best-performing model with its optimal hyperparameters.
+\item Merges predictors and outcomes.
+\item Creates stratified folds using \strong{rsample}, either by event or by cohort × event (LODO).
+\item Evaluates predefined survival models: Cox PH, penalized Cox (glmnet), AFT (flexsurv),
+decision trees, bagged trees, and random forests.
+\item Aggregates the median and MAD of C-index across resamples.
+\item Retrains the top-performing model on the full dataset.
 }
 
-When a custom fold construction function is provided via \code{fold_construction_fun},
-the function handles folds in parallel, saves intermediate results under
-\code{"Results/"}, and returns additional outputs for advanced integration.
+If \code{fold_construction_fun} is provided, the function handles folds in parallel
+and returns additional outputs for advanced integration.
 }
+\seealso{
+\code{\link[=compute_ml_survival]{compute_ml_survival()}}, \code{\link[=get_default_hyperparams]{get_default_hyperparams()}}, \code{\link[=aggregate_results]{aggregate_results()}}
+}
+\keyword{internal}

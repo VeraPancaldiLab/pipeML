@@ -44,3 +44,4 @@ importance scores.
 \seealso{
 \code{\link[caret]{varImp}}
 }
+\keyword{internal}

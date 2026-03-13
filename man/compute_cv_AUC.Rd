@@ -2,7 +2,7 @@
 % Please edit documentation in R/machine_learning.R
 \name{compute_cv_AUC}
 \alias{compute_cv_AUC}
-\title{Compute Cross-Validated AUC Values for Machine Learning Models}
+\title{Internal: Compute Cross-Validated AUROC and AUPRC for ML Models}
 \usage{
 compute_cv_AUC(
   models,
@@ -13,38 +13,27 @@ compute_cv_AUC(
 )
 }
 \arguments{
-\item{models}{A named list of trained machine learning models. Each model should contain a \code{resample}
-data frame with AUROC and AUPRC values from cross-validation.}
+\item{models}{Named list of trained ML models. Each model must contain a \code{$resample} data frame with \code{AUROC} and \code{AUPRC} columns.}
 
-\item{file_name}{(Optional) Character string. Used as the prefix for the plot filenames if \code{save_plot = TRUE}.}
+\item{file_name}{Optional character string. Prefix for saving AUROC/AUPRC plots in the \code{Results/} directory.}
 
-\item{base_models}{Logical. If \code{TRUE}, selects a subset of models as base learners for stacking using the \code{choose_base_models()} function.}
+\item{base_models}{Logical. If \code{TRUE}, selects a subset of models as base learners for stacking using \code{choose_base_models()}.}
 
-\item{AUC_type}{Character. Either \code{"AUROC"} or \code{"AUPRC"}; determines which metric is used to select the top-performing model.}
+\item{AUC_type}{Character. Either \code{"AUROC"} or \code{"AUPRC"}, used to select the top-performing model.}
 
-\item{return}{Logical. Whether to return the results and generated plots.}
+\item{return}{Logical. If \code{TRUE}, saves barplots of AUROC and AUPRC values in the \code{Results/} directory.}
 }
 \value{
 A list containing:
 \describe{
-\item{\code{AUROC}}{A data frame with median and standard deviation of AUROC values for each model.}
-\item{\code{AUPRC}}{A data frame with median and standard deviation of AUPRC values for each model.}
-\item{\code{Top_model}}{The name of the model with the highest median value for the selected metric (\code{AUC_type}).}
-\item{\code{Base_models}}{(Optional) A character vector of selected base models for stacking, returned if \code{base_models = TRUE}.}
+\item{\code{AUROC}}{Data frame with median and MAD of AUROC for each model.}
+\item{\code{AUPRC}}{Data frame with median and MAD of AUPRC for each model.}
+\item{\code{Top_model}}{Character string: the model with the highest median value for the selected metric (\code{AUC_type}).}
+\item{\code{Base_models}}{(Optional) Character vector of selected base models if \code{base_models = TRUE}.}
 }
 }
 \description{
-This function computes cross-validated AUROC and AUPRC scores for a list of trained machine learning models.
-It can also save performance barplots and optionally select base models for stacking.
+Internal function to summarize cross-validated AUROC and AUPRC values from a list of trained machine learning models.
+Computes median and MAD for each model, optionally generates barplots, and can select base models for stacking.
 }
-\examples{
-\dontrun{
-res <- compute_cv_AUC(
-  models = ml_models,
-  file_name = "Model_Performance",
-  base_models = TRUE,
-  AUC_type = "AUROC",
-  save_plot = TRUE
-)
-}
-}
+\keyword{internal}

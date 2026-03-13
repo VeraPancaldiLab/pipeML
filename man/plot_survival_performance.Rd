@@ -2,56 +2,33 @@
 % Please edit documentation in R/machine_learning.R
 \name{plot_survival_performance}
 \alias{plot_survival_performance}
-\title{Plot and save survival performance of a model on test data}
+\title{Plot and Save Survival Performance of a Model (Internal)}
 \usage{
-plot_survival_performance(
-  df_test,
-  c_index = NULL,
-  n_groups = 3,
-  file_name = NULL
-)
+plot_survival_performance(df_test, prediction, n_groups = 3, file_name = NULL)
 }
 \arguments{
-\item{df_test}{A data frame containing at least the following columns:
-\describe{
-\item{time}{Observed survival or follow-up time (numeric).}
-\item{event}{Event indicator (1 = event occurred, 0 = censored).}
-\item{.pred}{Predicted risk score or linear predictor from the model
-(higher values indicate higher risk).}
-}}
+\item{df_test}{Data frame containing observed survival, event indicator and predicted risk score.}
 
-\item{c_index}{Numeric. The concordance index (C-index) computed on the test data.}
+\item{prediction}{List containing prediction results}
 
-\item{n_groups}{Integer. Number of risk groups to stratify by (default = 3).
-Typically 3 groups correspond to "Low", "Medium", and "High" risk strata.}
+\item{n_groups}{Integer. Number of risk groups for stratification (default = 3).}
 
-\item{file_name}{Character (optional). If provided, the Kaplan–Meier plot will be
-saved to \code{"Results/Survival_KM_<file_name>.pdf"}.}
+\item{file_name}{Optional character. If provided, saves the Kaplan–Meier plot
+to "Results/Survival_KM_<file_name>.pdf".}
 }
 \value{
-Invisibly returns the \code{ggsurvplot} object for further customization,
-and saves a PDF of the plot in the "Results/" directory if \code{file_name} is provided.
+Invisibly returns the \code{ggsurvplot} object for further customization.
 }
 \description{
-This function groups individuals into risk strata (e.g., Low/Medium/High)
-based on their predicted risk scores from a fitted survival model.
-It then plots Kaplan–Meier survival curves for each risk group,
-including a log-rank test for group separation and displays the
-concordance index (C-index) of the model on the test data.
+Stratifies individuals into risk groups based on predicted risk scores from
+a fitted survival model, plots Kaplan–Meier survival curves per risk group,
+performs a log-rank test, and displays the concordance index (C-index) with
+confidence interval. Optionally saves the plot as a PDF in "Results/".
 }
 \details{
-Risk groups are defined by quantile-based cut points on the predicted risk scores.
-The log-rank test is used to assess whether survival curves differ significantly
-between risk strata. The C-index is displayed for interpretability.
+Risk groups are defined by quantiles of the predicted risk scores. Kaplan–Meier
+curves visualize survival per risk group, and a log-rank test assesses
+differences. The C-index and its 95\% confidence interval are displayed in the
+plot subtitle.
 }
-\examples{
-\dontrun{
-plot_survival_performance(
-  df_test = test_data,
-  c_index = 0.74,
-  n_groups = 3,
-  file_name = "cox_model_test"
-)
-}
-
-}
+\keyword{internal}

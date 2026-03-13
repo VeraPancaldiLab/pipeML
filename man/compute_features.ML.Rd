@@ -21,7 +21,6 @@ compute_features.ML(
   batch_id = NULL,
   file_name = NULL,
   ncores = NULL,
-  maximize = "Accuracy",
   return = FALSE,
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
@@ -30,91 +29,82 @@ compute_features.ML(
 }
 \arguments{
 \item{features_train}{A data frame or matrix of predictor variables used for training
-(rows as samples, columns as features).}
+(rows = samples, columns = features).}
 
 \item{features_test}{A data frame or matrix of predictor variables used for testing.}
 
-\item{clinical}{A data frame containing clinical or outcome information.
-Row names must match those of \code{features_train} and \code{features_test}.}
+\item{clinical}{A data frame containing clinical or outcome information. Row names must match
+those of \code{features_train} and \code{features_test}.}
 
-\item{task_type}{Character. Type of task: either \code{"classification"} or \code{"survival"}.}
+\item{task_type}{Character. Type of task: \code{"classification"} or \code{"survival"}.}
 
-\item{trait}{Character. Name of the column in \code{clinical} used as the target variable
+\item{trait}{Character. Column name in \code{clinical} used as the target variable
 (required for classification tasks).}
 
-\item{trait.positive}{Character or numeric. Value in \code{trait} considered the positive class.}
+\item{trait.positive}{Value in \code{trait} that represents the positive class (classification only).
+Ensures all performance metrics and interpretability analyses consistently treat the correct class as positive.}
 
-\item{time_var}{Character. Name of the column in \code{clinical} containing survival or follow-up time
-(required for survival tasks).}
+\item{time_var}{Character. Column name in \code{clinical} containing survival/follow-up time (required for survival tasks).}
 
-\item{event_var}{Character. Name of the column in \code{clinical} indicating event occurrence
+\item{event_var}{Character. Column name in \code{clinical} indicating event occurrence
 (1 = event occurred, 0 = censored; required for survival tasks).}
 
-\item{metric}{Character. Performance metric for model tuning and selection.
-Supported options for classification: \code{"Accuracy"}, \code{"AUROC"}, \code{"AUPRC"}.
-For survival models, performance is evaluated using the concordance index (C-index).}
+\item{metric}{Character. Performance metric used for model tuning and selection:
+\itemize{
+\item Classification: \code{"Accuracy"}, \code{"AUROC"}, \code{"AUPRC"}.
+\item Survival: evaluated using concordance index (C-index).
+}}
 
-\item{stack}{Logical. Whether to perform model stacking (default = \code{FALSE}).}
+\item{stack}{Logical. Perform model stacking (ensemble meta-learning). Default: \code{FALSE}.}
 
-\item{k_folds}{Integer. Number of folds for cross-validation (default = 10).}
+\item{k_folds}{Integer. Number of folds for cross-validation. Default: 10.}
 
-\item{n_rep}{Integer. Number of repetitions for cross-validation (default = 5).}
+\item{n_rep}{Integer. Number of repetitions for cross-validation. Default: 5.}
 
-\item{LODO}{Logical. If \code{TRUE}, performs Leave-One-Dataset-Out (LODO) cross-validation
-based on cohort identifiers.}
+\item{LODO}{Logical. If \code{TRUE}, performs Leave-One-Dataset-Out cross-validation based on cohorts.}
 
-\item{batch_id}{Column name indicating where the cohort or batch membership for each sample is.
-Required if \code{LODO = TRUE}.}
+\item{batch_id}{Column name indicating cohort or batch membership for each sample (required if \code{LODO = TRUE}).}
 
-\item{file_name}{Character. Base name used to save plots and results under the \code{Results/} directory.
-For survival tasks, this will be used to create a Kaplan–Meier plot named
-\code{"Results/Survival_KM_<file_name>.pdf"}.}
+\item{file_name}{Character. Base name used to save plots/results under \code{Results/}. For survival tasks,
+Kaplan–Meier plots are saved as \code{"Results/Survival_KM_<file_name>.pdf"}.}
 
-\item{ncores}{Integer. Number of CPU cores to use for parallelization. If not specified,
-defaults to \code{parallel::detectCores() - 1}.}
+\item{ncores}{Integer. Number of CPU cores for parallelization. Default: \code{parallel::detectCores() - 1}.}
 
-\item{maximize}{Character. Metric to maximize when selecting the optimal classification threshold
-(options: \code{"Accuracy"}, \code{"Precision"}, \code{"Recall"}, \code{"Specificity"},
-\code{"Sensitivity"}, \code{"F1"}, or \code{"MCC"}). Default = \code{"Accuracy"}.}
-
-\item{return}{Logical. Whether to return and save plots (default = \code{FALSE}).}
+\item{return}{Logical. Whether to return and save plots/results. Default: \code{FALSE}.}
 
 \item{fold_construction_fun}{Function. Optional custom function to construct cross-validation folds.
-Must accept a \code{bestune} argument internally for optimized hyperparameter injection.}
+Must accept a \code{bestune} argument internally to inject optimized hyperparameters.}
 
-\item{fold_construction_args_fixed}{List. Fixed arguments passed to \code{fold_construction_fun},
-used in both cross-validation and final model training.}
+\item{fold_construction_args_fixed}{List. Fixed arguments passed to \code{fold_construction_fun} for both CV and final training.}
 
-\item{fold_construction_args_tunable}{List. Tunable arguments passed to \code{fold_construction_fun},
-defining hyperparameters to explore during cross-validation.}
+\item{fold_construction_args_tunable}{List. Arguments passed to \code{fold_construction_fun} defining hyperparameters to explore during CV.}
 }
 \value{
 A named list containing:
 \describe{
-\item{Model}{The trained model or workflow (classification) or refitted best model (survival).}
+\item{Model}{Trained model or workflow (classification) or refitted best model (survival).}
 \item{Metrics}{Performance metrics computed on the test data.}
 \item{AUC}{For classification tasks, a list containing AUROC and AUPRC values.}
 \item{Prediction}{Predicted class probabilities (classification) or risk scores (survival).}
-\item{CV_Results}{Cross-validation results, including median and MAD of C-index (survival).}
-\item{Test_CINDEX}{Concordance index for the test data (survival only).}
+\item{CV_Results}{Cross-validation results, including median and MAD of C-index for survival tasks.}
+\item{Test_CINDEX}{Concordance index on test data (survival only).}
 \item{KM_Plot}{Kaplan–Meier plot object (if \code{return = TRUE}).}
 }
 }
 \description{
 This function trains and evaluates machine learning models using cross-validation on training data
-and then tests performance on independent test data. It supports both \strong{classification} and
+and then evaluates performance on independent test data. It supports both \strong{classification} and
 \strong{survival analysis} tasks, including hyperparameter tuning, model stacking, and cohort-based
 (Leave-One-Dataset-Out, LODO) validation. For survival models, it computes the \strong{C-index}
 and generates Kaplan–Meier plots stratified by predicted risk.
 }
 \details{
-For \strong{classification tasks}, this function performs cross-validation tuning based on the chosen
-performance metric (e.g., Accuracy, AUROC, or AUPRC), followed by test-set evaluation and ROC/PR curve plotting.
+For \strong{classification tasks}, the function performs repeated k-fold cross-validation
+with hyperparameter tuning, followed by evaluation on the test set. ROC and PR curves are generated.
 
-For \strong{survival analysis tasks}, it performs model selection using the C-index, refits the best
-model on the full training data, evaluates the test-set C-index, and plots Kaplan–Meier survival
-curves across quantile-based risk strata (Low/Medium/High risk). The C-index and log-rank test
-p-value are displayed on the plot.
+For \strong{survival tasks}, it performs model selection using the C-index, refits the best model
+on the full training data, evaluates test-set C-index, and plots Kaplan–Meier curves across
+quantile-based risk strata (Low/Medium/High). The C-index and log-rank test p-value are displayed.
 }
 \examples{
 \dontrun{

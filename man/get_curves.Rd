@@ -35,3 +35,4 @@ This function generates and saves the Receiver Operating Characteristic (ROC) cu
 and Precision-Recall curve based on the provided metrics. It also includes the AUC values
 for both curves in the plot legends.
 }
+\keyword{internal}

@@ -20,3 +20,4 @@ A data frame containing sensitivity, specificity, precision, recall, F1 score, M
 This function calculates sensitivity (recall), specificity, and other related metrics (accuracy, precision, recall, F1 score, MCC)
 from predicted and true class labels.
 }
+\keyword{internal}

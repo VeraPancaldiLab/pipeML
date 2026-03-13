@@ -18,3 +18,4 @@ The AUPRC score, a numeric value between 0 and 1.
 This function calculates the Area Under the Precision-Recall Curve (AUPRC).
 It uses the trapezoidal rule to compute the AUPRC from the recall and precision values.
 }
+\keyword{internal}
