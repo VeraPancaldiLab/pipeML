@@ -31,4 +31,3 @@ curves visualize survival per risk group, and a log-rank test assesses
 differences. The C-index and its 95\% confidence interval are displayed in the
 plot subtitle.
 }
-\keyword{internal}

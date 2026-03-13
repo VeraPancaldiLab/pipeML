@@ -7,7 +7,7 @@
 compute_features.ML(
   features_train,
   features_test,
-  clinical,
+  coldata,
   task_type = c("classification", "survival"),
   trait = NULL,
   trait.positive = NULL,
@@ -33,7 +33,7 @@ compute_features.ML(
 
 \item{features_test}{A data frame or matrix of predictor variables used for testing.}
 
-\item{clinical}{A data frame containing clinical or outcome information. Row names must match
+\item{coldata}{A data frame containing outcome information. Row names must match
 those of \code{features_train} and \code{features_test}.}
 
 \item{task_type}{Character. Type of task: \code{"classification"} or \code{"survival"}.}
@@ -112,7 +112,7 @@ quantile-based risk strata (Low/Medium/High). The C-index and log-rank test p-va
 results_classif <- compute_features.ML(
   features_train = X_train,
   features_test  = X_test,
-  clinical       = clin_df,
+  coldata        = clin_df,
   task_type      = "classification",
   trait          = "Response",
   trait.positive = "Responder",
@@ -126,7 +126,7 @@ results_classif <- compute_features.ML(
 results_surv <- compute_features.ML(
   features_train = X_train,
   features_test  = X_test,
-  clinical       = clin_df,
+  coldata        = clin_df,
   task_type      = "survival",
   time_var       = "time",
   event_var      = "status",

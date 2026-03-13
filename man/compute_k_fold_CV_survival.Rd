@@ -12,6 +12,7 @@ compute_k_fold_CV_survival(
   k_folds,
   n_rep,
   ncores,
+  return = FALSE,
   LODO = FALSE,
   batch_id = NULL,
   file_name = NULL,
@@ -34,6 +35,8 @@ compute_k_fold_CV_survival(
 \item{n_rep}{Integer. Number of repeated CV iterations (default = 1).}
 
 \item{ncores}{Integer. Number of CPU cores for parallelization.}
+
+\item{return}{Logical. Whether to return the generated plots.}
 
 \item{LODO}{Logical. If \code{TRUE}, performs Leave-One-Domain-Out CV using \code{batch_id}.}
 

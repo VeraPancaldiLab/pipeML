@@ -1510,7 +1510,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #' @param features_train A data frame or matrix of predictor variables used for training
 #'   (rows = samples, columns = features).
 #' @param features_test A data frame or matrix of predictor variables used for testing.
-#' @param clinical A data frame containing clinical or outcome information. Row names must match
+#' @param coldata A data frame containing outcome information. Row names must match
 #'   those of \code{features_train} and \code{features_test}.
 #' @param task_type Character. Type of task: \code{"classification"} or \code{"survival"}.
 #' @param trait Character. Column name in \code{clinical} used as the target variable
@@ -1564,7 +1564,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #' results_classif <- compute_features.ML(
 #'   features_train = X_train,
 #'   features_test  = X_test,
-#'   clinical       = clin_df,
+#'   coldata        = clin_df,
 #'   task_type      = "classification",
 #'   trait          = "Response",
 #'   trait.positive = "Responder",
@@ -1578,7 +1578,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #' results_surv <- compute_features.ML(
 #'   features_train = X_train,
 #'   features_test  = X_test,
-#'   clinical       = clin_df,
+#'   coldata        = clin_df,
 #'   task_type      = "survival",
 #'   time_var       = "time",
 #'   event_var      = "status",
@@ -1590,7 +1590,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #' }
 #'
 #' @export
-compute_features.ML <- function(features_train, features_test, clinical,
+compute_features.ML <- function(features_train, features_test, coldata,
                                 task_type = c("classification", "survival"),
                                 trait = NULL, trait.positive = NULL,
                                 time_var = NULL, event_var = NULL,
@@ -1608,10 +1608,10 @@ compute_features.ML <- function(features_train, features_test, clinical,
   if (task_type == "classification") {
 
     # Train cohort
-    traitData_train = clinical[rownames(clinical)%in%rownames(features_train), ]
+    traitData_train = coldata[rownames(coldata)%in%rownames(features_train), ]
 
     # Test cohort
-    traitData_test = clinical[rownames(clinical)%in%rownames(features_test), ]
+    traitData_test = coldata[rownames(coldata)%in%rownames(features_test), ]
 
     ####################################################Training
 
@@ -1640,9 +1640,9 @@ compute_features.ML <- function(features_train, features_test, clinical,
       ####################### Testing set
 
       if(stack){
-        prediction = compute_prediction(training, features_test, traitData_test[,trait], trait.positive, stack = TRUE, file.name = file_name, return = return)
+        prediction = compute_prediction(training$Model, features_test, traitData_test[,trait], trait.positive, stack = TRUE, file.name = file_name, return = return)
       }else{
-        prediction = compute_prediction(training, features_test, traitData_test[,trait], trait.positive, stack = FALSE, file.name = file_name, return = return)
+        prediction = compute_prediction(training$Model, features_test, traitData_test[,trait], trait.positive, stack = FALSE, file.name = file_name, return = return)
       }
 
       auc_roc_score = prediction[["AUC"]][["AUROC"]]
@@ -1670,20 +1670,20 @@ compute_features.ML <- function(features_train, features_test, clinical,
     train_data <- features_train %>%
       as.data.frame() %>%
       dplyr::mutate(
-        time = clinical[rownames(features_train), time_var],
-        event = clinical[rownames(features_train), event_var]
+        time = coldata[rownames(features_train), time_var],
+        event = coldata[rownames(features_train), event_var]
       )
 
     test_data <- features_test %>%
       as.data.frame() %>%
       dplyr::mutate(
-        time = clinical[rownames(features_test), time_var],
-        event = clinical[rownames(features_test), event_var]
+        time = coldata[rownames(features_test), time_var],
+        event = coldata[rownames(features_test), event_var]
       )
 
     if (LODO) {
       train_data = train_data %>%
-        dplyr::mutate(dataset = clinical[,batch_id])
+        dplyr::mutate(dataset = coldata[,batch_id])
     }
 
     df_outcome  <- train_data %>% dplyr::select(time, event)
@@ -1698,6 +1698,7 @@ compute_features.ML <- function(features_train, features_test, clinical,
       k_folds = k_folds,
       n_rep = n_rep,
       ncores = ncores,
+      return= return,
       file_name   = file_name
     )
 
@@ -2809,13 +2810,18 @@ calculate_recall <- function(metrics, target) {
 #'        corresponding color in the plot. Multiple cohorts will result in different curves.
 #' @param auc_roc A numeric value representing the AUC for the ROC curve.
 #' @param auc_prc A numeric value representing the AUC for the Precision-Recall curve.
+#' @param LODO Logical. If TRUE, the function assumes the data contains stacked predictions from
+#'   multiple cohorts and assigns AUROC/AUPRC per cohort (default = FALSE).
 #' @param file.name A character string used as the file name prefix for saving the plots.
+#' @param width A numeric value for the width of plot
+#' @param height A numeric value for the height of plot
+#'
 #'
 #' @return Saves two PDF plots: one for the ROC curve and one for the Precision-Recall curve
 #'         in the "Results/" directory.
-#' @keywords internal
+#' @export
 #'
-get_curves = function(data, spec, sens, reca, prec, color, auc_roc, auc_prc, file.name){
+get_curves = function(data, spec = "Specificity", sens = "Sensitivity", reca = "Recall", prec = "Precision", color, auc_roc, auc_prc, LODO = FALSE, file.name, width = 6, height = 6){
 
   data = data %>%
     dplyr::mutate(specificity = data[,spec],
@@ -2824,18 +2830,49 @@ get_curves = function(data, spec, sens, reca, prec, color, auc_roc, auc_prc, fil
                   precision = data[,prec],
                   color = data[,color])
 
+  # ---------------------------------------------------------------------------
+  # Repeat AUROC / AUPRC per row
+  # If LODO = TRUE, we assume data has multiple cohorts stacked
+  # If LODO = FALSE, single AUROC/AUPRC for the whole dataset
+  # ---------------------------------------------------------------------------
+  if (LODO) {
+    # AUROC
+    auc_roc_df <- tibble::tibble(
+      cohort = names(auc_roc$mean),
+      auc_mean  = unname(auc_roc$mean),
+      auc_lower = unname(auc_roc$lower),
+      auc_upper = unname(auc_roc$upper)
+    )
+
+    # AUPRC
+    auc_prc_df <- tibble::tibble(
+      cohort = names(auc_prc$mean),
+      auprc_mean  = unname(auc_prc$mean),
+      auprc_lower = unname(auc_prc$lower),
+      auprc_upper = unname(auc_prc$upper)
+    )
+
+    data <- data %>%
+      dplyr::left_join(auc_roc_df, by = c(color = "cohort")) %>%
+      dplyr::left_join(auc_prc_df, by = c(color = "cohort"))
+
+  } else {
+    data$auc_mean  <- rep(auc_roc$mean, nrow(data))
+    data$auc_lower <- rep(auc_roc$lower, nrow(data))
+    data$auc_upper <- rep(auc_roc$upper, nrow(data))
+
+    data$auprc_mean  <- rep(auc_prc$mean, nrow(data))
+    data$auprc_lower <- rep(auc_prc$lower, nrow(data))
+    data$auprc_upper <- rep(auc_prc$upper, nrow(data))
+  }
+
   ## ---- ROC Curve ----
-  data$sens_lower <- auc_roc$lower
-  data$sens_upper <- auc_roc$upper
+  data$color_label_roc <- paste0(data$color,
+                             "\n(AUC-ROC = ", round(data$auc_mean, 2),
+                             " [", round(data$auc_lower, 2), "-", round(data$auc_upper, 2), "])")
 
-  data$color_label <- paste0(data$model_color,
-                             "\n(AUC-ROC = ", round(auc_roc$mean, 2),
-                             " [", round(auc_roc$lower[1],2), "-", round(auc_roc$upper[1],2), "])")
-
-  roc <- ggplot(data, aes(x = 1 - specificity, y = sensitivity, color = color_label)) +
+  roc <- ggplot(data, aes(x = 1 - specificity, y = sensitivity, color = color_label_roc)) +
     geom_line(size = 1.2) +
-    geom_ribbon(aes(x = 1 - specificity, ymin = sens_lower, ymax = sens_upper, fill = color_label),
-                alpha = 0.2, color = NA) +
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey") +
     scale_color_brewer(palette = "Set1") +
     scale_fill_brewer(palette = "Set1") +
@@ -2845,18 +2882,18 @@ get_curves = function(data, spec, sens, reca, prec, color, auc_roc, auc_prc, fil
           legend.position = "bottom",
           axis.title = element_text(face = "bold"))
 
-  ## ---- PRC Curve ----
-  data$prec_lower <- auc_prc$lower
-  data$prec_upper <- auc_prc$upper
+  if(!LODO){ ## Add CI only if LODO = FALSE
+    roc = roc +
+      geom_ribbon(aes(ymin = auc_lower, ymax = auc_upper, fill = color_label_roc), alpha = 0.2, color = NA)
+  }
 
-  data$color_label_prc <- paste0(data$model_color,
-                                 "\n(AUC-PRC = ", round(auc_prc$mean, 2),
-                                 " [", round(auc_prc$lower[1],2), "-", round(auc_prc$upper[1],2), "])")
+  ## ---- PRC Curve ----
+  data$color_label_prc <- paste0(data$color,
+                                 "\n(AUC-PRC = ", round(data$auprc_mean, 2),
+                                 " [", round(data$auprc_lower, 2), "-", round(data$auprc_upper, 2), "])")
 
   prc <- ggplot(data, aes(x = recall, y = precision, color = color_label_prc)) +
     geom_line(size = 1.2) +
-    geom_ribbon(aes(x = recall, ymin = prec_lower, ymax = prec_upper, fill = color_label_prc),
-                alpha = 0.2, color = NA) +
     scale_color_brewer(palette = "Set1") +
     scale_fill_brewer(palette = "Set1") +
     labs(title = "Precision-Recall Curve", x = "Recall", y = "Precision") +
@@ -2866,12 +2903,17 @@ get_curves = function(data, spec, sens, reca, prec, color, auc_roc, auc_prc, fil
           legend.position = "bottom",
           axis.title = element_text(face = "bold"))
 
+  if(!LODO){ ## Add CI only if LODO = FALSE
+    prc = prc +
+      geom_ribbon(aes(ymin = auprc_lower, ymax = auprc_upper, fill = color_label_prc), alpha = 0.2, color = NA)
+  }
+
   ## ---- Save PDFs ----
-  grDevices::pdf(paste0("Results/ROC_curve_", file.name, ".pdf"), width = 6, height = 6)
+  grDevices::pdf(paste0("Results/ROC_curve_", file.name, ".pdf"), width = width, height = height)
   print(roc)
   grDevices::dev.off()
 
-  grDevices::pdf(paste0("Results/PRC_curve_", file.name, ".pdf"), width = 6, height = 6)
+  grDevices::pdf(paste0("Results/PRC_curve_", file.name, ".pdf"), width = width, height = height)
   print(prc)
   grDevices::dev.off()
 
@@ -4611,6 +4653,7 @@ compute_ml_survival <- function(df_train, df_test = NULL,
 #' @param k_folds Integer. Number of folds for K-fold CV (default = 5).
 #' @param n_rep Integer. Number of repeated CV iterations (default = 1).
 #' @param ncores Integer. Number of CPU cores for parallelization.
+#' @param return Logical. Whether to return the generated plots.
 #' @param LODO Logical. If `TRUE`, performs Leave-One-Domain-Out CV using `batch_id`.
 #' @param batch_id Character. Name of column representing cohort/batch. Required if `LODO = TRUE`.
 #' @param file_name Optional string. Suffix for generated C-index summary PDF saved in `"Results/"`.
@@ -4642,7 +4685,7 @@ compute_ml_survival <- function(df_train, df_test = NULL,
 #'
 #' @seealso [compute_ml_survival()], [get_default_hyperparams()], [aggregate_results()]
 #' @keywords internal
-compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, event_col, k_folds, n_rep, ncores,
+compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, event_col, k_folds, n_rep, ncores, return = FALSE,
                                        LODO = FALSE, batch_id = NULL, file_name = NULL, fold_construction_fun = NULL,
                                        fold_construction_args_fixed = NULL,
                                        fold_construction_args_tunable = NULL){
@@ -5077,7 +5120,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
   # using wrapper_train_best_hyperparams_survival().
 
   #Top model with best accuracy or AUC
-  metrics <- compute_cv_CINDEX(models, plot_results = TRUE, file_name = file_name)
+  metrics <- compute_cv_CINDEX(models, plot_results = return, file_name = file_name)
 
   top_model = metrics[["Top_model"]]
   c_index_median = metrics[["CINDEX_summary"]] %>%
@@ -5253,7 +5296,7 @@ compute_cv_CINDEX <- function(models, file_name = NULL, plot_results = TRUE){
 #'
 #' @return Invisibly returns the \code{ggsurvplot} object for further customization.
 #'
-#' @keywords internal
+#' @export
 plot_survival_performance <- function(df_test,
                                       prediction,
                                       n_groups = 3,
