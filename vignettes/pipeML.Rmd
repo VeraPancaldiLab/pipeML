@@ -240,8 +240,6 @@ In survival analysis, the response variable is defined by two components:
 
 Load example dataset for survival
 ```{r}
-library(survival)
-library(censored)
 data = pipeML::data_example_survival
 X <- data %>% dplyr::select(-time, -status)
 time <- data$time
@@ -387,6 +385,26 @@ head(res$Model$Model$pred)
 Check prediction metrics
 ```{r}
 head(res$Metrics)
+```
+
+Load data 
+```{r}
+data = pipeML::data_example_survival
+X <- data %>% dplyr::select(-time, -status)
+time <- data$time
+event <- data$status
+
+set.seed(123)
+train_idx <- caret::createDataPartition(event, p = 0.7, list = FALSE)
+
+X_train <- X[train_idx, ]
+X_test  <- X[-train_idx, ]
+
+time_train <- time[train_idx]
+time_test  <- time[-train_idx]
+
+event_train <- event[train_idx]
+event_test  <- event[-train_idx]
 ```
 
 Survival tasks 

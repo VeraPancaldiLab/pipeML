@@ -2,3 +2,33 @@ url: https://verapancaldilab.github.io/pipeML/
 template:
   bootstrap: 5
 
+reference:
+- title: Main
+  desc: >
+    Machine learning
+  contents:
+  - compute_features.training.ML
+  - compute_features.ML
+  - compute_prediction
+- title: Variable importance
+  desc: >
+    Model interpretability
+  contents:
+  - compute_shap_values
+  - plot_shap_stability
+  - feature.selection.boruta
+- title: Visualization
+  desc: >
+    Model visualization
+  contents:
+  - get_curves
+  - plot_survival_performance
+- title: Package Data
+  desc: >
+    Example data
+  contents:
+  - data_example_classification
+  - data_example_survival
+  - counts_example
+  - coldata_example
+

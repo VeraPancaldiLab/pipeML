@@ -4,11 +4,11 @@
 \name{pipeML-package}
 \alias{pipeML}
 \alias{pipeML-package}
-\title{pipeML: A robust R machine learning pipeline for classification tasks and survival analysis}
+\title{pipeML: A flexible and modular machine learning framework designed to support leakage-free model training through custom cross-validation fold construction}
 \description{
 \if{html}{\figure{logo.png}{options: style='float: right' alt='logo' width='120'}}
 
-pipeML is develop for a fast and easy use, its complexity allows a robust implementation during each step of the pipeline.
+pipeML enables users to recompute global dataset features independently within each cross-validation fold, ensuring strict separation between training and test data, while preserving compatibility with a wide range of machine learning algorithms for both classification and survival tasks.
 }
 \seealso{
 Useful links:

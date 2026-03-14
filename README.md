@@ -40,7 +40,7 @@ machine learning applications.
 
 <p align="center">
 
-<img src="man/figures/MLpipeline.png?raw=true"/>
+<img src="man/figures/pipeML.svg?raw=true"/>
 
 </p>
 <p align="center">
@@ -61,27 +61,44 @@ Leakage-aware validation
 - Support for fold-aware feature recomputation
 - Prevents information leakage when using dataset-dependent features
 
-Flexible model evaluation \* Repeated and stratified k-fold
-cross-validation \* Leave-one-dataset-out (LODO) evaluation for
-cross-cohort generalization
+Flexible model evaluation
 
-Feature selection \* Boruta-based feature selection \* Optional
-correlation-based feature filtering
+- Repeated and stratified k-fold cross-validation
+- Leave-one-dataset-out (LODO) evaluation for cross-cohort
+  generalization
 
-Hyperparameter tuning \* Automatic optimization based on: \* AUROC \*
-AUPRC \* Accuracy
+Feature selection
 
-Model interpretation \* SHAP-based feature importance \* Variable
-importance summaries \* Performance visualization (ROC and PR curves)
+- Boruta-based feature selection
+- Optional correlation-based feature filtering
 
-Ensemble learning \* Model stacking
+Hyperparameter tuning
 
-Parallel computing \* Multi-core support for faster model training and
-cross-validation
+- Automatic optimization based on:
 
-Custom workflows \* Users can define custom fold construction functions
-\* These functions can receive a bestTune argument after hyperparameter
-optimization to retrain models on the full training dataset.
+  - AUROC
+  - AUPRC
+  - Accuracy
+
+Model interpretation
+
+- SHAP-based feature importance
+- Variable importance summaries
+- Performance visualization (ROC and PR curves)
+
+Ensemble learning
+
+- Model stacking
+
+Parallel computing
+
+- Multi-core support for faster model training and cross-validation
+
+Custom workflows
+
+- Users can define custom fold construction functions
+- These functions can receive a bestTune argument after hyperparameter
+  optimization to retrain models on the full training dataset.
 
 Supported Machine Learning Methods
 

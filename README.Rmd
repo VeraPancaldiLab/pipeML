@@ -39,7 +39,7 @@ The framework is designed to integrate naturally with R/Bioconductor workflows, 
 
 <p align="center">
 
-<img src="man/figures/MLpipeline.png?raw=true"/>
+<img src="man/figures/pipeML.svg?raw=true"/>
 
 </p>
 
@@ -61,31 +61,39 @@ Leakage-aware validation
 * Prevents information leakage when using dataset-dependent features
 
 Flexible model evaluation
+
 * Repeated and stratified k-fold cross-validation
 * Leave-one-dataset-out (LODO) evaluation for cross-cohort generalization
 
 Feature selection
+
 * Boruta-based feature selection
 * Optional correlation-based feature filtering
 
 Hyperparameter tuning 
+
 * Automatic optimization based on: 
+
   * AUROC
   * AUPRC
   * Accuracy
   
 Model interpretation
+
 * SHAP-based feature importance
 * Variable importance summaries
 * Performance visualization (ROC and PR curves)
 
 Ensemble learning 
+
 * Model stacking 
 
 Parallel computing
+
 * Multi-core support for faster model training and cross-validation
 
 Custom workflows
+
 * Users can define custom fold construction functions
 * These functions can receive a bestTune argument after hyperparameter optimization to retrain models on the full training dataset.
 
