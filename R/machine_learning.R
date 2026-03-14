@@ -40,6 +40,7 @@ utils::globalVariables(c(
 #'   \item A data frame with feature importance statistics.
 #'   \item A character vector indicating the Boruta decision for each feature (Confirmed, Tentative, or Rejected).
 #' }
+#' @keywords internal
 compute_boruta <- function(data, seed, fix = TRUE) {
 
   set.seed(seed)
@@ -79,6 +80,7 @@ compute_boruta <- function(data, seed, fix = TRUE) {
 #'   \item A vector of tentative features.
 #'   \item A data frame with median importance values and final decisions.
 #' }
+#' @keywords internal
 merge_boruta_results = function(importance_values, decisions, file_name, iterations, threshold, return = TRUE){
 
   ### Construct matrix of importance

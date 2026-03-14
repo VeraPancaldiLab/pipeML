@@ -18,6 +18,8 @@ knitr::opts_chunk$set(
 library(pipeML)
 library(caret)
 library(dplyr)
+library(survival)
+library(censored)
 ```
 
 This tutorial demonstrates how to use the `pipeML` package for training and testing machine learning models. It introduces the main functions of the pipeline and guides you through additional functions for visualization. 
@@ -408,7 +410,7 @@ event_test  <- event[-train_idx]
 ```
 
 Survival tasks 
-```{r}
+```{r, eval = FALSE}
 res <- compute_features.ML(features_train = X_train, 
                            features_test = X_test, 
                            coldata = data,
