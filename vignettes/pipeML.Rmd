@@ -101,15 +101,15 @@ res_boruta <- feature.selection.boruta(
 Train and tune models using repeated stratified k-fold cross-validation:
 ```{r}
 res <- compute_features.training.ML(features_train = X_train, 
-                                     target_var = y_train,
-                                     task_type = "classification",
-                                     trait.positive = "1",
-                                     metric = "AUROC",
-                                     k_folds = 2,
-                                     n_rep = 1,
-                                     file_name = "Example_classification",
-                                     ncores = 1,
-                                     return = TRUE)
+                                    target_var = y_train,
+                                    task_type = "classification",
+                                    trait.positive = "1",
+                                    metric = "AUROC",
+                                    k_folds = 2,
+                                    n_rep = 1,
+                                    file_name = "Example_classification",
+                                    ncores = 1,
+                                    return = TRUE)
 ```
 
 Access the best-trained model:
@@ -592,36 +592,30 @@ compute_features_modular <- function(data, structure = NULL, ...) {
 Here we illustrate a correlation-based feature computation using Weighted Gene Co-expression Network Analysis (WGCNA). This is just an example: in practice, you can use any feature computation that depends on multiple samples, such as clustering, PCA, among others.
 ```{r, eval= FALSE}
 # WGCNA feature computation function
-compute_features_modular <- function(counts, power = 6, modules = NULL) {
-  
-  # counts: features as rows, samples as columns
-  # power: soft-thresholding power for WGCNA
-  # modules: precomputed modules; NULL for training mode
-  
+compute_features_modular <- function(counts, power, modules = NULL) {
+
   ## Just preprocessing 
   rownames(counts) <- gsub("-", ".", rownames(counts)) # Standardize gene names
   datExpr <- t(counts) # Transpose so samples are rows
-  
+  cor <- WGCNA::cor
+
   # TRAINING MODE: learn modules from training data
   if (is.null(modules)) {
     
     net <- WGCNA::blockwiseModules(
       datExpr,
-      power = power,
-      TOMType = "unsigned",
-      minModuleSize = 30,
-      verbose = 0
+      power = power
     )
     
     modules <- net$colors
     names(modules) <- colnames(datExpr)
   }
   
-  # PROJECT MODE (or after training): compute module eigengenes
+  # PROJECT MODE 
   module_features <- sapply(unique(modules), function(mod) {
     genes <- names(modules[modules == mod])
     pc <- prcomp(datExpr[, genes, drop = FALSE])
-    pc$x[, 1]   # first principal component = module eigengene
+    pc$x[, 1]  
   })
   
   ## Just formatting
@@ -653,21 +647,19 @@ In `pipeML` data corresponds to samples as rows and features as columns. If your
 The parameters `data`, `folds`, `besttune` are taking care inside pipeML automatically once `fold_construction_fun` is set. Be sure to not change the parameteres names or delete them! 
 
 ```{r, eval= FALSE}
-# Generic template to prepare leakage-aware folds for pipeML
-# Users can replace `compute_features_function` with any algorithm (e.g., PCA, clustering)
 prepare_custom_folds <- function(data, folds = NULL, bestune = NULL, ...) {
   
   #' @param ... Additional parameters passed to your feature function
 
-  # Full dataset mode (optional, e.g., for training on all data)
+  # Full dataset mode 
   if (!is.null(bestune)) {
     
     obs_train <- data$target
     data$target <- NULL
     
-    ## Here make sure compute_features_modular() returns a matrix with the features. If not, make sure to extract them before adding     the target column
-    train_features_final <- compute_features_modular(data, ...)  # or t(data) if necessary
-    ## train_features_final = train_features_final$features --> if necessary
+    ## Here make sure compute_features_modular() returns a matrix with the features. If not, make sure to extract them before adding the target column
+    result <- compute_features_modular(data, ...)  # or t(data) if necessary
+    train_features_final = result$features ### if necessary
     train_features_final$target <- obs_train
     
     custom_output <- result
@@ -727,7 +719,7 @@ prepare_custom_folds <- function(data, folds = NULL, bestune = NULL, ...) {
 }
 ```
 
-Here we illustrate how the function will look applying our `compute_wgcna_features()` function
+Here we illustrate how the function will look applying our `compute_features_modular()` function
 ```{r, eval= FALSE}
 prepare_WGCNA_folds <- function(data, folds = NULL, bestune = NULL, power) {
   
@@ -803,11 +795,9 @@ Step 3 – Run Custom Cross-Validation
 
 Once your custom fold function is ready, pass it to `compute_features.training.ML()` via fold_construction_fun.
 
-Note the argument  `fold_construction_args_fixed` corresponds to the additional parameters passed in `prepare_custom_folds()` function (in this example `prepare_WGCNA_folds()`). They should be set with the value to use when running your function. If your function does not have any parameters, you can ignore this argument and it will set up to NULL.
+Note the argument  `fold_construction_args_fixed` corresponds to the additional parameters passed in `prepare_custom_folds()` function (in this example `prepare_WGCNA_folds()`). They should be set with the value to use when running your function. If your function does not have any parameters, you can ignore this argument and it will be set up to NULL.
 
 ```{r, eval=FALSE}
-## counts: Normalized counts to compute the features from the training samples
-## coldata: Target variable from the training samples
 res_custom   = compute_features.training.ML(features_train = t(counts),
                                             target_var     = coldata$Response,
                                             task_type      = "classification",
@@ -838,25 +828,74 @@ Briefly, the user provides a grid of candidate parameter values, and `pipeML` wi
 - compare the resulting performance across folds and repetitions
 - return the parameter values that maximize the selected performance metric
 
-Before that, user needs to modify `prepare_custom_folds()` to account for all these parameters. In this case
+Before that, user needs to modify `compute_features_modular` and `prepare_custom_folds()` to account for all these parameters. 
+
+For the `compute_features_modular` we are only going to add the tunable parameters in our function call
 ```{r, eval= FALSE}
-prepare_custom_folds_with_tuning <- function(
-  data,
-  folds = NULL,
-  bestune = NULL,
-  ncores = NULL,
-  ...
+# WGCNA feature computation function 
+compute_features_modular <- function(
+    counts, 
+    power,                  
+    modules = NULL,    
+    ## tunable parameters
+    minModuleSize,         
+    mergeCutHeight,      
+    deepSplit,              
 ) {
+  
+  ## Just preprocessing 
+  rownames(counts) <- gsub("-", ".", rownames(counts)) # Standardize gene names
+  datExpr <- t(counts) # Transpose so samples are rows
+  cor <- WGCNA::cor
+  
+  # TRAINING MODE: learn modules from training data
+  if (is.null(modules)) {
+    
+    net <- WGCNA::blockwiseModules(
+      datExpr,
+      power = power,
+      minModuleSize = minModuleSize,
+      mergeCutHeight = mergeCutHeight,
+      deepSplit = deepSplit
+    )
+        
+    modules <- net$colors
+    names(modules) <- colnames(datExpr)
+  }
+  
+  # PROJECT MODE 
+  module_features <- sapply(unique(modules), function(mod) {
+    genes <- names(modules[modules == mod])
+    pc <- prcomp(datExpr[, genes, drop = FALSE])
+    pc$x[, 1]   
+  })
+  
+  ## Just formatting
+  colnames(module_features) <- paste0("Module_", seq_len(ncol(module_features)))
+  
+  # Return both features and modules (structure)
+  return(list(
+    features = as.matrix(module_features),
+    structure = modules
+  ))
+}
+```
+
+Then we will use this version of `prepare_custom_folds()` that have some modifications to account for parameters combinations
+
+Notice we have an additional parameter `ncores` that will control paralellization for evaluating all your runs (don't remove it!)
+```{r, eval= FALSE}
+prepare_custom_folds_tuning <- function(data, folds = NULL, bestune = NULL, ncores = NULL, ...){
   
   #' @param ... Additional parameters passed to your feature function
   
-  # ---- Full dataset mode with best parameters ----
+  # Full dataset mode
   if (!is.null(bestune)) {
     
     obs_train <- data$target
     data$target <- NULL
     
-    required_cols <- c(### list your params separated by a comma)
+    required_cols <- c()### list your params separated by a comma
     
     best_params <- if (is.data.frame(bestune)) {
       if (all(required_cols %in% names(bestune))) {
@@ -870,7 +909,7 @@ prepare_custom_folds_with_tuning <- function(
       stop("`bestune` must be a data.frame or list.")
     }
     
-    ## Ensure compute_features_function() returns a list with features and structure
+    ## Ensure compute_features_modular() returns a list with features and structure
     res_final <- compute_features_modular(
       counts = t(data),  # transpose if necessary
       # here you will put your tunable parameters
@@ -967,15 +1006,15 @@ prepare_custom_folds_with_tuning <- function(
 }
 ```
 
-In our case it would be
+In our case it would be:
 ```{r, eval= FALSE}
 prepare_WGCNA_folds_modular <- function(
     data,
     folds = NULL,
     bestune = NULL,
-    ncores = NULL,
     power,
-    TOMType,
+    ncores = NULL,
+    ### tunable parameters
     minModuleSize,
     mergeCutHeight,
     deepSplit
@@ -986,7 +1025,7 @@ prepare_WGCNA_folds_modular <- function(
     obs_train <- data$target
     data$target <- NULL
     
-    required_cols <- c("power", "minModuleSize", "mergeCutHeight", "deepSplit")
+    required_cols <- c("minModuleSize", "mergeCutHeight", "deepSplit")
     
     best_params <- if (is.data.frame(bestune)) {
       if (all(required_cols %in% names(bestune))) {
@@ -1002,8 +1041,8 @@ prepare_WGCNA_folds_modular <- function(
     
     res_final <- compute_features_modular(
       counts = t(data),
-      power = best_params$power,
-      TOMType = TOMType, 
+      power = power,
+      ## tunable parameters
       minModuleSize = best_params$minModuleSize,
       mergeCutHeight = best_params$mergeCutHeight,
       deepSplit = best_params$deepSplit
@@ -1051,8 +1090,8 @@ prepare_WGCNA_folds_modular <- function(
         # ---- TRAINING MODE ----
         wgcna_train <- compute_features_modular(
           counts = t(train_data),
-          power = params$power,
-          TOMType = TOMType,
+          power = power,
+          ## tunable parameters
           minModuleSize = params$minModuleSize,
           mergeCutHeight = params$mergeCutHeight,
           deepSplit = params$deepSplit
@@ -1099,6 +1138,22 @@ prepare_WGCNA_folds_modular <- function(
 
 To enable this functionality, the user must specify the argument `fold_construction_args_tunable`, which contains the set of parameter values to be evaluated 
 
+Note the argument  `fold_construction_args_fixed` corresponds to the additional parameters passed in `prepare_custom_folds()` function that are not tunable (in our case `power` and `ncores`). This means these parameters are going to have the same value across all runs (**fix**). Be sure of setting `ncores` to a value that your computer can handle to avoid crashing.
+
+The tunable parameters define the search space explored during feature computation. The total number of configurations corresponds to all combinations of the provided parameter values. In this example:
+
+- minModuleSize = c(20, 50, 100) → 3 values
+- mergeCutHeight = c(0.15, 0.25, 0.35) → 3 values
+- deepSplit = c(1, 2, 3) → 3 values
+
+This results in **3 × 3 × 3 = 27** feature parameter combinations.
+
+For each of these 27 configurations, the machine learning models are trained and tuned. For example, if logistic regression with elastic net (`glmnet`) is used, the model internally evaluates different values of the hyperparameters `alpha` and `lambda`. If the model tests **10 alpha values and 20 lambda values**, this results in **200 model configurations** for each feature combination.
+
+Therefore, the total number of evaluated models becomes:
+
+**27 (feature configurations) × 200 (model hyperparameter combinations) = 5400** model fits, which are further multiplied by the number of folds and repetitions used in cross-validation.
+
 ```{r, eval= FALSE}
 res_params <- compute_features.training.ML(features_train = t(counts), 
                                           target_var     = coldata$Response,
@@ -1111,7 +1166,6 @@ res_params <- compute_features.training.ML(features_train = t(counts),
                                           fold_construction_fun = prepare_WGCNA_folds_modular,
                                           fold_construction_args_fixed = list(power=6, ncores = 2),
                                           fold_construction_args_tunable = list(
-                                            power = c(6, 8, 10),                 
                                             minModuleSize = c(20, 50, 100),       
                                             mergeCutHeight = c(0.15, 0.25, 0.35),
                                             deepSplit = c(1, 2, 3)           
@@ -1119,18 +1173,20 @@ res_params <- compute_features.training.ML(features_train = t(counts),
 
 ```
 
-Step 4 – After training Predict on Test Data
+Step 4 – Prediction on test data
 
 To apply the model to new data, compute the same type of features using the learned modules from the training set.
 ```{r}
-test_features = compute_wgcna_features(counts_test, modules = res_custom$Custom_output$modules)$features
+test = compute_features_modular(counts_test, 
+                                modules = res_custom$Custom_output$modules)
+test_features = test$features
 ```
 
 Prediction
 ```{r, eval = FALSE}
 pred <- compute_prediction(res_custom$Model,
                            test_features,
-                           traitData_test[,"Response"],
+                           coldata$Response,
                            trait.positive = "R",
                            return = FALSE)
 ```
