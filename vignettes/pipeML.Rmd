@@ -804,6 +804,16 @@ Load data example (Gene expression counts)
 ```{r}
 counts = pipeML::counts_example
 coldata = pipeML::coldata_example
+
+set.seed(123)
+
+train_idx <- caret::createDataPartition(coldata$Response, p = 0.8, list = FALSE)
+
+counts_train <- counts[train_idx, ]
+counts_test  <- counts[-train_idx, ]
+
+coldata_train <- coldata[train_idx]
+coldata_test  <- coldata[-train_idx]
 ```
 
 Step 3 – Run Custom Cross-Validation
@@ -813,8 +823,8 @@ Once your custom fold function is ready, pass it to `compute_features.training.M
 Note the argument  `fold_construction_args_fixed` corresponds to the additional parameters passed in `prepare_custom_folds()` function (in this example `prepare_WGCNA_folds()`). They should be set with the value to use when running your function. If your function does not have any parameters, you can ignore this argument and it will be set up to NULL.
 
 ```{r, eval=FALSE}
-res_custom   = compute_features.training.ML(features_train = t(counts),
-                                            target_var     = coldata$Response,
+res_custom   = compute_features.training.ML(features_train = t(counts_train),
+                                            target_var     = coldata_train$Response,
                                             task_type      = "classification",
                                             trait.positive = "R",
                                             metric         = "AUROC",
@@ -1194,8 +1204,8 @@ Therefore, the total number of evaluated models becomes:
 **27 (feature configurations) × 200 (model hyperparameter combinations) = 5400** model fits, which are further multiplied by the number of folds and repetitions used in cross-validation.
 
 ```{r, eval= FALSE}
-res_params <- compute_features.training.ML(features_train = t(counts), 
-                                          target_var     = coldata$Response,
+res_params <- compute_features.training.ML(features_train = t(counts_train), 
+                                          target_var     = coldata_train$Response,
                                           task_type = "classification",
                                           trait.positive = "R",
                                           metric = "AUROC",
@@ -1225,7 +1235,7 @@ Prediction
 ```{r, eval = FALSE}
 pred <- compute_prediction(res_custom$Model,
                            test_features,
-                           coldata$Response,
+                           coldata_test$Response,
                            trait.positive = "R",
                            return = FALSE)
 ```
