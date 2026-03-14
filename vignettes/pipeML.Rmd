@@ -108,7 +108,6 @@ res <- compute_features.training.ML(features_train = X_train,
                                     k_folds = 2,
                                     n_rep = 1,
                                     file_name = "Example_classification",
-                                    ncores = 1,
                                     return = TRUE)
 ```
 
@@ -558,74 +557,70 @@ This ensures a leakage-aware workflow:
 - Test data is projected without altering the learned structure.
 
 Structure of base function
+
+- data: features as rows, samples as columns
+- structure: precomputed structure (e.g., clusters, components); NULL for training
+- ... : additional arguments specific to the algorithm used
+  
 ```{r, eval= FALSE}
-# Generic modular feature computation function
-# Can be adapted for clustering, PCA, TF activity, or any sample-dependent feature extraction
 compute_features_modular <- function(data, structure = NULL, ...) {
   
-  # data: features as rows, samples as columns
-  # structure: precomputed structure (e.g., clusters, components); NULL for training
-  # ... : additional arguments specific to the algorithm used
-  
-  # TRAINING MODE: learn the structure from the training data
+
+  # TRAINING MODE
   if (is.null(structure)) {
     
-    # --- Replace this block with any feature-learning algorithm ---
-    # Example placeholder: clustering / PCA / network modules
+    # -------------------- REPLACE THIS BLOCK --------------------
     structure <- learn_structure(data, ...)   # user-defined function
+    # -------------------- REPLACE THIS BLOCK --------------------
     
   }
   
-  # PROJECT MODE: compute features for new data using the learned structure
-  # --- Replace this block with algorithm-specific projection logic ---
-  features <- project_data(data, structure, ...)   # user-defined function
+  # PROJECT MODE
   
-  # Return both features and structure
-  # structure will be reused for test/projection data in cross-validation
-  return(list(
-    features = features,
-    structure = structure
-  ))
+  # -------------------- REPLACE THIS BLOCK --------------------
+  features <- project_data(data, structure, ...)   # user-defined function
+  # -------------------- REPLACE THIS BLOCK --------------------
+
+  
+  return(list(features = features, structure = structure))
 }
 ```
 
 Here we illustrate a correlation-based feature computation using Weighted Gene Co-expression Network Analysis (WGCNA). This is just an example: in practice, you can use any feature computation that depends on multiple samples, such as clustering, PCA, among others.
 ```{r, eval= FALSE}
-# WGCNA feature computation function
 compute_features_modular <- function(counts, power, modules = NULL) {
 
-  ## Just preprocessing 
-  rownames(counts) <- gsub("-", ".", rownames(counts)) # Standardize gene names
-  datExpr <- t(counts) # Transpose so samples are rows
+  ## Just preprocessing (IGNORE)
+  rownames(counts) <- gsub("-", ".", rownames(counts)) 
+  datExpr <- t(counts) 
   cor <- WGCNA::cor
 
-  # TRAINING MODE: learn modules from training data
+  # TRAINING MODE
   if (is.null(modules)) {
     
-    net <- WGCNA::blockwiseModules(
-      datExpr,
-      power = power
-    )
-    
+    # -------------------- REPLACE THIS BLOCK --------------------
+    net <- WGCNA::blockwiseModules(datExpr, power = power)
     modules <- net$colors
     names(modules) <- colnames(datExpr)
+    # -------------------- REPLACE THIS BLOCK --------------------
+    
   }
   
   # PROJECT MODE 
+  
+  # -------------------- REPLACE THIS BLOCK --------------------
   module_features <- sapply(unique(modules), function(mod) {
     genes <- names(modules[modules == mod])
     pc <- prcomp(datExpr[, genes, drop = FALSE])
     pc$x[, 1]  
   })
-  
-  ## Just formatting
+  # -------------------- REPLACE THIS BLOCK --------------------
+
+  ## Just formatting (IGNORE)
   colnames(module_features) <- paste0("Module_", seq_len(ncol(module_features)))
   
-  # Return both features and modules (structure)
-  return(list(
-    features = as.matrix(module_features),
-    structure = modules
-  ))
+  
+  return(list(features = as.matrix(module_features), structure = modules))
 }
 ```
 
@@ -646,19 +641,24 @@ In `pipeML` data corresponds to samples as rows and features as columns. If your
 
 The parameters `data`, `folds`, `besttune` are taking care inside pipeML automatically once `fold_construction_fun` is set. Be sure to not change the parameteres names or delete them! 
 
+- ... : Additional parameters passed to your feature function
+
+Make sure `compute_features_modular()` returns a matrix with the features. If not, make sure to extract them before adding the target column
+
 ```{r, eval= FALSE}
 prepare_custom_folds <- function(data, folds = NULL, bestune = NULL, ...) {
   
-  #' @param ... Additional parameters passed to your feature function
-
-  # Full dataset mode 
   if (!is.null(bestune)) {
     
     obs_train <- data$target
     data$target <- NULL
     
-    ## Here make sure compute_features_modular() returns a matrix with the features. If not, make sure to extract them before adding the target column
+    
+    # -------------------- REPLACE THIS BLOCK --------------------
     result <- compute_features_modular(data, ...)  # or t(data) if necessary
+    # -------------------- REPLACE THIS BLOCK --------------------
+    
+    
     train_features_final = result$features ### if necessary
     train_features_final$target <- obs_train
     
@@ -668,7 +668,6 @@ prepare_custom_folds <- function(data, folds = NULL, bestune = NULL, ...) {
     
   } else {
     
-    # Cross-validation mode
     processed_folds <- list()
     
     for (i in seq_along(folds)) {
@@ -676,29 +675,35 @@ prepare_custom_folds <- function(data, folds = NULL, bestune = NULL, ...) {
       train_idx <- folds[[i]]
       test_idx  <- setdiff(seq_len(nrow(data)), train_idx)
       
-      # ---- TRAIN DATA ----
       train_data <- data[train_idx, , drop = FALSE]
       obs_train <- train_data$target
       train_data$target <- NULL
       
+      
+      # -------------------- REPLACE THIS BLOCK --------------------
       train_result <- compute_features_modular(train_data, ...) # or t(train_data) if necessary
+      # -------------------- REPLACE THIS BLOCK --------------------
+      
+      
       train_features = train_result$features ## if necessary
       train_features$target <- obs_train
       
-      # ---- TEST DATA (projection) ----
       test_data <- data[test_idx, , drop = FALSE]
       obs_test <- test_data$target
       test_data$target <- NULL
       
+      
+      # -------------------- REPLACE THIS BLOCK --------------------
       test_features <- compute_features_modular(
         test_data, # or t(test_data) if necessary
-        structure = train_result$structure,  # Use training structure
+        structure = train_result$structure,  
         ...
       )
+      # -------------------- REPLACE THIS BLOCK --------------------
+      
+      
       test_features = test_features$features ## if necessary
 
-      
-      # ---- Save fold information ----
       processed_folds[[i]] <- list(
         train_data = train_features,
         test_data  = test_features,
@@ -708,7 +713,6 @@ prepare_custom_folds <- function(data, folds = NULL, bestune = NULL, ...) {
       )
     }
     
-    # Save temporal fold objects to disk (this will be removed at the end of the ML training)
     for (i in seq_along(processed_folds)) {
       filename <- file.path("Results", paste0("fold_", names(folds)[i], ".rds"))
       saveRDS(processed_folds[[i]], file = filename)
@@ -720,6 +724,8 @@ prepare_custom_folds <- function(data, folds = NULL, bestune = NULL, ...) {
 ```
 
 Here we illustrate how the function will look applying our `compute_features_modular()` function
+
+Notice that each time I call my function I am setting my additional argument `power`
 ```{r, eval= FALSE}
 prepare_WGCNA_folds <- function(data, folds = NULL, bestune = NULL, power) {
   
@@ -727,8 +733,12 @@ prepare_WGCNA_folds <- function(data, folds = NULL, bestune = NULL, power) {
     
     obs_train <- data$target
     data$target <- NULL
+        
     
+    # -------------------- REPLACE THIS BLOCK --------------------
     wgcna_result <- compute_features_modular(t(data), power = power)
+    # -------------------- REPLACE THIS BLOCK --------------------
+    
     
     train_cell_data_final <- as.data.frame(wgcna_result$features)
     train_cell_data_final$target <- obs_train
@@ -746,25 +756,31 @@ prepare_WGCNA_folds <- function(data, folds = NULL, bestune = NULL, power) {
       train_idx <- folds[[i]]
       test_idx  <- setdiff(seq_len(nrow(data)), train_idx)
       
-      # ---- TRAIN DATA ----
       train_data <- data[train_idx, , drop = FALSE]
       obs_train <- train_data$target
       train_data$target <- NULL
       
-      wgcna_train <- compute_features_modular(t(train_data), power = power)
       
-      train_features <- as.data.frame(wgcna_train$features)
+      # -------------------- REPLACE THIS BLOCK --------------------
+      train_result <- compute_features_modular(t(train_data), power = power)
+      # -------------------- REPLACE THIS BLOCK --------------------
+      
+      
+      train_features <- as.data.frame(train_result$features)
       train_features$target <- obs_train
       
-      # ---- TEST DATA (projection) ----
       test_data <- data[test_idx, , drop = FALSE]
       obs_test <- test_data$target
       test_data$target <- NULL
       
-      wgcna_test <- compute_features_modular(t(test_data), modules = wgcna_train$modules)
-      test_features <- as.data.frame(wgcna_test$features)
       
-      # ---- SAVE FOLD ----
+      # -------------------- REPLACE THIS BLOCK --------------------
+      test_features <- compute_features_modular(t(test_data), modules = train_result$modules)
+      # -------------------- REPLACE THIS BLOCK --------------------
+      
+      
+      test_features <- as.data.frame(test_features$features)
+      
       processed_folds[[i]] <- list(
         train_data = train_features,
         test_data  = test_features,
@@ -774,7 +790,6 @@ prepare_WGCNA_folds <- function(data, folds = NULL, bestune = NULL, power) {
       )
     }
     
-    # ---- Save folds ----
     for (i in seq_along(processed_folds)) {
       filename <- file.path("Results", paste0("fold_", names(folds)[i], ".rds"))
       saveRDS(processed_folds[[i]], file = filename)
@@ -832,7 +847,6 @@ Before that, user needs to modify `compute_features_modular` and `prepare_custom
 
 For the `compute_features_modular` we are only going to add the tunable parameters in our function call
 ```{r, eval= FALSE}
-# WGCNA feature computation function 
 compute_features_modular <- function(
     counts, 
     power,                  
@@ -843,14 +857,17 @@ compute_features_modular <- function(
     deepSplit,              
 ) {
   
-  ## Just preprocessing 
-  rownames(counts) <- gsub("-", ".", rownames(counts)) # Standardize gene names
-  datExpr <- t(counts) # Transpose so samples are rows
+  ## Just preprocessing (IGNORE)
+  rownames(counts) <- gsub("-", ".", rownames(counts)) 
+  datExpr <- t(counts) 
   cor <- WGCNA::cor
   
-  # TRAINING MODE: learn modules from training data
+  # TRAINING MODE
+  
   if (is.null(modules)) {
     
+    
+    # -------------------- REPLACE THIS BLOCK --------------------
     net <- WGCNA::blockwiseModules(
       datExpr,
       power = power,
@@ -858,26 +875,29 @@ compute_features_modular <- function(
       mergeCutHeight = mergeCutHeight,
       deepSplit = deepSplit
     )
-        
     modules <- net$colors
     names(modules) <- colnames(datExpr)
+    # -------------------- REPLACE THIS BLOCK --------------------
+    
+    
   }
   
-  # PROJECT MODE 
+  # PROJECT MODE
+  
+  
+  # -------------------- REPLACE THIS BLOCK --------------------
   module_features <- sapply(unique(modules), function(mod) {
     genes <- names(modules[modules == mod])
     pc <- prcomp(datExpr[, genes, drop = FALSE])
     pc$x[, 1]   
   })
+  # -------------------- REPLACE THIS BLOCK --------------------
   
-  ## Just formatting
+  
+  ## Just formatting (IGNORE)
   colnames(module_features) <- paste0("Module_", seq_len(ncol(module_features)))
   
-  # Return both features and modules (structure)
-  return(list(
-    features = as.matrix(module_features),
-    structure = modules
-  ))
+  return(list(features = as.matrix(module_features), structure = modules))
 }
 ```
 
@@ -887,15 +907,14 @@ Notice we have an additional parameter `ncores` that will control paralellizatio
 ```{r, eval= FALSE}
 prepare_custom_folds_tuning <- function(data, folds = NULL, bestune = NULL, ncores = NULL, ...){
   
-  #' @param ... Additional parameters passed to your feature function
-  
-  # Full dataset mode
   if (!is.null(bestune)) {
     
     obs_train <- data$target
     data$target <- NULL
     
-    required_cols <- c()### list your params separated by a comma
+    # -------------------- REPLACE THIS BLOCK --------------------
+    required_cols <- c()# list your params separated by a comma
+    # -------------------- REPLACE THIS BLOCK --------------------
     
     best_params <- if (is.data.frame(bestune)) {
       if (all(required_cols %in% names(bestune))) {
@@ -909,15 +928,18 @@ prepare_custom_folds_tuning <- function(data, folds = NULL, bestune = NULL, ncor
       stop("`bestune` must be a data.frame or list.")
     }
     
-    ## Ensure compute_features_modular() returns a list with features and structure
+    
+    # -------------------- REPLACE THIS BLOCK --------------------
     res_final <- compute_features_modular(
-      counts = t(data),  # transpose if necessary
-      # here you will put your tunable parameters
+      counts = data,  # or t(data) if necessary
+      # here you will put your tunable parameters (just change param1, param2, ... for the names of your parameters)
       param1 = best_params$param1,
       param2 = best_params$param2,
       param3 = best_params$param3
       ...
     )
+    # -------------------- REPLACE THIS BLOCK --------------------
+    
     
     train_features_final = res_final$features  ## if necessary
     train_features_final$target <- obs_train
@@ -927,8 +949,8 @@ prepare_custom_folds_tuning <- function(data, folds = NULL, bestune = NULL, ncor
     return(list(train_features_final, custom_output, bestune))
     
   } else {
-    
-    # ---- Tunable grid ----
+
+    # -------------------- REPLACE THIS BLOCK --------------------    
     custom_grid <- expand.grid(
       param1 = param1,
       param2 = param2,
@@ -936,8 +958,8 @@ prepare_custom_folds_tuning <- function(data, folds = NULL, bestune = NULL, ncor
       ...,
       stringsAsFactors = FALSE
     )
+    # -------------------- REPLACE THIS BLOCK --------------------
     
-    # ---- Parallel setup ----
     if (is.null(ncores)) ncores <- parallel::detectCores() - 2
     cl <- parallel::makeCluster(ncores)
     doParallel::registerDoParallel(cl)
@@ -948,36 +970,42 @@ prepare_custom_folds_tuning <- function(data, folds = NULL, bestune = NULL, ncor
       train_idx <- folds[[i]]
       test_idx  <- setdiff(seq_len(nrow(data)), train_idx)
       
-      # ---- TRAIN DATA ----
       train_data <- data[train_idx, , drop = FALSE]
       obs_train <- train_data$target
       train_data$target <- NULL
       
-      # ---- Loop over hyperparameter combinations ----
       fold_results <- lapply(seq_len(nrow(param_grid)), function(j) {
         params <- param_grid[j, ]
         
-        # ---- TRAINING MODE ----
+        
+        # -------------------- REPLACE THIS BLOCK --------------------
         res_train <- compute_features_modular(
-          counts = t(train_data),  # transpose if necessary
+          counts = train_data,  # or t(train_data) if necessary
           param1 = params$param1,
           param2 = params$param2,
           param3 = params$param3,
           ...
         )
+        # -------------------- REPLACE THIS BLOCK --------------------
+        
+        
         train_features <- as.data.frame(res_train$features) #if necessary
         train_features$target <- obs_train
         
-        # ---- TEST DATA (projection) ----
         test_data <- data[test_idx, , drop = FALSE]
         obs_test <- test_data$target
         test_data$target <- NULL
         
+        
+        # -------------------- REPLACE THIS BLOCK --------------------
         test_features <- compute_features_modular(
           test_data, # or t(test_data) if necessary
-          structure = res_train$structure,  # Use training structure
+          structure = res_train$structure,  
           ...
         )
+        # -------------------- REPLACE THIS BLOCK --------------------
+        
+        
         test_features = test_features$features ## if necessary
 
         list(
@@ -990,7 +1018,6 @@ prepare_custom_folds_tuning <- function(data, folds = NULL, bestune = NULL, ncor
         )
       })
       
-      # ---- Save temporal fold objects to disk ----
       filename <- file.path("Results", paste0("fold_", names(folds)[i], ".rds"))
       saveRDS(processed_folds[[i]], file = filename)
       
@@ -998,7 +1025,6 @@ prepare_custom_folds_tuning <- function(data, folds = NULL, bestune = NULL, ncor
       
     }
     
-    # ---- Stop parallel backend if used ----
     parallel::stopCluster(cl)
     unregister_dopar()
     
@@ -1021,11 +1047,15 @@ prepare_WGCNA_folds_modular <- function(
 ) {
   
   if (!is.null(bestune)) {
-    # ---- Full training set with best parameters ----
+    
     obs_train <- data$target
     data$target <- NULL
     
+    
+    # -------------------- REPLACE THIS BLOCK --------------------
     required_cols <- c("minModuleSize", "mergeCutHeight", "deepSplit")
+    # -------------------- REPLACE THIS BLOCK --------------------
+    
     
     best_params <- if (is.data.frame(bestune)) {
       if (all(required_cols %in% names(bestune))) {
@@ -1039,6 +1069,8 @@ prepare_WGCNA_folds_modular <- function(
       stop("`bestune` must be a data.frame or list.")
     }
     
+    
+    # -------------------- REPLACE THIS BLOCK --------------------
     res_final <- compute_features_modular(
       counts = t(data),
       power = power,
@@ -1047,6 +1079,8 @@ prepare_WGCNA_folds_modular <- function(
       mergeCutHeight = best_params$mergeCutHeight,
       deepSplit = best_params$deepSplit
     )
+    # -------------------- REPLACE THIS BLOCK --------------------
+    
     
     train_cell_data_final <- as.data.frame(res_final$features)
     train_cell_data_final$target <- obs_train
@@ -1057,7 +1091,8 @@ prepare_WGCNA_folds_modular <- function(
     
   } else {
     
-    # ---- Tunable grid ----
+    
+    # -------------------- REPLACE THIS BLOCK --------------------
     custom_grid <- expand.grid(
       power = power,
       minModuleSize = minModuleSize,
@@ -1065,8 +1100,9 @@ prepare_WGCNA_folds_modular <- function(
       deepSplit = deepSplit,
       stringsAsFactors = FALSE
     )
+    # -------------------- REPLACE THIS BLOCK --------------------
     
-    # ---- Parallel setup ----
+    
     if (is.null(ncores)) ncores <- parallel::detectCores() - 2
     cl <- parallel::makeCluster(ncores)
     doParallel::registerDoParallel(cl)
@@ -1077,17 +1113,16 @@ prepare_WGCNA_folds_modular <- function(
       train_idx <- folds[[i]]
       test_idx <- setdiff(seq_len(nrow(data)), train_idx)
       
-      # ---- TRAIN DATA ----
       train_data <- data[train_idx, , drop = FALSE]
       obs_train <- train_data$target
       train_data$target <- NULL
       
-      # ---- Loop over hyperparameter combinations ----
       fold_results <- lapply(seq_len(nrow(custom_grid)), function(j) {
 
         params <- custom_grid[j, ]
         
-        # ---- TRAINING MODE ----
+        
+        # -------------------- REPLACE THIS BLOCK --------------------
         wgcna_train <- compute_features_modular(
           counts = t(train_data),
           power = power,
@@ -1096,19 +1131,25 @@ prepare_WGCNA_folds_modular <- function(
           mergeCutHeight = params$mergeCutHeight,
           deepSplit = params$deepSplit
         )
+        # -------------------- REPLACE THIS BLOCK --------------------
+        
         
         train_features <- as.data.frame(wgcna_train$features) # if necessary
         train_features$target <- obs_train
         
-        # ---- TEST DATA (projection) ----
         test_data <- data[test_idx, , drop = FALSE]
         obs_test <- test_data$target
         test_data$target <- NULL
       
+        
+        # -------------------- REPLACE THIS BLOCK --------------------
         wgcna_test <- compute_features_modular(
           counts = t(test_data),
           modules = wgcna_train$modules
         )
+        # -------------------- REPLACE THIS BLOCK --------------------
+        
+        
         test_features <- as.data.frame(wgcna_test$features) ) # if necessary
         
         list(
@@ -1121,14 +1162,12 @@ prepare_WGCNA_folds_modular <- function(
         )
       })
       
-      # ---- Save temporal fold objects to disk ----
       filename <- file.path("Results", paste0("fold_", names(folds)[i], ".rds"))
       saveRDS(fold_results, file = filename)
       
       fold_results
     }
     
-    # ---- Stop parallel backend if used ----
     parallel::stopCluster(cl)
     unregister_dopar() 
     

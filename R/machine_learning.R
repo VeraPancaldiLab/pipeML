@@ -333,17 +333,21 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metri
 
   ### Implement parallelization
   if(is.null(ncores) == TRUE){
-    ncores = parallel::detectCores() - 2
+    threads = FALSE
+  }else{
+    threads = TRUE
   }
 
   if(is.null(fold_construction_fun)){ #No custom function provided, using normal CV
 
     custom_outputs = NULL
 
-    cl <- parallel::makeCluster(ncores)
-    doParallel::registerDoParallel(cl)
+    if(is.null(ncores) == F){
+      cl <- parallel::makeCluster(ncores)
+      doParallel::registerDoParallel(cl)
+    }
 
-    trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = T, classProbs = TRUE, savePredictions=T)
+    trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = threads, classProbs = TRUE, savePredictions=T)
 
     ##################################################### ML models
     #To do: Re-calculate accuracy values based on tuning parameters optimized by the cv AUC - now the values are based on accuracy! be careful
@@ -398,8 +402,10 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metri
 
     invisible(utils::capture.output({fit.xgbTree <- caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)}, type = "output"))
 
-    parallel::stopCluster(cl)  # stop the cluster after parallel execution
-    unregister_dopar() #Stop Dopar from running in the background
+    if(is.null(ncores) == F){
+      parallel::stopCluster(cl)  # stop the cluster after parallel execution
+      unregister_dopar() #Stop Dopar from running in the background
+    }
 
     # Store models in a named list
     models <- list(
