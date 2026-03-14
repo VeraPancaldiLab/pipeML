@@ -349,6 +349,20 @@ knitr::include_graphics("figures/KM.png")
 
 If a separate testing dataset is already available, pipeML allows you to train models and generate predictions in a single step using the compute_features.ML() function. This function performs model training, hyperparameter tuning, and evaluation on the training data, and then applies the selected model to the test dataset.
 
+Load data 
+```{r}
+data = pipeML::data_example_classification
+X <- data %>% dplyr::select(-target)
+y <- data$target
+
+set.seed(123)
+
+train_idx <- caret::createDataPartition(y, p = 0.8, list = FALSE)
+
+X_train <- X[train_idx, ]
+X_test  <- X[-train_idx, ]
+```
+
 Classification tasks 
 ```{r}
 res <- compute_features.ML(features_train = X_train, 
