@@ -396,7 +396,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metri
     #If both are ON it can slower performance (lead to over-parallelization and CPU contention)
     trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = F, classProbs = TRUE, savePredictions=T)
 
-    invisible(utils::capture.output({fit.xgbTree <- caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)}, type = "output"))
+    fit.xgbTree <- caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)
 
     parallel::stopCluster(cl)  # stop the cluster after parallel execution
     unregister_dopar() #Stop Dopar from running in the background
@@ -3343,6 +3343,7 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 #' @import foreach
 #' @import doParallel
 #' @import fastshap
+#' @importFrom fastshap explain
 #' @import grDevices
 #' @export
 compute_shap_values <- function(model_trained, data_train, task_type = "classification", target_col = NULL,
