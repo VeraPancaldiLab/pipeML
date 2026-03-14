@@ -108,7 +108,7 @@ res <- compute_features.training.ML(features_train = X_train,
                                      k_folds = 2,
                                      n_rep = 1,
                                      file_name = "Example_classification",
-                                     ncores = 2,
+                                     ncores = 1,
                                      return = TRUE)
 ```
 
