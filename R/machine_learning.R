@@ -3615,7 +3615,15 @@ plot_shap_stability <- function(shap_df, file.name){
 
 }
 
-
+#' Reset foreach backend to sequential
+#'
+#' Internal helper that unregisters any active parallel backend used by
+#' \pkg{foreach} and restores the sequential backend via
+#' \code{foreach::registerDoSEQ()}. This is used to ensure that parallel
+#' clusters created during model training are properly released and that
+#' subsequent operations run sequentially.
+#'
+#' @keywords internal
 unregister_dopar <- function() {
   if (!is.null(foreach::getDoParRegistered())) {
     # switch back to sequential backend
@@ -5043,7 +5051,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
     # Combines all model results using aggregate_results().
     # Ensures that each hyperparameter configuration was evaluated across all folds.
     models = aggregate_results(models_all_folds, task = 'survival')
-    names(models) <- model_list[seq_along(models)]
+    names(models) <- model_list
 
     ## Sanity check (each param conf has to be evaluated in all resamples)
     for(i in 1:length(models)){
