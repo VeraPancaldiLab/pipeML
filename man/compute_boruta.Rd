@@ -23,3 +23,4 @@ A list containing:
 \description{
 Compute Boruta algorithm
 }
+\keyword{internal}

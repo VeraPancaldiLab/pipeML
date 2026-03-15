@@ -27,14 +27,14 @@ This tutorial demonstrates how to use the `pipeML` package for training and test
 # **Classification tasks**
 
 Load example data 
-```{r}
+```{r, eval = FALSE}
 data = pipeML::data_example_classification
 X <- data %>% dplyr::select(-target)
 y <- data$target
 ```
 
 For example purposes we make a Train/Test split
-```{r}
+```{r, eval = FALSE}
 set.seed(123)
 
 train_idx <- caret::createDataPartition(y, p = 0.8, list = FALSE)
@@ -49,7 +49,7 @@ y_test  <- y[-train_idx]
 ## **Feature selection**
 
 Apply repeated feature selection using the Boruta algorithm:
-```{r}
+```{r, eval = FALSE}
 y = as.factor(y)
 res_boruta <- feature.selection.boruta(
   data = data,
@@ -63,7 +63,7 @@ res_boruta <- feature.selection.boruta(
 ```
 
 Inspect the results:
-```{r}
+```{r, eval = FALSE}
 head(res_boruta$Matrix_Importance)
 
 cat("Confirmed features:\n", res_boruta$Confirmed)
@@ -101,7 +101,7 @@ res_boruta <- feature.selection.boruta(
 ## **Train machine learning models for classification tasks**
 
 Train and tune models using repeated stratified k-fold cross-validation:
-```{r}
+```{r, eval = FALSE}
 res <- compute_features.training.ML(features_train = X_train, 
                                     target_var = y_train,
                                     task_type = "classification",
@@ -114,12 +114,12 @@ res <- compute_features.training.ML(features_train = X_train,
 ```
 
 Access the best-trained model:
-```{r}
+```{r, eval = FALSE}
 res$Model
 ```
 
 View all trained and tuned machine learning models:
-```{r}
+```{r, eval = FALSE}
 names(res$ML_Models)
 ```
 
@@ -130,7 +130,7 @@ knitr::include_graphics("figures/AUROC_classification.png")
 ## **Model prediction**
 
 After training, users can predict on new data by using the `compute_prediction()` function. You can specify which metric to maximize when determining the optimal classification threshold. Supported values for maximize include: "Accuracy", "Precision", "Recall", "Specificity", "Sensitivity", "F1", and "MCC".
-```{r}
+```{r, eval = FALSE}
 pred = compute_prediction(model = res$Model, 
                           test_data = X_test, 
                           target_var = y_test, 
@@ -141,12 +141,12 @@ pred = compute_prediction(model = res$Model,
 ```
 
 Check predicitions
-```{r}
+```{r, eval = FALSE}
 head(pred$Predictions)
 ```
 
 Verify threshold-based predictions metrics
-```{r}
+```{r, eval = FALSE}
 head(pred$Metrics)
 ```
 
@@ -275,13 +275,15 @@ res_survival <- compute_features.training.ML(
   k_folds = 2,
   n_rep = 1,
   file_name = "Example_survival",
-  ncores = 4,
+  ncores = 1,
   return = TRUE
 )
+
 ```
 
 Access to the best model 
 ```{r}
+names(res_survival$ML_Models)
 res_survival$Model$Model_object
 ```
 
@@ -312,7 +314,7 @@ shap_survival <- compute_shap_values(
 ## **Predict Survival risk**
 
 After training, predictions can be generated using `compute_prediction()`.
-```{r}
+```{r, eval = FALSE}
 pred <- compute_prediction(
   model = res_survival$Model,
   test_data = X_test,
@@ -350,7 +352,7 @@ knitr::include_graphics("figures/KM.png")
 If a separate testing dataset is already available, pipeML allows you to train models and generate predictions in a single step using the compute_features.ML() function. This function performs model training, hyperparameter tuning, and evaluation on the training data, and then applies the selected model to the test dataset.
 
 Load data 
-```{r}
+```{r, eval = FALSE}
 data = pipeML::data_example_classification
 X <- data %>% dplyr::select(-target)
 y <- data$target
@@ -364,7 +366,7 @@ X_test  <- X[-train_idx, ]
 ```
 
 Classification tasks 
-```{r}
+```{r, eval = FALSE}
 res <- compute_features.ML(features_train = X_train, 
                            features_test = X_test, 
                            coldata = data,
@@ -380,17 +382,17 @@ res <- compute_features.ML(features_train = X_train,
 ```
 
 Check training metrics
-```{r}
+```{r, eval = FALSE}
 head(res$Model$Model$pred)
 ```
 
 Check prediction metrics
-```{r}
+```{r, eval = FALSE}
 head(res$Metrics)
 ```
 
 Load data 
-```{r}
+```{r, eval = FALSE}
 data = pipeML::data_example_survival
 X <- data %>% dplyr::select(-time, -status)
 time <- data$time
@@ -431,7 +433,7 @@ If your data includes features from multiple cohorts, `pipeML` provides a flexib
 Below, we demonstrate how to perform a LODO analysis using simulated datasets:
 
 Simulate datasets from different batches
-```{r}
+```{r, eval = FALSE}
 set.seed(123)
 
 # Simulate traitData with 3 cohorts
@@ -455,7 +457,7 @@ colnames(features_all) <- paste0("Feature", 1:15)
 ```
 
 Perform LODO analysis
-```{r}
+```{r, eval = FALSE}
 prediction = list()
 i = 1
 for (cohort in unique(traitData$Cohort)) {
@@ -505,7 +507,7 @@ for (cohort in unique(traitData$Cohort)) {
 For plotting we will make use of our `get_curves` function adapted in a case for multiple cohorts. This function is implemented inside `compute_prediction` to make the RO and PR curves.
 
 Extract prediction metrics and join
-```{r}
+```{r, eval = FALSE}
 roc_data <- lapply(names(prediction), function(cohort) {
   df <- prediction[[cohort]]$Metrics
   df$cohort <- cohort
@@ -526,7 +528,7 @@ auc_prc <- list(
 ```
 
 Plot RO and PR curves
-```{r}
+```{r, eval = FALSE}
 get_curves(
   data = roc_data,
   color = "cohort",
@@ -835,7 +837,7 @@ prepare_WGCNA_folds <- function(data, folds = NULL, bestune = NULL, power) {
 ```
 
 Load data example (Gene expression counts)
-```{r}
+```{r, eval = FALSE}
 counts = pipeML::counts_example
 coldata = pipeML::coldata_example
 
@@ -1259,9 +1261,8 @@ res_params <- compute_features.training.ML(features_train = t(counts_train),
 Step 4 – Prediction on test data
 
 To apply the model to new data, compute the same type of features using the learned modules from the training set.
-```{r}
-test = compute_features_modular(counts_test, 
-                                modules = res_custom$Custom_output$modules)
+```{r, eval = FALSE}
+test = compute_features_modular(counts_test, modules = res_custom$Custom_output$modules)
 test_features = test$features
 ```
 

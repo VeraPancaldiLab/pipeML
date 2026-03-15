@@ -26,7 +26,9 @@ utils::globalVariables(c(
   "n_resamples",
   "parameter_i", "mean_importance",
   "color_label", "sens_lower", "sens_upper",
-  "color_label_prc", "prec_lower", "prec_upper"
+  "color_label_prc", "prec_lower", "prec_upper",
+  "color_label_roc", "auc_lower", "auc_upper", "auprc_lower",
+  "auprc_upper"
 ))
 
 #' Compute Boruta algorithm
@@ -1490,6 +1492,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
       n_rep = n_rep,
       ncores = ncores,
       file_name   = file_name,
+      return = return,
       fold_construction_fun = fold_construction_fun,
       fold_construction_args_fixed = fold_construction_args_fixed,
       fold_construction_args_tunable = fold_construction_args_tunable
@@ -4859,7 +4862,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
     }
 
     models = aggregate_results(models_all_folds, task = 'survival')
-    names(models) <- model_list
+    names(models) <- model_list[seq_along(models)]
 
     ## Sanity check (each param conf has to be evaluated in all resamples)
     for(i in 1:length(models)){
@@ -5039,7 +5042,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
     # Combines all model results using aggregate_results().
     # Ensures that each hyperparameter configuration was evaluated across all folds.
     models = aggregate_results(models_all_folds, task = 'survival')
-    names(models) <- model_list
+    names(models) <- model_list[seq_along(models)]
 
     ## Sanity check (each param conf has to be evaluated in all resamples)
     for(i in 1:length(models)){

@@ -37,3 +37,4 @@ A list containing:
 \description{
 Merge results from multiple Boruta runs to identify robust feature selections.
 }
+\keyword{internal}
