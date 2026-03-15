@@ -50,7 +50,10 @@ Suggests:
     tidymodels,
     cowplot,
     recipes,
-    censored
+    censored,
+    flexsurv,
+    coin,
+    aorsf
 LazyData: true
 LazyDataCompression: bzip2
 VignetteBuilder: knitr
