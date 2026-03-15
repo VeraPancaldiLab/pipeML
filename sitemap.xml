@@ -55,6 +55,7 @@
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/plot_survival_performance.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/predict_and_evaluate_survival.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/preprocess_features.html</loc></url>
+<url><loc>https://verapancaldilab.github.io/pipeML/reference/unregister_dopar.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_classification.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_survival.html</loc></url>
 </urlset>
