@@ -62,8 +62,8 @@ It allows flexible cross-validation schemes, including:</p><ul><li><p>Standard s
 <span>  trait.positive <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  time_var <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  event_var <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  metric <span class="op">=</span> <span class="st">"Accuracy"</span>,</span>
-<span>  <span class="va">stack</span>,</span>
+<span>  metric <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  stack <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  k_folds <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  n_rep <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -82,31 +82,31 @@ It allows flexible cross-validation schemes, including:</p><ul><li><p>Standard s
 
 
 <dl><dt id="arg-features-train">features_train<a class="anchor" aria-label="anchor" href="#arg-features-train"></a></dt>
-<dd><p>A data frame containing the features used for training (samples in rows, features in columns).</p></dd>
+<dd><p>A data frame with samples in rows and features in columns.</p></dd>
 
 
 <dt id="arg-task-type">task_type<a class="anchor" aria-label="anchor" href="#arg-task-type"></a></dt>
-<dd><p>Character. Specifies the type of prediction task. Either <code>"classification"</code> or <code>"survival"</code>.</p></dd>
+<dd><p>Character. Prediction task type: <code>"classification"</code> or <code>"survival"</code>.</p></dd>
 
 
 <dt id="arg-target-var">target_var<a class="anchor" aria-label="anchor" href="#arg-target-var"></a></dt>
-<dd><p>Vector. The target variable to predict (required for classification tasks).</p></dd>
+<dd><p>Vector. Target variable for classification tasks.</p></dd>
 
 
 <dt id="arg-trait-positive">trait.positive<a class="anchor" aria-label="anchor" href="#arg-trait-positive"></a></dt>
-<dd><p>Value in <code>target_var</code> that represents the positive class (used for metrics like AUROC and AUPRC).</p></dd>
+<dd><p>Value in <code>target_var</code> representing the positive class.</p></dd>
 
 
 <dt id="arg-time-var">time_var<a class="anchor" aria-label="anchor" href="#arg-time-var"></a></dt>
-<dd><p>Character. The name of the survival time variable (required for survival models).</p></dd>
+<dd><p>Character. Name of the survival time variable (required for survival tasks).</p></dd>
 
 
 <dt id="arg-event-var">event_var<a class="anchor" aria-label="anchor" href="#arg-event-var"></a></dt>
-<dd><p>Character. The name of the event indicator variable (required for survival models; 1 = event occurred, 0 = censored).</p></dd>
+<dd><p>Character. Name of the event indicator (1 = event occurred, 0 = censored) for survival tasks.</p></dd>
 
 
 <dt id="arg-metric">metric<a class="anchor" aria-label="anchor" href="#arg-metric"></a></dt>
-<dd><p>Character. Performance metric used for model selection and tuning. Supported values are:</p><ul><li><p><code>"Accuracy"</code> — classification accuracy</p></li>
+<dd><p>Character. Performance metric for model selection and tuning. Supported values:</p><ul><li><p><code>"Accuracy"</code> — classification accuracy</p></li>
 <li><p><code>"AUROC"</code> — area under the ROC curve</p></li>
 <li><p><code>"AUPRC"</code> — area under the precision-recall curve</p></li>
 <li><p><code>"C-index"</code> — concordance index (for survival tasks)</p></li>
@@ -114,19 +114,19 @@ It allows flexible cross-validation schemes, including:</p><ul><li><p>Standard s
 
 
 <dt id="arg-stack">stack<a class="anchor" aria-label="anchor" href="#arg-stack"></a></dt>
-<dd><p>Logical. Whether to perform model stacking (ensemble meta-learning). Default is <code>FALSE</code>.</p></dd>
+<dd><p>Logical. Perform model stacking (ensemble meta-learning). Default: <code>FALSE</code>.</p></dd>
 
 
 <dt id="arg-k-folds">k_folds<a class="anchor" aria-label="anchor" href="#arg-k-folds"></a></dt>
-<dd><p>Integer. Number of folds to use for cross-validation.</p></dd>
+<dd><p>Integer. Number of folds for cross-validation. Default: 10.</p></dd>
 
 
 <dt id="arg-n-rep">n_rep<a class="anchor" aria-label="anchor" href="#arg-n-rep"></a></dt>
-<dd><p>Integer. Number of repetitions for cross-validation (repeated CV).</p></dd>
+<dd><p>Integer. Number of repetitions for repeated CV. Default: 5.</p></dd>
 
 
 <dt id="arg-lodo">LODO<a class="anchor" aria-label="anchor" href="#arg-lodo"></a></dt>
-<dd><p>Logical. If <code>TRUE</code>, constructs cross-validation folds stratified by cohort (Leave-One-Dataset-Out scheme).</p></dd>
+<dd><p>Logical. If <code>TRUE</code>, constructs folds stratified by cohort (LODO scheme).</p></dd>
 
 
 <dt id="arg-batch-var">batch_var<a class="anchor" aria-label="anchor" href="#arg-batch-var"></a></dt>
@@ -134,64 +134,52 @@ It allows flexible cross-validation schemes, including:</p><ul><li><p>Standard s
 
 
 <dt id="arg-file-name">file_name<a class="anchor" aria-label="anchor" href="#arg-file-name"></a></dt>
-<dd><p>Character. File name used for saving performance plots in the <code>"Results/"</code> directory.</p></dd>
+<dd><p>Character. File name prefix used to save performance plots in <code>"Results/"</code>.</p></dd>
 
 
 <dt id="arg-ncores">ncores<a class="anchor" aria-label="anchor" href="#arg-ncores"></a></dt>
-<dd><p>Integer. Number of CPU cores to use for parallelization. Defaults to <code>parallel::detectCores() - 1</code>.</p></dd>
+<dd><p>Integer. Number of CPU cores for parallelization. Default: <code>parallel::detectCores() - 1</code>.</p></dd>
 
 
 <dt id="arg-return">return<a class="anchor" aria-label="anchor" href="#arg-return"></a></dt>
-<dd><p>Logical. Whether to return and save the generated plots. Default is <code>FALSE</code>.</p></dd>
+<dd><p>Logical. Whether to return the trained models and plots. Default: <code>FALSE</code>.</p></dd>
 
 
 <dt id="arg-fold-construction-fun">fold_construction_fun<a class="anchor" aria-label="anchor" href="#arg-fold-construction-fun"></a></dt>
-<dd><p>Function. Optional user-defined function to construct cross-validation folds.
-This enables full control over how data splits and feature transformations are created.
-The function must accept a <code>bestune</code> argument:</p><ul><li><p>If <code>bestune = NULL</code>, the function explores a parameter grid across folds
-(executed in parallel via <code>foreach</code>).</p></li>
-<li><p>If <code>bestune</code> is provided, optimized parameters are applied to the full dataset
-to rebuild features before final training.</p></li>
-</ul><p>The fold constructor should save individual folds as <code>"Results/fold_*.rds"</code> objects containing:</p><ul><li><p><code>train_data</code> — training data for that fold</p></li>
-<li><p><code>test_data</code> — testing data for that fold</p></li>
-<li><p><code>obs_test</code> — observed target or survival outcomes</p></li>
-<li><p><code>params</code> — parameter combination used (if applicable)</p></li>
+<dd><p>Function. Optional user-defined function for fold construction. Must accept a <code>bestune</code> argument:</p><ul><li><p><code>bestune = NULL</code> — explore parameter grid across folds (parallelized via <code>foreach</code>).</p></li>
+<li><p><code>bestune provided</code> — rebuild features on the full dataset using optimized parameters.</p></li>
+</ul><p>The function should save individual folds as <code>"Results/fold_*.rds"</code> with:</p><ul><li><p><code>train_data</code> — training data</p></li>
+<li><p><code>test_data</code> — testing data</p></li>
+<li><p><code>obs_test</code> — observed outcomes</p></li>
+<li><p><code>params</code> — parameters used (if applicable)</p></li>
 </ul></dd>
 
 
 <dt id="arg-fold-construction-args-fixed">fold_construction_args_fixed<a class="anchor" aria-label="anchor" href="#arg-fold-construction-args-fixed"></a></dt>
-<dd><p>List. Arguments passed to <code>fold_construction_fun</code> that remain fixed
-during both cross-validation and final training (e.g., annotation files, normalization flags, etc.).</p></dd>
+<dd><p>List of arguments passed to <code>fold_construction_fun</code> that remain fixed across CV and final training.</p></dd>
 
 
 <dt id="arg-fold-construction-args-tunable">fold_construction_args_tunable<a class="anchor" aria-label="anchor" href="#arg-fold-construction-args-tunable"></a></dt>
-<dd><p>List. Arguments passed to <code>fold_construction_fun</code> that define
-hyperparameters to tune during cross-validation. Each element should contain one or more candidate values.</p></dd>
+<dd><p>List of arguments passed to <code>fold_construction_fun</code> for hyperparameter tuning.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A list containing:</p><ul><li><p>Trained model(s) or meta-learner (if <code>stack = TRUE</code>)</p></li>
-<li><p>Feature set used for model training</p></li>
+<li><p>Features used for training</p></li>
 <li><p>Cross-validation performance results and plots</p></li>
 <li><p>Best hyperparameter configuration (if applicable)</p></li>
 </ul></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>The function supports both classification and survival analysis pipelines by setting
+    <p>The function supports both classification and survival analysis pipelines via
 <code>task_type = "classification"</code> or <code>task_type = "survival"</code>.</p>
-<p>The function supports:</p><ul><li><p>Automatic feature preprocessing (e.g., correlation filtering, low-variance removal).</p></li>
-<li><p>Parallelized cross-validation across folds and repetitions.</p></li>
-<li><p>Integration with custom model pipelines (e.g., CellTFusion, pathway-based deconvolution).</p></li>
-<li><p>Unified handling of both survival and classification models.</p></li>
-</ul><p>When a custom fold constructor is provided via <code>fold_construction_fun</code>, the default stratified k-fold
-logic is bypassed, and the function will instead iterate through all <code>Results/fold_*.rds</code> files generated
-by the custom routine. This allows hybrid pipelines combining biological preprocessing (e.g., CellTFusion)
-with downstream model fitting.</p>
-    </div>
-    <div class="section level2">
-    <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p><code><a href="compute_k_fold_CV_survival.html">compute_k_fold_CV_survival()</a></code>, <code><a href="compute_ml_survival.html">compute_ml_survival()</a></code>, <code><a href="compute_cv_CINDEX.html">compute_cv_CINDEX()</a></code></p></div>
+<p>The function provides:</p><ul><li><p>Automatic feature preprocessing (e.g., correlation filtering, low-variance removal)</p></li>
+<li><p>Parallelized cross-validation across folds and repetitions</p></li>
+<li><p>Integration with custom model pipelines (e.g., CellTFusion, pathway-based deconvolution)</p></li>
+<li><p>Unified handling of both survival and classification models</p></li>
+</ul><p>When a custom fold constructor is provided, default k-fold logic is bypassed, and
+results are computed using the pre-generated folds.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

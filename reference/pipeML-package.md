@@ -1,13 +1,16 @@
-# pipeML: A robust R machine learning pipeline for classification tasks and survival analysis
+# pipeML: A flexible and modular machine learning framework designed to support leakage-free model training through custom cross-validation fold construction
 
-pipeML is develop for a fast and easy use, its complexity allows a
-robust implementation during each step of the pipeline.
+pipeML enables users to recompute global dataset features independently
+within each cross-validation fold, ensuring strict separation between
+training and test data, while preserving compatibility with a wide range
+of machine learning algorithms for both classification and survival
+tasks.
 
 ## See also
 
 Useful links:
 
-- <https://github.com/VeraPancaldiLab/pipeML>
+- <https://verapancaldilab.github.io/pipeML>
 
 ## Author
 

@@ -1,20 +1,20 @@
-# Train and Evaluate a Survival Model
+# Train and Evaluate a Survival Model (Internal)
 
-This function trains and evaluates a single survival model using the
-**tidymodels** framework. It supports a range of survival model types,
-including Cox, penalized Cox, AFT, random forests, bagged trees, and
-gradient boosting models.
+This internal function trains and evaluates a survival model using the
+**tidymodels** framework. It supports Cox, penalized Cox, AFT, random
+forests, bagged trees, and gradient boosting survival models.
 
 ## Usage
 
 ``` r
 compute_ml_survival(
   df_train,
-  df_test,
+  df_test = NULL,
   outcome_col,
-  event_col = NULL,
+  event_col,
   model,
-  models_hyperparameters
+  models_hyperparameters,
+  return_model = F
 )
 ```
 
@@ -22,34 +22,32 @@ compute_ml_survival(
 
 - df_train:
 
-  A data frame containing the training data, including survival time,
-  event indicator, and predictor variables.
+  A data frame containing training data including survival time, event
+  indicator, and predictors.
 
 - df_test:
 
-  A data frame containing the test data with the same structure and
-  columns as `df_train`.
+  Optional data frame for testing. Must contain the same columns as
+  `df_train`.
 
 - outcome_col:
 
-  Character string specifying the name of the survival time column.
+  Character. Name of the survival time column.
 
 - event_col:
 
-  Character string specifying the name of the event indicator column
-  (`1 = event occurred`, `0 = censored`).
+  Character. Name of the event indicator column (1 = event occurred, 0 =
+  censored).
 
 - model:
 
-  Character string specifying which survival model to train. Supported
-  values include:
+  Character. The type of survival model to train. Options:
 
-  - `"cox_ph_survival"` – Cox proportional hazards model (survival)
+  - `"cox_ph_survival"` – Cox proportional hazards model
 
-  - `"proportional_hazards_glmnet"` – Penalized Cox model (LASSO/Elastic
-    Net)
+  - `"proportional_hazards_glmnet"` – Penalized Cox (LASSO/Elastic Net)
 
-  - `"survreg_flexsurv"` – Parametric AFT model (flexsurv)
+  - `"survreg_flexsurv"` – Parametric AFT model
 
   - `"rand_forest_partykit"` – Random survival forest (ctree engine)
 
@@ -63,51 +61,54 @@ compute_ml_survival(
 
 - models_hyperparameters:
 
-  A list containing model hyperparameter values to apply. Typically
-  created from a tuning grid or optimization step, e.g.:
-  `list(list(trees = 500, min_n = 10))`. If `NULL`, default parameters
-  are used.
+  Optional list of hyperparameter values to apply. Example:
+  `list(list(trees = 500, min_n = 10))`. Defaults to `NULL` (use engine
+  defaults).
+
+- return_model:
+
+  Logical. If `TRUE`, returns the fitted model along with predictions.
+  Default is `FALSE`.
 
 ## Value
 
-A tibble with two columns:
+If `df_test` is provided:
 
-- `model`:
+- A tibble with columns `predictions` (predicted risk scores) and
+  `c_index` (Concordance Index).
 
-  The model name as a character string.
+- If `return_model = TRUE`, a list with elements:
 
-- `c_index`:
+  - `Model` – fitted tidymodels workflow
 
-  Numeric value of the computed C-index on the test data.
+  - `Metrics` – tibble with `predictions` and `c_index`. If `df_test` is
+    `NULL`, the function returns only the fitted model object.
 
 ## Details
 
-The function automatically applies user-specified hyperparameters,
-standardizes predictions from different engines, and evaluates model
-performance using the **Concordance Index (C-index)** as the primary
-metric. It ensures a consistent risk-score direction across models
-(higher values indicate higher risk).
+The function standardizes predictions across different engines and
+evaluates model performance using the Concordance Index (C-index). Risk
+scores are aligned such that higher values indicate higher risk.
 
-The function uses the **parsnip** interface from tidymodels to define,
-train, and evaluate models.
+The function uses the **parsnip** interface to define and fit survival
+models. Workflow:
 
-Workflow:
+1.  Create model specification
+    ([`parsnip::model_spec`](https://parsnip.tidymodels.org/reference/model_spec.html))
+    based on `model` type.
 
-1.  Defines the model specification
-    ([`parsnip::model_spec`](https://parsnip.tidymodels.org/reference/model_spec.html)).
-
-2.  Optionally applies user-specified hyperparameters via
+2.  Apply optional hyperparameters via
     [`parsnip::set_args()`](https://parsnip.tidymodels.org/reference/set_args.html).
 
-3.  Constructs a survival formula of the form `Surv(time, event) ~ .`.
+3.  Construct survival formula: `Surv(time, event) ~ .`.
 
-4.  Fits the model using
+4.  Fit model using
     [`parsnip::fit()`](https://generics.r-lib.org/reference/fit.html) on
-    the training data.
+    `df_train`.
 
-5.  Evaluates model performance using
-    [`predict_and_evaluate_survival()`](https://verapancaldilab.github.io/pipeML/reference/predict_and_evaluate_survival.md),
-    which computes the C-index.
+5.  Evaluate performance using
+    [`predict_and_evaluate_survival()`](https://verapancaldilab.github.io/pipeML/reference/predict_and_evaluate_survival.md)
+    (C-index).
 
 ## See also
 

@@ -21,8 +21,8 @@ compute_features.training.ML(
   trait.positive = NULL,
   time_var = NULL,
   event_var = NULL,
-  metric = "Accuracy",
-  stack,
+  metric = NULL,
+  stack = FALSE,
   k_folds = 10,
   n_rep = 5,
   LODO = FALSE,
@@ -40,38 +40,34 @@ compute_features.training.ML(
 
 - features_train:
 
-  A data frame containing the features used for training (samples in
-  rows, features in columns).
+  A data frame with samples in rows and features in columns.
 
 - task_type:
 
-  Character. Specifies the type of prediction task. Either
-  `"classification"` or `"survival"`.
+  Character. Prediction task type: `"classification"` or `"survival"`.
 
 - target_var:
 
-  Vector. The target variable to predict (required for classification
-  tasks).
+  Vector. Target variable for classification tasks.
 
 - trait.positive:
 
-  Value in `target_var` that represents the positive class (used for
-  metrics like AUROC and AUPRC).
+  Value in `target_var` representing the positive class.
 
 - time_var:
 
-  Character. The name of the survival time variable (required for
-  survival models).
+  Character. Name of the survival time variable (required for survival
+  tasks).
 
 - event_var:
 
-  Character. The name of the event indicator variable (required for
-  survival models; 1 = event occurred, 0 = censored).
+  Character. Name of the event indicator (1 = event occurred, 0 =
+  censored) for survival tasks.
 
 - metric:
 
-  Character. Performance metric used for model selection and tuning.
-  Supported values are:
+  Character. Performance metric for model selection and tuning.
+  Supported values:
 
   - `"Accuracy"` — classification accuracy
 
@@ -83,21 +79,21 @@ compute_features.training.ML(
 
 - stack:
 
-  Logical. Whether to perform model stacking (ensemble meta-learning).
-  Default is `FALSE`.
+  Logical. Perform model stacking (ensemble meta-learning). Default:
+  `FALSE`.
 
 - k_folds:
 
-  Integer. Number of folds to use for cross-validation.
+  Integer. Number of folds for cross-validation. Default: 10.
 
 - n_rep:
 
-  Integer. Number of repetitions for cross-validation (repeated CV).
+  Integer. Number of repetitions for repeated CV. Default: 5.
 
 - LODO:
 
-  Logical. If `TRUE`, constructs cross-validation folds stratified by
-  cohort (Leave-One-Dataset-Out scheme).
+  Logical. If `TRUE`, constructs folds stratified by cohort (LODO
+  scheme).
 
 - batch_var:
 
@@ -106,54 +102,50 @@ compute_features.training.ML(
 
 - file_name:
 
-  Character. File name used for saving performance plots in the
-  `"Results/"` directory.
+  Character. File name prefix used to save performance plots in
+  `"Results/"`.
 
 - ncores:
 
-  Integer. Number of CPU cores to use for parallelization. Defaults to
+  Integer. Number of CPU cores for parallelization. Default:
   `parallel::detectCores() - 1`.
 
 - return:
 
-  Logical. Whether to return and save the generated plots. Default is
+  Logical. Whether to return the trained models and plots. Default:
   `FALSE`.
 
 - fold_construction_fun:
 
-  Function. Optional user-defined function to construct cross-validation
-  folds. This enables full control over how data splits and feature
-  transformations are created. The function must accept a `bestune`
-  argument:
+  Function. Optional user-defined function for fold construction. Must
+  accept a `bestune` argument:
 
-  - If `bestune = NULL`, the function explores a parameter grid across
-    folds (executed in parallel via `foreach`).
+  - `bestune = NULL` — explore parameter grid across folds (parallelized
+    via `foreach`).
 
-  - If `bestune` is provided, optimized parameters are applied to the
-    full dataset to rebuild features before final training.
+  - `bestune provided` — rebuild features on the full dataset using
+    optimized parameters.
 
-  The fold constructor should save individual folds as
-  `"Results/fold_*.rds"` objects containing:
+  The function should save individual folds as `"Results/fold_*.rds"`
+  with:
 
-  - `train_data` — training data for that fold
+  - `train_data` — training data
 
-  - `test_data` — testing data for that fold
+  - `test_data` — testing data
 
-  - `obs_test` — observed target or survival outcomes
+  - `obs_test` — observed outcomes
 
-  - `params` — parameter combination used (if applicable)
+  - `params` — parameters used (if applicable)
 
 - fold_construction_args_fixed:
 
-  List. Arguments passed to `fold_construction_fun` that remain fixed
-  during both cross-validation and final training (e.g., annotation
-  files, normalization flags, etc.).
+  List of arguments passed to `fold_construction_fun` that remain fixed
+  across CV and final training.
 
 - fold_construction_args_tunable:
 
-  List. Arguments passed to `fold_construction_fun` that define
-  hyperparameters to tune during cross-validation. Each element should
-  contain one or more candidate values.
+  List of arguments passed to `fold_construction_fun` for hyperparameter
+  tuning.
 
 ## Value
 
@@ -161,7 +153,7 @@ A list containing:
 
 - Trained model(s) or meta-learner (if `stack = TRUE`)
 
-- Feature set used for model training
+- Features used for training
 
 - Cross-validation performance results and plots
 
@@ -170,29 +162,20 @@ A list containing:
 ## Details
 
 The function supports both classification and survival analysis
-pipelines by setting `task_type = "classification"` or
+pipelines via `task_type = "classification"` or
 `task_type = "survival"`.
 
-The function supports:
+The function provides:
 
 - Automatic feature preprocessing (e.g., correlation filtering,
-  low-variance removal).
+  low-variance removal)
 
-- Parallelized cross-validation across folds and repetitions.
+- Parallelized cross-validation across folds and repetitions
 
 - Integration with custom model pipelines (e.g., CellTFusion,
-  pathway-based deconvolution).
+  pathway-based deconvolution)
 
-- Unified handling of both survival and classification models.
+- Unified handling of both survival and classification models
 
-When a custom fold constructor is provided via `fold_construction_fun`,
-the default stratified k-fold logic is bypassed, and the function will
-instead iterate through all `Results/fold_*.rds` files generated by the
-custom routine. This allows hybrid pipelines combining biological
-preprocessing (e.g., CellTFusion) with downstream model fitting.
-
-## See also
-
-[`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md),
-[`compute_ml_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_ml_survival.md),
-[`compute_cv_CINDEX()`](https://verapancaldilab.github.io/pipeML/reference/compute_cv_CINDEX.md)
+When a custom fold constructor is provided, default k-fold logic is
+bypassed, and results are computed using the pre-generated folds.

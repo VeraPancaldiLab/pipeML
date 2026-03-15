@@ -30,9 +30,9 @@
     </div>
 
     <div class="section level2">
-      <h2 id="all-functions">All functions<a class="anchor" aria-label="anchor" href="#all-functions"></a></h2>
+      <h2 id="main">Main<a class="anchor" aria-label="anchor" href="#main"></a></h2>
 
-
+      <div class="section-desc"><p>Machine learning</p></div>
 
       <dl></dl></div><div class="section level2">
 
@@ -41,115 +41,10 @@
 
       <dl><dt>
 
-          <code><a href="aggregate_results.html">aggregate_results()</a></code>
+          <code><a href="compute_features.training.ML.html">compute_features.training.ML()</a></code>
 
         </dt>
-        <dd>Aggregate Nested Cross-Validation Results for Classification or Survival Tasks</dd>
-
-        <dt>
-
-          <code><a href="calculate_accuracy.html">calculate_accuracy()</a></code>
-
-        </dt>
-        <dd>Calculates accuracy values from prediction</dd>
-
-        <dt>
-
-          <code><a href="calculate_auprc.html">calculate_auprc()</a></code>
-
-        </dt>
-        <dd>Calculate AUC from Precision-Recall Curve</dd>
-
-        <dt>
-
-          <code><a href="calculate_auroc.html">calculate_auroc()</a></code>
-
-        </dt>
-        <dd>Calculate AUC from ROC Curve</dd>
-
-        <dt>
-
-          <code><a href="calculate_confusion_values.html">calculate_confusion_values()</a></code>
-
-        </dt>
-        <dd>Calculate confusion values</dd>
-
-        <dt>
-
-          <code><a href="calculate_f1.html">calculate_f1()</a></code>
-
-        </dt>
-        <dd>Compute F1 Score</dd>
-
-        <dt>
-
-          <code><a href="calculate_feature_importance_stacking.html">calculate_feature_importance_stacking()</a></code>
-
-        </dt>
-        <dd>Compute Weighted Feature Importance from Base Models and Meta-Learner for Stacking Models</dd>
-
-        <dt>
-
-          <code><a href="calculate_mcc.html">calculate_mcc()</a></code>
-
-        </dt>
-        <dd>Compute Matthews Correlation Coefficient (MCC) Score</dd>
-
-        <dt>
-
-          <code><a href="calculate_precision.html">calculate_precision()</a></code>
-
-        </dt>
-        <dd>Calculate precision values</dd>
-
-        <dt>
-
-          <code><a href="calculate_recall.html">calculate_recall()</a></code>
-
-        </dt>
-        <dd>Calculate recall values</dd>
-
-        <dt>
-
-          <code><a href="choose_base_models.html">choose_base_models()</a></code>
-
-        </dt>
-        <dd>Choose Top Base Models for Stacking Based on Accuracy or AUC Scores</dd>
-
-        <dt>
-
-          <code><a href="compute_boruta.html">compute_boruta()</a></code>
-
-        </dt>
-        <dd>Compute Boruta algorithm</dd>
-
-        <dt>
-
-          <code><a href="compute_custom_k_fold_CV.html">compute_custom_k_fold_CV()</a></code>
-
-        </dt>
-        <dd>Train and evaluate machine learning models on previously constructed k folds</dd>
-
-        <dt>
-
-          <code><a href="compute_cv_AUC.html">compute_cv_AUC()</a></code>
-
-        </dt>
-        <dd>Compute Cross-Validated AUC Values for Machine Learning Models</dd>
-
-        <dt>
-
-          <code><a href="compute_cv_CINDEX.html">compute_cv_CINDEX()</a></code>
-
-        </dt>
-        <dd>Summarize and Visualize C-index Results from Survival Model Cross-Validation</dd>
-
-        <dt>
-
-          <code><a href="compute_cv_accuracy.html">compute_cv_accuracy()</a></code>
-
-        </dt>
-        <dd>Compute Cross-Validation Accuracy for ML Models</dd>
+        <dd>Train machine learning or survival models with optional stacking and custom cross-validation</dd>
 
         <dt>
 
@@ -160,52 +55,33 @@
 
         <dt>
 
-          <code><a href="compute_features.training.ML.html">compute_features.training.ML()</a></code>
-
-        </dt>
-        <dd>Train machine learning or survival models with optional stacking and custom cross-validation</dd>
-
-        <dt>
-
-          <code><a href="compute_k_fold_CV.html">compute_k_fold_CV()</a></code>
-
-        </dt>
-        <dd>Perform repeated stratified k-fold cross-validation for model training and tuning</dd>
-
-        <dt>
-
-          <code><a href="compute_k_fold_CV_survival.html">compute_k_fold_CV_survival()</a></code>
-
-        </dt>
-        <dd>Nested Cross-Validation for Survival Models with Optional Custom Fold Construction</dd>
-
-        <dt>
-
-          <code><a href="compute_ml_survival.html">compute_ml_survival()</a></code>
-
-        </dt>
-        <dd>Train and Evaluate a Survival Model</dd>
-
-        <dt>
-
           <code><a href="compute_prediction.html">compute_prediction()</a></code>
 
         </dt>
         <dd>Compute Prediction Metrics for a Trained Machine Learning Model</dd>
+      </dl></div><div class="section level2">
+      <h2 id="variable-importance">Variable importance<a class="anchor" aria-label="anchor" href="#variable-importance"></a></h2>
+
+      <div class="section-desc"><p>Model interpretability</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="compute_shap_values.html">compute_shap_values()</a></code>
+
+        </dt>
+        <dd>Compute SHAP Values for Machine Learning Models</dd>
 
         <dt>
 
-          <code><a href="compute_variable.importance.html">compute_variable.importance()</a></code>
+          <code><a href="plot_shap_stability.html">plot_shap_stability()</a></code>
 
         </dt>
-        <dd>Compute variable importance using SHAP values</dd>
-
-        <dt>
-
-          <code><a href="deconvolution.html">deconvolution</a></code>
-
-        </dt>
-        <dd>Deconvolution matrix</dd>
+        <dd>Plot SHAP Feature Importance Stability Across Resamples</dd>
 
         <dt>
 
@@ -213,15 +89,17 @@
 
         </dt>
         <dd>Compute Feature Selection Using Repeated Boruta Algorithm</dd>
+      </dl></div><div class="section level2">
+      <h2 id="visualization">Visualization<a class="anchor" aria-label="anchor" href="#visualization"></a></h2>
 
-        <dt>
+      <div class="section-desc"><p>Model visualization</p></div>
 
-          <code><a href="find.ML.models.html">find.ML.models()</a></code>
+      <dl></dl></div><div class="section level2">
 
-        </dt>
-        <dd>Extract ML models from a directory based on specific AUC score</dd>
 
-        <dt>
+
+
+      <dl><dt>
 
           <code><a href="get_curves.html">get_curves()</a></code>
 
@@ -230,96 +108,50 @@
 
         <dt>
 
-          <code><a href="get_default_hyperparams.html">get_default_hyperparams()</a></code>
-
-        </dt>
-        <dd>Get default hyperparameter grids for supported survival models</dd>
-
-        <dt>
-
-          <code><a href="get_pooled_boxplots.html">get_pooled_boxplots()</a></code>
-
-        </dt>
-        <dd>Plot Pooled AUROC and AUPRC Boxplots Across Multiple Folders</dd>
-
-        <dt>
-
-          <code><a href="get_pooled_roc_curves.html">get_pooled_roc_curves()</a></code>
-
-        </dt>
-        <dd>Plot Pooled AUROC and AUPRC Performance Curves</dd>
-
-        <dt>
-
-          <code><a href="get_sensitivity_specificity.html">get_sensitivity_specificity()</a></code>
-
-        </dt>
-        <dd>Calculate Sensitivity and Specificity Values</dd>
-
-        <dt>
-
-          <code><a href="merge_boruta_results.html">merge_boruta_results()</a></code>
-
-        </dt>
-        <dd>Merge Boruta Results</dd>
-
-        <dt>
-
-          <code><a href="plot_shap_values.html">plot_shap_values()</a></code>
-
-        </dt>
-        <dd>Plot SHAP values</dd>
-
-        <dt>
-
           <code><a href="plot_survival_performance.html">plot_survival_performance()</a></code>
 
         </dt>
-        <dd>Plot and save survival performance of a model on test data</dd>
+        <dd>Plot and Save Survival Performance of a Model (Internal)</dd>
+      </dl></div><div class="section level2">
+      <h2 id="package-data">Package Data<a class="anchor" aria-label="anchor" href="#package-data"></a></h2>
+
+      <div class="section-desc"><p>Example data</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="data_example_classification.html">data_example_classification</a></code>
+
+        </dt>
+        <dd>data_example_classification</dd>
 
         <dt>
 
-          <code><a href="predict_and_evaluate_survival.html">predict_and_evaluate_survival()</a></code>
+          <code><a href="data_example_survival.html">data_example_survival</a></code>
 
         </dt>
-        <dd>Predict and Evaluate Survival Model Performance</dd>
+        <dd>data_example_survival</dd>
 
         <dt>
 
-          <code><a href="preprocess_features.html">preprocess_features()</a></code>
+          <code><a href="counts_example.html">counts_example</a></code>
 
         </dt>
-        <dd>Preprocess Features for Machine Learning</dd>
+        <dd>counts_example</dd>
 
         <dt>
 
-          <code><a href="raw.counts.html">raw.counts</a></code>
+          <code><a href="coldata_example.html">coldata_example</a></code>
 
         </dt>
-        <dd>Raw counts</dd>
-
-        <dt>
-
-          <code><a href="traitData.html">traitData</a></code>
-
-        </dt>
-        <dd>Clinical data</dd>
-
-        <dt>
-
-          <code><a href="wrapper_train_best_hyperparams_classification.html">wrapper_train_best_hyperparams_classification()</a></code>
-
-        </dt>
-        <dd>Train model with optimized hyperparameters for classification tasks</dd>
-
-        <dt>
-
-          <code><a href="wrapper_train_best_hyperparams_survival.html">wrapper_train_best_hyperparams_survival()</a></code>
-
-        </dt>
-        <dd>Train the Best Survival Model Using Optimized Hyperparameters</dd>
+        <dd>coldata_example</dd>
       </dl></div>
-  </main></div>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">

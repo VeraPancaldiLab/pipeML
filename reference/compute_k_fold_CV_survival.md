@@ -1,10 +1,9 @@
-# Nested Cross-Validation for Survival Models with Optional Custom Fold Construction
+# Nested Cross-Validation for Survival Models (Internal)
 
-Performs *nested cross-validation* to evaluate and tune multiple
-survival models using the **tidymodels** ecosystem. Supports both
-standard event-stratified cross-validation and *Leave-One-Domain-Out
-(LODO)* setups, enabling cohort-balanced model evaluation.
-Hyperparameter grids are automatically constructed for each model type.
+Performs nested cross-validation for survival models using the
+**tidymodels** ecosystem. Supports both standard event-stratified K-fold
+CV and Leave-One-Domain-Out (LODO) setups. Hyperparameter grids are
+automatically generated for each model type.
 
 ## Usage
 
@@ -17,6 +16,7 @@ compute_k_fold_CV_survival(
   k_folds,
   n_rep,
   ncores,
+  return = FALSE,
   LODO = FALSE,
   batch_id = NULL,
   file_name = NULL,
@@ -30,25 +30,24 @@ compute_k_fold_CV_survival(
 
 - df_features:
 
-  A data frame of predictor variables (features).
+  Data frame of predictor variables (features).
 
 - df_outcome:
 
-  A data frame containing survival outcomes — typically including
-  survival time and event indicator columns.
+  Data frame of survival outcomes (time and event columns).
 
 - outcome_col:
 
-  Character string giving the name of the survival time column.
+  Character. Name of the survival time column.
 
 - event_col:
 
-  Character string giving the name of the event indicator column
-  (`0 = censored`, `1 = event`).
+  Character. Name of the event indicator column (`0 = censored`,
+  `1 = event`).
 
 - k_folds:
 
-  Integer. Number of folds for K-fold cross-validation (default = 5).
+  Integer. Number of folds for K-fold CV (default = 5).
 
 - n_rep:
 
@@ -56,40 +55,42 @@ compute_k_fold_CV_survival(
 
 - ncores:
 
-  Integer. Number of CPU cores to use for parallelization.
+  Integer. Number of CPU cores for parallelization.
+
+- return:
+
+  Logical. Whether to return the generated plots.
 
 - LODO:
 
-  Logical; if `TRUE`, performs Leave-One-Domain-Out cross-validation
-  using `batch_id` to stratify samples by cohort.
+  Logical. If `TRUE`, performs Leave-One-Domain-Out CV using `batch_id`.
 
 - batch_id:
 
-  Optional character string naming the column representing cohort or
-  batch identifiers. Required if `LODO = TRUE`.
+  Character. Name of column representing cohort/batch. Required if
+  `LODO = TRUE`.
 
 - file_name:
 
-  Optional string specifying the suffix for the generated C-index
-  summary PDF saved in the `"Results/"` directory.
+  Optional string. Suffix for generated C-index summary PDF saved in
+  `"Results/"`.
 
 - fold_construction_fun:
 
-  Optional custom function for constructing data folds. Used to
-  interface with external preprocessing workflows (e.g., CellTFusion).
+  Optional custom function to construct data folds.
 
 - fold_construction_args_fixed:
 
-  Optional list of fixed arguments passed to `fold_construction_fun()`.
+  Optional list of fixed arguments passed to `fold_construction_fun`.
 
 - fold_construction_args_tunable:
 
-  Optional list of tunable arguments passed to `fold_construction_fun()`
+  Optional list of tunable arguments passed to `fold_construction_fun`
   during hyperparameter tuning.
 
 ## Value
 
-A named list with the following elements:
+A named list containing:
 
 - `Model`:
 
@@ -105,38 +106,40 @@ A named list with the following elements:
 
 - `Custom_output`:
 
-  Optional list of custom outputs from fold construction.
+  Optional outputs from the custom fold construction function.
 
 ## Details
 
-Depending on the inputs, the function can:
+The function can:
 
-1.  Build folds internally or accept custom folds from a user-defined
+1.  Build folds internally or accept a custom fold construction
     function.
 
-2.  Train survival models with or without hyperparameter tuning.
+2.  Train multiple survival models with optional hyperparameter tuning.
 
 3.  Compute and aggregate the Concordance Index (C-index) across folds.
 
-4.  Identify and retrain the top-performing model using optimal
-    parameters.
+4.  Retrain the top-performing model using its optimal hyperparameters.
 
-Internally, the function:
+The function internally:
 
-- Merges predictors and outcomes into a single dataset.
+- Merges predictors and outcomes.
 
-- Creates stratified folds using **rsample**, either by event rate or by
-  cohort × event combinations (if `LODO = TRUE`).
+- Creates stratified folds using **rsample**, either by event or by
+  cohort × event (LODO).
 
-- Evaluates a predefined set of survival models: Cox PH, penalized Cox
-  (glmnet), AFT (flexsurv), decision trees, bagged trees, and random
-  forests.
+- Evaluates predefined survival models: Cox PH, penalized Cox (glmnet),
+  AFT (flexsurv), decision trees, bagged trees, and random forests.
 
-- Aggregates the median and MAD of the C-index across resamples.
+- Aggregates the median and MAD of C-index across resamples.
 
-- Retrains the best-performing model with its optimal hyperparameters.
+- Retrains the top-performing model on the full dataset.
 
-When a custom fold construction function is provided via
-`fold_construction_fun`, the function handles folds in parallel, saves
-intermediate results under `"Results/"`, and returns additional outputs
-for advanced integration.
+If `fold_construction_fun` is provided, the function handles folds in
+parallel and returns additional outputs for advanced integration.
+
+## See also
+
+[`compute_ml_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_ml_survival.md),
+[`get_default_hyperparams()`](https://verapancaldilab.github.io/pipeML/reference/get_default_hyperparams.md),
+[`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md)

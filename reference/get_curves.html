@@ -43,7 +43,20 @@ for both curves in the plot legends.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">get_curves</span><span class="op">(</span><span class="va">data</span>, <span class="va">spec</span>, <span class="va">sens</span>, <span class="va">reca</span>, <span class="va">prec</span>, <span class="va">color</span>, <span class="va">auc_roc</span>, <span class="va">auc_prc</span>, <span class="va">file.name</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">get_curves</span><span class="op">(</span></span>
+<span>  <span class="va">data</span>,</span>
+<span>  spec <span class="op">=</span> <span class="st">"Specificity"</span>,</span>
+<span>  sens <span class="op">=</span> <span class="st">"Sensitivity"</span>,</span>
+<span>  reca <span class="op">=</span> <span class="st">"Recall"</span>,</span>
+<span>  prec <span class="op">=</span> <span class="st">"Precision"</span>,</span>
+<span>  <span class="va">color</span>,</span>
+<span>  <span class="va">auc_roc</span>,</span>
+<span>  <span class="va">auc_prc</span>,</span>
+<span>  LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  <span class="va">file.name</span>,</span>
+<span>  width <span class="op">=</span> <span class="fl">6</span>,</span>
+<span>  height <span class="op">=</span> <span class="fl">6</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -83,8 +96,21 @@ corresponding color in the plot. Multiple cohorts will result in different curve
 <dd><p>A numeric value representing the AUC for the Precision-Recall curve.</p></dd>
 
 
+<dt id="arg-lodo">LODO<a class="anchor" aria-label="anchor" href="#arg-lodo"></a></dt>
+<dd><p>Logical. If TRUE, the function assumes the data contains stacked predictions from
+multiple cohorts and assigns AUROC/AUPRC per cohort (default = FALSE).</p></dd>
+
+
 <dt id="arg-file-name">file.name<a class="anchor" aria-label="anchor" href="#arg-file-name"></a></dt>
 <dd><p>A character string used as the file name prefix for saving the plots.</p></dd>
+
+
+<dt id="arg-width">width<a class="anchor" aria-label="anchor" href="#arg-width"></a></dt>
+<dd><p>A numeric value for the width of plot</p></dd>
+
+
+<dt id="arg-height">height<a class="anchor" aria-label="anchor" href="#arg-height"></a></dt>
+<dd><p>A numeric value for the height of plot</p></dd>
 
 </dl></div>
     <div class="section level2">

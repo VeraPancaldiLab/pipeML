@@ -71,28 +71,3 @@ to generate evenly spaced sequences of parameter values across their
 default ranges. For data-dependent parameters (like `mtry`),
 [`dials::finalize()`](https://dials.tidymodels.org/reference/finalize.html)
 is used to compute appropriate limits based on `train_x`.
-
-## Examples
-
-``` r
-# Example 1: Random forest with feature-dependent hyperparameter
-get_default_hyperparams("rand_forest_partykit", train_x = iris[, 1:4])
-#> $trees
-#> [1]    1  500 1000 1500 2000
-#> 
-#> $min_n
-#> [1]  2 11 21 30 40
-#> 
-#> $mtry
-#> [1] 1 2 3 4
-#> 
-
-# Example 2: Penalized Cox model with default parameter ranges
-get_default_hyperparams("proportional_hazards_glmnet")
-#> $penalty
-#> [1] 1.000000e-10 3.162278e-08 1.000000e-05 3.162278e-03 1.000000e+00
-#> 
-#> $mixture
-#> [1] 0.00 0.25 0.50 0.75 1.00
-#> 
-```

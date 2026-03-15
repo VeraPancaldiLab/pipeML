@@ -1,10 +1,9 @@
-# Predict and Evaluate Survival Model Performance
+# Predict and Evaluate Survival Model Performance (Internal)
 
-This function generates predictions from a fitted survival model and
-evaluates its performance using the Concordance Index (C-index). It
-automatically handles different prediction output types supported by
-various survival modeling engines and standardizes predictions into a
-comparable numeric format.
+Generates predictions from a fitted survival model and evaluates
+performance using the Concordance Index (C-index). Handles multiple
+prediction output types from different survival engines and standardizes
+predictions into a comparable numeric format.
 
 ## Usage
 
@@ -12,8 +11,8 @@ comparable numeric format.
 predict_and_evaluate_survival(
   model_fit,
   data,
-  outcome_col = "time",
-  event_col = "event"
+  outcome_col = NULL,
+  event_col = NULL
 )
 ```
 
@@ -21,72 +20,57 @@ predict_and_evaluate_survival(
 
 - model_fit:
 
-  A fitted survival model object (typically created via a `parsnip` or
-  `workflow` model specification).
+  A fitted survival model object (typically from `parsnip` or
+  `workflow`).
 
 - data:
 
-  A data frame containing the predictors and survival outcome variables
-  used for prediction and evaluation.
+  Data frame containing predictors and survival outcome variables.
 
 - outcome_col:
 
-  Character string specifying the name of the survival time column in
-  `data`. Default is `"time"`.
+  Character string specifying the survival time column (default =
+  `"time"`).
 
 - event_col:
 
-  Character string specifying the name of the event indicator column in
-  `data`. Default is `"event"`.
+  Character string specifying the event indicator column (default =
+  `"event"`).
 
 ## Value
 
-A list with two elements:
+A list containing:
 
 - `preds`:
 
-  A tibble containing standardized numeric predictions.
+  Tibble with standardized numeric predictions `.pred`.
 
 - `c_index`:
 
-  Numeric value representing the computed C-index.
+  Numeric value of the computed C-index.
+
+- `c_index_lower`:
+
+  Lower bound of 95% CI for the C-index.
+
+- `c_index_upper`:
+
+  Upper bound of 95% CI for the C-index.
 
 ## Details
 
-The function attempts to generate predictions using multiple possible
-prediction types, depending on what the model supports:
+The function attempts predictions using multiple types depending on
+model support:
 
-- `"linear_pred"` — Linear predictor or log hazard (e.g., Cox models),
-  where higher values indicate higher risk.
+- `"linear_pred"` — Linear predictor/log hazard (higher = higher risk).
 
-- `"time"` — Expected survival time (e.g., AFT models), where higher
-  values imply longer survival (automatically reversed).
+- `"time"` — Expected survival time (higher = longer survival, reversed
+  internally).
 
-- `"survival"` — Survival probability at a specific evaluation time,
-  where higher values indicate better survival (automatically reversed).
+- `"survival"` — Survival probability at a median evaluation time
+  (higher = better survival, reversed internally).
 
-It standardizes the prediction output into a tibble with one numeric
-column `.pred`, ensuring consistency across engines. The function then
-computes the Concordance Index (C-index) using
-[`yardstick::concordance_survival_vec()`](https://yardstick.tidymodels.org/reference/concordance_survival.html)
-to assess how well the model ranks predicted survival relative to actual
-outcomes.
-
-## See also
-
-[`yardstick::concordance_survival_vec()`](https://yardstick.tidymodels.org/reference/concordance_survival.html),
-[`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md)
-
-## Examples
-
-``` r
-if (FALSE) { # \dontrun{
-fitted_model <- parsnip::fit(
-  parsnip::proportional_hazards(engine = "survival"),
-  Surv(time, event) ~ .,
-  data = lung
-)
-results <- predict_and_evaluate_survival(fitted_model, lung)
-results$c_index
-} # }
-```
+Standardizes output into a tibble with a single numeric `.pred` column.
+Computes C-index using
+[`compute_cindex_ci()`](https://verapancaldilab.github.io/pipeML/reference/compute_cindex_ci.md)
+if outcome/event columns are provided.

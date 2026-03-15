@@ -1,8 +1,9 @@
-# Compute Cross-Validated AUC Values for Machine Learning Models
+# Internal: Compute Cross-Validated AUROC and AUPRC for ML Models
 
-This function computes cross-validated AUROC and AUPRC scores for a list
-of trained machine learning models. It can also save performance
-barplots and optionally select base models for stacking.
+Internal function to summarize cross-validated AUROC and AUPRC values
+from a list of trained machine learning models. Computes median and MAD
+for each model, optionally generates barplots, and can select base
+models for stacking.
 
 ## Usage
 
@@ -20,30 +21,29 @@ compute_cv_AUC(
 
 - models:
 
-  A named list of trained machine learning models. Each model should
-  contain a `resample` data frame with AUROC and AUPRC values from
-  cross-validation.
+  Named list of trained ML models. Each model must contain a `$resample`
+  data frame with `AUROC` and `AUPRC` columns.
 
 - file_name:
 
-  (Optional) Character string. Used as the prefix for the plot filenames
-  if `save_plot = TRUE`.
+  Optional character string. Prefix for saving AUROC/AUPRC plots in the
+  `Results/` directory.
 
 - base_models:
 
   Logical. If `TRUE`, selects a subset of models as base learners for
-  stacking using the
-  [`choose_base_models()`](https://verapancaldilab.github.io/pipeML/reference/choose_base_models.md)
-  function.
+  stacking using
+  [`choose_base_models()`](https://verapancaldilab.github.io/pipeML/reference/choose_base_models.md).
 
 - AUC_type:
 
-  Character. Either `"AUROC"` or `"AUPRC"`; determines which metric is
-  used to select the top-performing model.
+  Character. Either `"AUROC"` or `"AUPRC"`, used to select the
+  top-performing model.
 
 - return:
 
-  Logical. Whether to return the results and generated plots.
+  Logical. If `TRUE`, saves barplots of AUROC and AUPRC values in the
+  `Results/` directory.
 
 ## Value
 
@@ -51,34 +51,18 @@ A list containing:
 
 - `AUROC`:
 
-  A data frame with median and standard deviation of AUROC values for
-  each model.
+  Data frame with median and MAD of AUROC for each model.
 
 - `AUPRC`:
 
-  A data frame with median and standard deviation of AUPRC values for
-  each model.
+  Data frame with median and MAD of AUPRC for each model.
 
 - `Top_model`:
 
-  The name of the model with the highest median value for the selected
-  metric (`AUC_type`).
+  Character string: the model with the highest median value for the
+  selected metric (`AUC_type`).
 
 - `Base_models`:
 
-  (Optional) A character vector of selected base models for stacking,
-  returned if `base_models = TRUE`.
-
-## Examples
-
-``` r
-if (FALSE) { # \dontrun{
-res <- compute_cv_AUC(
-  models = ml_models,
-  file_name = "Model_Performance",
-  base_models = TRUE,
-  AUC_type = "AUROC",
-  save_plot = TRUE
-)
-} # }
-```
+  (Optional) Character vector of selected base models if
+  `base_models = TRUE`.

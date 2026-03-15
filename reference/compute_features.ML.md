@@ -1,7 +1,7 @@
 # Train and evaluate machine learning models for classification or survival analysis
 
 This function trains and evaluates machine learning models using
-cross-validation on training data and then tests performance on
+cross-validation on training data and then evaluates performance on
 independent test data. It supports both **classification** and
 **survival analysis** tasks, including hyperparameter tuning, model
 stacking, and cohort-based (Leave-One-Dataset-Out, LODO) validation. For
@@ -14,7 +14,7 @@ plots stratified by predicted risk.
 compute_features.ML(
   features_train,
   features_test,
-  clinical,
+  coldata,
   task_type = c("classification", "survival"),
   trait = NULL,
   trait.positive = NULL,
@@ -28,7 +28,6 @@ compute_features.ML(
   batch_id = NULL,
   file_name = NULL,
   ncores = NULL,
-  maximize = "Accuracy",
   return = FALSE,
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
@@ -41,107 +40,103 @@ compute_features.ML(
 - features_train:
 
   A data frame or matrix of predictor variables used for training (rows
-  as samples, columns as features).
+  = samples, columns = features).
 
 - features_test:
 
   A data frame or matrix of predictor variables used for testing.
 
-- clinical:
+- coldata:
 
-  A data frame containing clinical or outcome information. Row names
-  must match those of `features_train` and `features_test`.
+  A data frame containing outcome information. Row names must match
+  those of `features_train` and `features_test`.
 
 - task_type:
 
-  Character. Type of task: either `"classification"` or `"survival"`.
+  Character. Type of task: `"classification"` or `"survival"`.
 
 - trait:
 
-  Character. Name of the column in `clinical` used as the target
-  variable (required for classification tasks).
+  Character. Column name in `clinical` used as the target variable
+  (required for classification tasks).
 
 - trait.positive:
 
-  Character or numeric. Value in `trait` considered the positive class.
+  Value in `trait` that represents the positive class (classification
+  only). Ensures all performance metrics and interpretability analyses
+  consistently treat the correct class as positive.
 
 - time_var:
 
-  Character. Name of the column in `clinical` containing survival or
-  follow-up time (required for survival tasks).
+  Character. Column name in `clinical` containing survival/follow-up
+  time (required for survival tasks).
 
 - event_var:
 
-  Character. Name of the column in `clinical` indicating event
-  occurrence (1 = event occurred, 0 = censored; required for survival
-  tasks).
+  Character. Column name in `clinical` indicating event occurrence (1 =
+  event occurred, 0 = censored; required for survival tasks).
 
 - metric:
 
-  Character. Performance metric for model tuning and selection.
-  Supported options for classification: `"Accuracy"`, `"AUROC"`,
-  `"AUPRC"`. For survival models, performance is evaluated using the
-  concordance index (C-index).
+  Character. Performance metric used for model tuning and selection:
+
+  - Classification: `"Accuracy"`, `"AUROC"`, `"AUPRC"`.
+
+  - Survival: evaluated using concordance index (C-index).
 
 - stack:
 
-  Logical. Whether to perform model stacking (default = `FALSE`).
+  Logical. Perform model stacking (ensemble meta-learning). Default:
+  `FALSE`.
 
 - k_folds:
 
-  Integer. Number of folds for cross-validation (default = 10).
+  Integer. Number of folds for cross-validation. Default: 10.
 
 - n_rep:
 
-  Integer. Number of repetitions for cross-validation (default = 5).
+  Integer. Number of repetitions for cross-validation. Default: 5.
 
 - LODO:
 
-  Logical. If `TRUE`, performs Leave-One-Dataset-Out (LODO)
-  cross-validation based on cohort identifiers.
+  Logical. If `TRUE`, performs Leave-One-Dataset-Out cross-validation
+  based on cohorts.
 
 - batch_id:
 
-  Column name indicating where the cohort or batch membership for each
-  sample is. Required if `LODO = TRUE`.
+  Column name indicating cohort or batch membership for each sample
+  (required if `LODO = TRUE`).
 
 - file_name:
 
-  Character. Base name used to save plots and results under the
-  `Results/` directory. For survival tasks, this will be used to create
-  a Kaplan–Meier plot named `"Results/Survival_KM_<file_name>.pdf"`.
+  Character. Base name used to save plots/results under `Results/`. For
+  survival tasks, Kaplan–Meier plots are saved as
+  `"Results/Survival_KM_<file_name>.pdf"`.
 
 - ncores:
 
-  Integer. Number of CPU cores to use for parallelization. If not
-  specified, defaults to `parallel::detectCores() - 1`.
-
-- maximize:
-
-  Character. Metric to maximize when selecting the optimal
-  classification threshold (options: `"Accuracy"`, `"Precision"`,
-  `"Recall"`, `"Specificity"`, `"Sensitivity"`, `"F1"`, or `"MCC"`).
-  Default = `"Accuracy"`.
+  Integer. Number of CPU cores for parallelization. Default:
+  `parallel::detectCores() - 1`.
 
 - return:
 
-  Logical. Whether to return and save plots (default = `FALSE`).
+  Logical. Whether to return and save plots/results. Default: `FALSE`.
 
 - fold_construction_fun:
 
   Function. Optional custom function to construct cross-validation
-  folds. Must accept a `bestune` argument internally for optimized
-  hyperparameter injection.
+  folds. Must accept a `bestune` argument internally to inject optimized
+  hyperparameters.
 
 - fold_construction_args_fixed:
 
-  List. Fixed arguments passed to `fold_construction_fun`, used in both
-  cross-validation and final model training.
+  List. Fixed arguments passed to `fold_construction_fun` for both CV
+  and final training.
 
 - fold_construction_args_tunable:
 
-  List. Tunable arguments passed to `fold_construction_fun`, defining
-  hyperparameters to explore during cross-validation.
+  List. Arguments passed to `fold_construction_fun` defining
+  hyperparameters to explore during CV.
 
 ## Value
 
@@ -149,7 +144,7 @@ A named list containing:
 
 - Model:
 
-  The trained model or workflow (classification) or refitted best model
+  Trained model or workflow (classification) or refitted best model
   (survival).
 
 - Metrics:
@@ -167,12 +162,12 @@ A named list containing:
 
 - CV_Results:
 
-  Cross-validation results, including median and MAD of C-index
-  (survival).
+  Cross-validation results, including median and MAD of C-index for
+  survival tasks.
 
 - Test_CINDEX:
 
-  Concordance index for the test data (survival only).
+  Concordance index on test data (survival only).
 
 - KM_Plot:
 
@@ -180,15 +175,14 @@ A named list containing:
 
 ## Details
 
-For **classification tasks**, this function performs cross-validation
-tuning based on the chosen performance metric (e.g., Accuracy, AUROC, or
-AUPRC), followed by test-set evaluation and ROC/PR curve plotting.
+For **classification tasks**, the function performs repeated k-fold
+cross-validation with hyperparameter tuning, followed by evaluation on
+the test set. ROC and PR curves are generated.
 
-For **survival analysis tasks**, it performs model selection using the
-C-index, refits the best model on the full training data, evaluates the
-test-set C-index, and plots Kaplan–Meier survival curves across
-quantile-based risk strata (Low/Medium/High risk). The C-index and
-log-rank test p-value are displayed on the plot.
+For **survival tasks**, it performs model selection using the C-index,
+refits the best model on the full training data, evaluates test-set
+C-index, and plots Kaplan–Meier curves across quantile-based risk strata
+(Low/Medium/High). The C-index and log-rank test p-value are displayed.
 
 ## Examples
 
@@ -198,7 +192,7 @@ if (FALSE) { # \dontrun{
 results_classif <- compute_features.ML(
   features_train = X_train,
   features_test  = X_test,
-  clinical       = clin_df,
+  coldata        = clin_df,
   task_type      = "classification",
   trait          = "Response",
   trait.positive = "Responder",
@@ -212,7 +206,7 @@ results_classif <- compute_features.ML(
 results_surv <- compute_features.ML(
   features_train = X_train,
   features_test  = X_test,
-  clinical       = clin_df,
+  coldata        = clin_df,
   task_type      = "survival",
   time_var       = "time",
   event_var      = "status",

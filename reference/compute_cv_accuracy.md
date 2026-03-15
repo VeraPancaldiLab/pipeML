@@ -1,9 +1,8 @@
-# Compute Cross-Validation Accuracy for ML Models
+# Internal: Compute Cross-Validation Accuracy for ML Models
 
-This function extracts cross-validated accuracy values from a list of
-trained machine learning models, summarizes their median and standard
-deviation, and optionally plots a bar chart or selects base models for
-stacking.
+Internal function to extract cross-validated accuracy from a list of
+trained machine learning models, summarize their median and variability,
+optionally generate a barplot, and select base models for stacking.
 
 ## Usage
 
@@ -20,45 +19,43 @@ compute_cv_accuracy(
 
 - models:
 
-  A named list of trained ML models, each with a `resample` element
-  containing cross-validated accuracy.
+  Named list of trained ML models. Each model must contain a `$resample`
+  data frame with a column named `Accuracy`.
 
 - file_name:
 
-  (Optional) Character string specifying the filename prefix for the
-  saved accuracy plot (PDF format).
+  Optional character. Prefix for saving the accuracy barplot as a PDF in
+  the `Results/` directory.
 
 - base_models:
 
-  Logical. If `TRUE`, the function selects and returns base models using
+  Logical. If `TRUE`, selects base models using
   [`choose_base_models()`](https://verapancaldilab.github.io/pipeML/reference/choose_base_models.md)
   for stacking.
 
 - return:
 
-  Logical. If `TRUE`, the function saves a barplot of the model accuracy
-  values in the `Results/` directory.
+  Logical. If `TRUE`, saves a barplot of model accuracy values in the
+  `Results/` directory.
 
 ## Value
 
 A list containing:
 
-- `Accuracy`: A data frame with the median and standard deviation of
-  accuracy for each model.
+- `Accuracy`: Data frame summarizing the median and MAD of accuracy for
+  each model.
 
-- `Top_model`: A character string naming the model with the highest
+- `Top_model`: Character string with the model name having the highest
   median accuracy.
 
-- `Base_models` (optional): A character vector of selected base models
-  if `base_models = TRUE`.
+- `Base_models` (optional): Character vector of selected base models if
+  `base_models = TRUE`.
 
 ## Details
 
-This function assumes that each model in the list has a `$resample`
-component containing a column named `Accuracy`. It calculates the median
-and standard deviation of accuracy for each model and creates a barplot
-(if `return = TRUE`) with error bars.
-
-If `base_models = TRUE`, it calls a helper function
+The function assumes that each model contains a `$resample` component
+with an `Accuracy` column. Median and MAD (median absolute deviation) of
+accuracy are computed for each model. If `return = TRUE`, a PDF barplot
+with error bars is created. When `base_models = TRUE`,
 [`choose_base_models()`](https://verapancaldilab.github.io/pipeML/reference/choose_base_models.md)
-to select models for use in stacking.
+is called to select models for stacking.

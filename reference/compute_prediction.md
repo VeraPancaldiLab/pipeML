@@ -1,11 +1,12 @@
 # Compute Prediction Metrics for a Trained Machine Learning Model
 
-This function computes prediction metrics for a given machine learning
-model, including the confusion matrix, AUROC, AUPRC, and other
-performance metrics such as Accuracy, Sensitivity, Specificity,
-Precision, Recall, F1 score, and MCC. The function also determines the
-optimal classification threshold based on a chosen metric (e.g.,
-Accuracy, F1, or AUROC) and generates a confusion matrix plot.
+Computes prediction metrics for a trained machine learning model,
+including the confusion matrix, AUROC, AUPRC, Accuracy, Sensitivity,
+Specificity, Precision, Recall, F1 score, and MCC. For classification
+tasks, it also determines the optimal classification threshold and
+generates ROC, PRC, and confusion matrix plots. For survival analysis
+tasks, it predicts risk scores and optionally generates Kaplan–Meier
+plots.
 
 ## Usage
 
@@ -13,12 +14,14 @@ Accuracy, F1, or AUROC) and generates a confusion matrix plot.
 compute_prediction(
   model,
   test_data,
-  target_var,
-  trait.positive,
+  target_var = NULL,
+  trait.positive = NULL,
+  task_type = "classification",
+  time_var = NULL,
+  event_var = NULL,
   stack = FALSE,
   file.name = NULL,
-  maximize = "Accuracy",
-  return = F
+  return = FALSE
 )
 ```
 
@@ -27,75 +30,94 @@ compute_prediction(
 - model:
 
   The trained machine learning model returned from
-  [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
+  [`compute_features.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.ML.md)
   or
-  [`compute_features.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.ML.md).
+  [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md).
 
 - test_data:
 
-  A matrix or data frame containing the testing dataset (features only).
+  A data frame or matrix of predictor variables for the test set.
 
 - target_var:
 
-  A character vector of true target values for the test data (the
-  observed labels).
+  Vector of true labels for the test set (classification only).
 
 - trait.positive:
 
-  Value in `target_var` to be considered as the positive class.
+  Value in `target_var` representing the positive class (classification
+  only).
+
+- task_type:
+
+  Character. Either `"classification"` or `"survival"`.
+
+- time_var:
+
+  Column or vector of survival/follow-up times (required for survival
+  tasks).
+
+- event_var:
+
+  Column or vector of event indicators (1 = event, 0 = censored;
+  required for survival tasks).
 
 - stack:
 
-  Logical. If stacking was used during model training, this parameter
-  should be set to TRUE in order to use the meta-learner for prediction.
-  Default is FALSE.
+  Logical. If TRUE, uses meta-learner predictions for stacked models
+  (classification only).
 
 - file.name:
 
-  A character string to specify the filename for saving the confusion
-  matrix plot (optional). If `NULL`, the plot is not saved.
-
-- maximize:
-
-  A character string indicating which metric to maximize when selecting
-  the best threshold for the confusion matrix. Options include
-  "Accuracy", "Precision", "Recall", "Specificity", "Sensitivity", "F1",
-  or "MCC". Default is "Accuracy".
+  Character. Filename prefix for saving plots (optional). If NULL, plots
+  are not saved.
 
 - return:
 
-  Logical. Whether to return the results and generated plots.
+  Logical. Whether to return metrics, predictions, and plots. Default =
+  FALSE.
 
 ## Value
 
 A list containing:
 
-- Metrics:
+- `Metrics`:
 
-  A data frame with various performance metrics (Accuracy, Sensitivity,
-  Specificity, Precision, Recall, F1 score, MCC) for each threshold.
+  Data frame of performance metrics (Accuracy, Sensitivity, Specificity,
+  Precision, Recall, F1 score, MCC) for each threshold (classification
+  only).
 
-- AUC:
+- `AUC`:
 
-  A list containing the AUROC and AUPRC values.
+  List containing AUROC and AUPRC values with optional bootstrap
+  confidence intervals (classification only).
 
-- Predictions:
+- `Predictions`:
 
-  A data frame with the predicted probabilities for each class (e.g.,
-  `yes` or `no`).
+  Data frame of predicted probabilities for each class (classification)
+  or risk scores (survival).
 
 ## Details
 
-This function first generates predictions for the test dataset using the
-trained machine learning model. It then calculates performance metrics
-for a range of threshold values and selects the threshold that maximizes
-the chosen metric (e.g., Accuracy, F1 score, etc.). The function returns
-the metrics for the best threshold, including AUROC and AUPRC, and
-produces a confusion matrix plot that compares predicted versus actual
-labels.
+For **classification**, the function:
 
-The confusion matrix plot is saved as a PDF with the name
-`Confusion_Matrix_<file.name>.pdf` if a valid `file.name` is provided.
+1.  Uses the trained model (or meta-learner if `stack = TRUE`) to
+    predict probabilities for the test data.
+
+2.  Computes performance metrics across thresholds and selects the
+    optimal threshold based on a chosen metric.
+
+3.  Calculates AUROC and AUPRC and optionally bootstrapped confidence
+    intervals.
+
+4.  Generates ROC, PRC, and confusion matrix plots if `return = TRUE`
+    and `file.name` is provided.
+
+For **survival analysis**, the function:
+
+1.  Predicts risk scores using the trained survival model.
+
+2.  Optionally generates Kaplan–Meier plots stratified by predicted risk
+    groups.
 
 ## See also
 

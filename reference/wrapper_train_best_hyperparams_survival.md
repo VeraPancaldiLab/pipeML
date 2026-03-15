@@ -30,7 +30,9 @@ wrapper_train_best_hyperparams_survival(
 
 - optimized:
 
-  A list output from `aggregate_results_survival()` or
+  A list output from
+  [`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md)
+  or
   [`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md),
   containing the best-tuned parameters (`bestTune`) and model
   performance summaries.
@@ -111,9 +113,3 @@ This function performs the following steps:
 If the selected model type has no tunable hyperparameters, the function
 automatically detects this and proceeds with the default model
 configuration.
-
-## See also
-
-[`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md),
-`aggregate_results_survival()`,
-[`compute_ml_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_ml_survival.md)

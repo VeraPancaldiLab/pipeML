@@ -9,12 +9,13 @@
 
 ## Citation
 
-Hurtado M, Pancaldi V (2026). *pipeML: A robust R machine learning
-pipeline for classification tasks and survival analysis*. R package
-version 0.0.1, <https://verapancaldilab.github.io/pipeML>.
+Hurtado M, Pancaldi V (2026). *pipeML: A flexible and modular machine
+learning framework designed to support leakage-free model training
+through custom cross-validation fold construction*. R package version
+0.0.1, <https://verapancaldilab.github.io/pipeML>.
 
     @Manual{,
-      title = {pipeML: A robust R machine learning pipeline for classification tasks and survival analysis},
+      title = {pipeML: A flexible and modular machine learning framework designed to support leakage-free model training through custom cross-validation fold construction},
       author = {Marcelo Hurtado and Vera Pancaldi},
       year = {2026},
       note = {R package version 0.0.1},
