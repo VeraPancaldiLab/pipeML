@@ -57,7 +57,7 @@
 </h1>
 </div>
 <!-- README.md is generated from README.Rmd. Please edit that file -->
-<p>A robust R machine learning pipeline for classification tasks and survival analysis</p>
+<p>A flexible and modular machine learning framework designed to support leakage-free model training through custom cross-validation fold construction</p>
 <!-- badges: start -->
 <!-- badges: end -->
 <div class="section level2">
@@ -86,24 +86,41 @@
 <div class="section level2">
 <h2 id="key-features">Key Features<a class="anchor" aria-label="anchor" href="#key-features"></a>
 </h2>
-<p>End-to-end ML workflow * Integrated pipeline for feature selection, model training, validation, prediction, and interpretation</p>
-<p>Leakage-aware validation</p>
+<div class="section level3">
+<h3 id="end-to-end-ml-workflow">End-to-end ML workflow<a class="anchor" aria-label="anchor" href="#end-to-end-ml-workflow"></a>
+</h3>
+<ul>
+<li>Integrated pipeline for feature selection, model training, validation, prediction, and interpretation</li>
+</ul>
+</div>
+<div class="section level3">
+<h3 id="leakage-aware-validation">Leakage-aware validation<a class="anchor" aria-label="anchor" href="#leakage-aware-validation"></a>
+</h3>
 <ul>
 <li>Custom cross-validation fold construction</li>
 <li>Support for fold-aware feature recomputation</li>
 <li>Prevents information leakage when using dataset-dependent features</li>
 </ul>
-<p>Flexible model evaluation</p>
+</div>
+<div class="section level3">
+<h3 id="flexible-model-evaluation">Flexible model evaluation<a class="anchor" aria-label="anchor" href="#flexible-model-evaluation"></a>
+</h3>
 <ul>
 <li>Repeated and stratified k-fold cross-validation</li>
 <li>Leave-one-dataset-out (LODO) evaluation for cross-cohort generalization</li>
 </ul>
-<p>Feature selection</p>
+</div>
+<div class="section level3">
+<h3 id="feature-selection">Feature selection<a class="anchor" aria-label="anchor" href="#feature-selection"></a>
+</h3>
 <ul>
 <li>Boruta-based feature selection</li>
 <li>Optional correlation-based feature filtering</li>
 </ul>
-<p>Hyperparameter tuning</p>
+</div>
+<div class="section level3">
+<h3 id="hyperparameter-tuning">Hyperparameter tuning<a class="anchor" aria-label="anchor" href="#hyperparameter-tuning"></a>
+</h3>
 <ul>
 <li>
 <p>Automatic optimization based on:</p>
@@ -114,27 +131,46 @@
 </ul>
 </li>
 </ul>
-<p>Model interpretation</p>
+</div>
+<div class="section level3">
+<h3 id="model-interpretation">Model interpretation<a class="anchor" aria-label="anchor" href="#model-interpretation"></a>
+</h3>
 <ul>
 <li>SHAP-based feature importance</li>
 <li>Variable importance summaries</li>
 <li>Performance visualization (ROC and PR curves)</li>
 </ul>
-<p>Ensemble learning</p>
+</div>
+<div class="section level3">
+<h3 id="ensemble-learning">Ensemble learning<a class="anchor" aria-label="anchor" href="#ensemble-learning"></a>
+</h3>
 <ul>
 <li>Model stacking</li>
 </ul>
-<p>Parallel computing</p>
+</div>
+<div class="section level3">
+<h3 id="parallel-computing">Parallel computing<a class="anchor" aria-label="anchor" href="#parallel-computing"></a>
+</h3>
 <ul>
 <li>Multi-core support for faster model training and cross-validation</li>
 </ul>
-<p>Custom workflows</p>
+</div>
+<div class="section level3">
+<h3 id="custom-workflows">Custom workflows<a class="anchor" aria-label="anchor" href="#custom-workflows"></a>
+</h3>
 <ul>
 <li>Users can define custom fold construction functions</li>
 <li>These functions can receive a bestTune argument after hyperparameter optimization to retrain models on the full training dataset.</li>
 </ul>
-<p>Supported Machine Learning Methods</p>
-<p>The current implementation supports multiple classification algorithms, including:</p>
+</div>
+</div>
+<div class="section level2">
+<h2 id="supported-machine-learning-methods">Supported Machine Learning Methods<a class="anchor" aria-label="anchor" href="#supported-machine-learning-methods"></a>
+</h2>
+<div class="section level3">
+<h3 id="classification-algorithms">Classification algorithms:<a class="anchor" aria-label="anchor" href="#classification-algorithms"></a>
+</h3>
+<p>For classification tasks, we implemented a diverse set of classification algorithms that are benchmarked on the fly making extensive use of the R package <code>caret</code>.</p>
 <ul>
 <li>Bagged classification trees</li>
 <li>Random forests</li>
@@ -147,13 +183,11 @@
 <li>Support vector machines with linear and radial kernels</li>
 <li>Extreme Gradient Boosting (XGBoost)</li>
 </ul>
-<p>Machine Learning Pipeline for Survival Tasks</p>
-<p>For time-to-event outcomes, pipeML implements a unified survival modeling framework based on the parsnip and workflows ecosystems, enabling consistent training, hyperparameter tuning, and evaluation across multiple survival model families.</p>
-<p>Models are specified using a censored regression formulation and fitted using algorithm-specific computational engines. When applicable, model hyperparameters (e.g., regularization strength, mixing parameters, or number of trees) are optimized using grid search within the training data.</p>
-<p>All models are trained using cross-validation strategies consistent with the main pipeline, ensuring that feature construction and hyperparameter tuning are restricted to the training folds, preventing information leakage.</p>
-<p>Model performance is evaluated on held-out data using the Concordance Index (C-index), which measures the model’s ability to correctly rank survival times in the presence of right-censored observations.</p>
-<p>Supported survival models</p>
-<p>The current implementation supports multiple survival algorithms, including:</p>
+</div>
+<div class="section level3">
+<h3 id="survival-algorithms">Survival algorithms:<a class="anchor" aria-label="anchor" href="#survival-algorithms"></a>
+</h3>
+<p>For time-to-event outcomes, <code>pipeML</code> implements a unified survival modeling framework based on the <code>parsnip</code> and <code>workflows</code> ecosystems, enabling consistent training, hyperparameter tuning, and evaluation across multiple survival model families.</p>
 <ul>
 <li>Cox proportional hazards model</li>
 <li>Elastic net–regularized Cox regression</li>
@@ -164,43 +198,40 @@
 <li>Gradient boosting for censored outcomes</li>
 </ul>
 </div>
+</div>
 <div class="section level2">
 <h2 id="general-usage">General usage<a class="anchor" aria-label="anchor" href="#general-usage"></a>
 </h2>
-<p>Below are basic examples showing how to use pipeML.</p>
+<p>Below are basic examples showing how to use <code>pipeML</code></p>
 <p>For a detailed tutorial, see <a href="https://VeraPancaldiLab.github.io/pipeML/articles/pipeML.html" class="external-link">Get started</a></p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://verapancaldilab.github.io/pipeML">pipeML</a></span><span class="op">)</span></span></code></pre></div>
-<p>Training models</p>
-<p><code><a href="reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> trains machine learning models using repeated and stratified k-fold cross-validation across all classification or survival models.</p>
+<div class="section level3">
+<h3 id="training-models">Training models<a class="anchor" aria-label="anchor" href="#training-models"></a>
+</h3>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_ml</span> <span class="op">=</span> <span class="fu"><a href="reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span><span class="va">features_train</span>, <span class="va">clinical</span><span class="op">$</span><span class="va">Response</span>, <span class="st">"CR"</span>, </span>
 <span>                                      metric <span class="op">=</span> <span class="st">"AUROC"</span>, stack <span class="op">=</span> <span class="cn">F</span>, k_folds <span class="op">=</span> <span class="fl">5</span>, </span>
 <span>                                      n_rep <span class="op">=</span> <span class="fl">10</span>, file_name <span class="op">=</span> <span class="st">"Test"</span>, ncores <span class="op">=</span> <span class="fl">2</span>, return <span class="op">=</span> <span class="cn">T</span><span class="op">)</span></span></code></pre></div>
-<p>Predicting on new data</p>
-<p>Predictions on a new dataset can be generated using <code><a href="reference/compute_prediction.html">compute_prediction()</a></code>.</p>
-<p>The optimal classification threshold can be determined using different metrics. It outputs threshold-based metrics like:</p>
-<ul>
-<li>Accuracy</li>
-<li>Precision</li>
-<li>Recall</li>
-<li>Specificity</li>
-<li>Sensitivity</li>
-<li>F1</li>
-<li>MCC</li>
-</ul>
+</div>
+<div class="section level3">
+<h3 id="predicting-on-new-data">Predicting on new data<a class="anchor" aria-label="anchor" href="#predicting-on-new-data"></a>
+</h3>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pred</span> <span class="op">=</span> <span class="fu"><a href="reference/compute_prediction.html">compute_prediction</a></span><span class="op">(</span><span class="va">res_ml</span>, <span class="va">features_test</span>, <span class="va">traitData_test</span><span class="op">$</span><span class="va">Response</span>, </span>
 <span>                          <span class="st">"CR"</span>, stack <span class="op">=</span> <span class="cn">F</span>, file.name <span class="op">=</span> <span class="st">"Test"</span>, </span>
 <span>                          maximize <span class="op">=</span> <span class="st">"Accuracy"</span>, return <span class="op">=</span> <span class="cn">T</span><span class="op">)</span></span></code></pre></div>
-<p>Training and Testing Workflow</p>
-<p><code><a href="reference/compute_features.ML.html">compute_features.ML()</a></code>: This function is intended for training on a dataset and evaluating on a separate test dataset when is available. It automatically computes the prediction using the trained model in the testing set provided. It includes both previous functions.</p>
+</div>
+<div class="section level3">
+<h3 id="training-and-testing-workflow">Training and Testing Workflow<a class="anchor" aria-label="anchor" href="#training-and-testing-workflow"></a>
+</h3>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">=</span> <span class="fu"><a href="reference/compute_features.ML.html">compute_features.ML</a></span><span class="op">(</span><span class="va">tme_features_train</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span>, <span class="va">tme_features_test</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span>, </span>
 <span>                          clinical <span class="op">=</span> <span class="va">traitData</span>, trait <span class="op">=</span> <span class="st">"Response"</span>, </span>
 <span>                          trait.positive <span class="op">=</span> <span class="st">"R"</span>, metric <span class="op">=</span> <span class="st">"AUROC"</span>, stack <span class="op">=</span> <span class="cn">F</span>, </span>
 <span>                          k_folds <span class="op">=</span> <span class="fl">2</span>, n_rep <span class="op">=</span> <span class="fl">1</span>, LODO <span class="op">=</span> <span class="cn">T</span>, batch_id <span class="op">=</span> <span class="st">"Cohort"</span>, </span>
 <span>                          ncores <span class="op">=</span> <span class="fl">2</span>, maximize <span class="op">=</span> <span class="st">"Accuracy"</span>, return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span></code></pre></div>
+</div>
 </div>
 <div class="section level2">
 <h2 id="issues">Issues<a class="anchor" aria-label="anchor" href="#issues"></a>

@@ -186,30 +186,16 @@ for (f in top_features) {
 To apply model stacking, set `stack = TRUE`:
 
 ``` r
-res <- compute_features.training.ML(features_train = deconvolution, 
-                                    target_var = traitData$Best.Confirmed.Overall.Response,
+res <- compute_features.training.ML(features_train = X_train, 
+                                    target_var = y_train,
                                     task_type = "classification",
-                                    trait.positive = "CR",
+                                    trait.positive = "1",
                                     metric = "AUROC",
-                                    stack = TRUE,
+                                    stack = T,
                                     k_folds = 2,
-                                    n_rep = 2,
-                                    LODO = FALSE,
-                                    file_name = "Test",
-                                    ncores = 2,
-                                    return = FALSE)
-```
-
-Inspect the base models used in stacking:
-
-``` r
-res$Model$Base_models
-```
-
-Access the meta-learner:
-
-``` r
-res$Model$Meta_learner
+                                    n_rep = 1,
+                                    file_name = "Example_classification",
+                                    return = F)
 ```
 
 ## **Survival tasks**
@@ -221,9 +207,9 @@ predict time-to-event outcomes.
 In survival analysis, the response variable is defined by two
 components:
 
-- Time: follow-up or survival time
-- Event: indicator of whether the event occurred (1) or the observation
-  was censored (0)
+- **Time**: follow-up or survival time
+- **Event**: indicator of whether the event occurred (1) or the
+  observation was censored (0)
 
 `pipeML` automates the training, evaluation, and interpretation of
 survival models using cross-validation and SHAP-based explanations.
@@ -257,7 +243,7 @@ event_test  <- event[-train_idx]
 
 The function
 [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
-can also train survival models by setting task_type = “survival”.
+can also train survival models by setting `task_type = "survival"`.
 
 ``` r
 res_survival <- compute_features.training.ML(
@@ -359,8 +345,8 @@ shap_survival <- compute_shap_values(
 
 ## **ONE STEP: Training and prediction**
 
-If a separate testing dataset is already available, pipeML allows you to
-train models and generate predictions in a single step using the
+If a separate testing dataset is already available, `pipeML` allows you
+to train models and generate predictions in a single step using the
 [`compute_features.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.ML.md)
 function. This function performs model training, hyperparameter tuning,
 and evaluation on the training data, and then applies the selected model
@@ -613,7 +599,7 @@ By recomputing these steps within each fold, `pipeML` ensures that:
 This approach closely mimics how the model would behave when applied to
 completely unseen data, producing more realistic performance estimates.
 
-### **Step 1 – Define a base feature function (example: WGCNA)**
+### **Step 1 – Define a base feature function (e.g. WGCNA)**
 
 **Structure of the Base Feature Function**
 
@@ -624,7 +610,7 @@ The function is designed around two operational modes:
 - **Projection Mode** (modules provided): The function applies a
   previously learned structure to new data.
 
-Why the Function Returns Two Objects?
+#### Why the Function Returns Two Objects?
 
 - **features** → always returned; the transformed representation of the
   current dataset (training or test).
@@ -726,7 +712,7 @@ projection:
 Users can easily adapt this template by replacing their previous
 `compute_features_modular` function
 
-#### **Note**
+#### **NOTE**
 
 In `pipeML` data corresponds to samples as rows and features as columns.
 If your `compute_features_modular()` needs features as rows, make sure
@@ -954,7 +940,7 @@ head(res_custom$Custom_output$features)
 head(res_custom$Custom_output$structure)
 ```
 
-### **Tunable hyperparameters within custom fold functions**
+### **Step 4 - Tunable hyperparameters within custom fold functions (optional)**
 
 In some scenarios, the feature construction step may include parameters
 whose values can influence model performance. For example, when
@@ -1044,7 +1030,10 @@ Notice we have an additional parameter `ncores` that will control
 paralellization for evaluating all your runs (**don’t remove it!**)
 
 ``` r
-prepare_custom_folds_tuning <- function(data, folds = NULL, bestune = NULL, ncores = NULL, ...){
+prepare_custom_folds_tuning <- function(data, 
+                                        folds = NULL, 
+                                        bestune = NULL, 
+                                        ncores = NULL, ...){
   
   if (!is.null(bestune)) {
     
@@ -1105,8 +1094,10 @@ prepare_custom_folds_tuning <- function(data, folds = NULL, bestune = NULL, ncor
     cl <- parallel::makeCluster(ncores)
     doParallel::registerDoParallel(cl)
     
-    processed_folds <- foreach::foreach(i = seq_along(folds), .packages = c("dplyr"),
-                                        .export = c("compute_features_modular")) %dopar% {  
+    processed_folds <- foreach::foreach(i = seq_along(folds), 
+                                        .packages = c("dplyr"),
+                                        .export = c("compute_features_modular")) 
+    %dopar% {  
                                           
       train_idx <- folds[[i]]
       test_idx  <- setdiff(seq_len(nrow(data)), train_idx)
@@ -1259,8 +1250,10 @@ prepare_WGCNA_folds_modular <- function(
     cl <- parallel::makeCluster(ncores)
     doParallel::registerDoParallel(cl)
     
-    processed_folds <- foreach::foreach(i = seq_along(folds), .packages = c("dplyr"),
-                                          .export = c("compute_features_modular")) %dopar% {
+    processed_folds <- foreach::foreach(i = seq_along(folds), 
+                                        .packages = c("dplyr"),
+                                        .export = c("compute_features_modular")) 
+    %dopar% {
       
       train_idx <- folds[[i]]
       test_idx <- setdiff(seq_len(nrow(data)), train_idx)
@@ -1374,7 +1367,8 @@ res_params <- compute_features.training.ML(features_train = t(counts_train),
                                            n_rep = 1,
                                            return = FALSE,
                                            fold_construction_fun = prepare_WGCNA_folds_modular,
-                                           fold_construction_args_fixed = list(power=6, ncores = 2),
+                                           fold_construction_args_fixed = list(power=6, 
+                                                                               ncores = 2),
                                            fold_construction_args_tunable = list(
                                              minModuleSize = c(20),       
                                              mergeCutHeight = c(0.35),
@@ -1392,7 +1386,7 @@ combination, you can retrieve them by:
 head(res_params$Model$results)
 ```
 
-### **Step 4 – Prediction on test data**
+### **Step 5 – Prediction on test data**
 
 To apply the model to new data, compute the same type of features using
 the learned modules from the training set.
@@ -1413,8 +1407,7 @@ pred <- compute_prediction(model = res_custom$Model,
                            return = TRUE)
 ```
 
-Why do we need `bestune` argument even if I don’t have hyperparams in my
-function?
+#### Why do we need `bestune` argument even if I don’t have hyperparams in my function?
 
 For this to work, your custom function must accept a `bestune` argument,
 which is used internally to inject the optimized parameter values found

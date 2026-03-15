@@ -228,24 +228,16 @@ quantifying feature contributions.</p>
 </h3>
 <p>To apply model stacking, set <code>stack = TRUE</code>:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">deconvolution</span>, </span>
-<span>                                    target_var <span class="op">=</span> <span class="va">traitData</span><span class="op">$</span><span class="va">Best.Confirmed.Overall.Response</span>,</span>
+<code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">X_train</span>, </span>
+<span>                                    target_var <span class="op">=</span> <span class="va">y_train</span>,</span>
 <span>                                    task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
-<span>                                    trait.positive <span class="op">=</span> <span class="st">"CR"</span>,</span>
+<span>                                    trait.positive <span class="op">=</span> <span class="st">"1"</span>,</span>
 <span>                                    metric <span class="op">=</span> <span class="st">"AUROC"</span>,</span>
-<span>                                    stack <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>                                    stack <span class="op">=</span> <span class="cn">T</span>,</span>
 <span>                                    k_folds <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>                                    n_rep <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>                                    LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>                                    file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
-<span>                                    ncores <span class="op">=</span> <span class="fl">2</span>,</span>
-<span>                                    return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
-<p>Inspect the base models used in stacking:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">res</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">Base_models</span></span></code></pre></div>
-<p>Access the meta-learner:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">res</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">Meta_learner</span></span></code></pre></div>
+<span>                                    n_rep <span class="op">=</span> <span class="fl">1</span>,</span>
+<span>                                    file_name <span class="op">=</span> <span class="st">"Example_classification"</span>,</span>
+<span>                                    return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -258,22 +250,24 @@ machine learning models that predict time-to-event outcomes.</p>
 <p>In survival analysis, the response variable is defined by two
 components:</p>
 <ul>
-<li>Time: follow-up or survival time</li>
-<li>Event: indicator of whether the event occurred (1) or the
-observation was censored (0)</li>
+<li>
+<strong>Time</strong>: follow-up or survival time</li>
+<li>
+<strong>Event</strong>: indicator of whether the event occurred (1)
+or the observation was censored (0)</li>
 </ul>
 <p><code>pipeML</code> automates the training, evaluation, and
 interpretation of survival models using cross-validation and SHAP-based
 explanations.</p>
 <p>Load example dataset for survival</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">data</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/data_example_survival.html">data_example_survival</a></span></span>
 <span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">data</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">time</span>, <span class="op">-</span><span class="va">status</span><span class="op">)</span></span>
 <span><span class="va">time</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">time</span></span>
 <span><span class="va">event</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">status</span></span></code></pre></div>
 <p>Similar to the previous example, we will split our data in
 Train/Test</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
 <span><span class="va">train_idx</span> <span class="op">&lt;-</span> <span class="fu">caret</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/caret/man/createDataPartition.html" class="external-link">createDataPartition</a></span><span class="op">(</span><span class="va">event</span>, p <span class="op">=</span> <span class="fl">0.7</span>, list <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span></span>
@@ -291,8 +285,9 @@ Train/Test</p>
 tasks</strong><a class="anchor" aria-label="anchor" href="#train-machine-learning-models-for-survival-tasks"></a>
 </h3>
 <p>The function <code><a href="../reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> can also
-train survival models by setting task_type = “survival”.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+train survival models by setting
+<code>task_type = "survival"</code>.</p>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_survival</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span></span>
 <span>  features_train <span class="op">=</span> <span class="va">X_train</span>, </span>
 <span>  task_type <span class="op">=</span> <span class="st">"survival"</span>,</span>
@@ -305,11 +300,11 @@ train survival models by setting task_type = “survival”.</p>
 <span>  return <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Access to the best model</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">res_survival</span><span class="op">$</span><span class="va">ML_Models</span><span class="op">)</span></span>
 <span><span class="va">res_survival</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">Model_object</span></span></code></pre></div>
 <p>Check training metrics</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">res_survival</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">Prediction_folds</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
 <img src="figures/cindex_survival.png" class="r-plt" alt="Figure 4. Models training performance." width="80%"><p class="caption">
@@ -323,7 +318,7 @@ Figure 4. Models training performance.
 </h3>
 <p>After training, predictions can be generated using
 <code><a href="../reference/compute_prediction.html">compute_prediction()</a></code>.</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pred</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_prediction.html">compute_prediction</a></span><span class="op">(</span></span>
 <span>  model <span class="op">=</span> <span class="va">res_survival</span><span class="op">$</span><span class="va">Model</span>,</span>
 <span>  test_data <span class="op">=</span> <span class="va">X_test</span>,</span>
@@ -371,7 +366,7 @@ Figure 5. KM plot.
 <p>We will used the same function <code>compute_shap_values</code>
 computed before but this time with the
 <code>task_type = "survival"</code>.</p>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">shap_survival</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_shap_values.html">compute_shap_values</a></span><span class="op">(</span></span>
 <span>  model_trained <span class="op">=</span> <span class="va">res_survival</span><span class="op">$</span><span class="va">Model</span>,</span>
 <span>  data_train <span class="op">=</span> <span class="va">df</span>,</span>
@@ -387,16 +382,17 @@ computed before but this time with the
 <h2 id="one-step-training-and-prediction">
 <strong>ONE STEP: Training and prediction</strong><a class="anchor" aria-label="anchor" href="#one-step-training-and-prediction"></a>
 </h2>
-<p>If a separate testing dataset is already available, pipeML allows you
-to train models and generate predictions in a single step using the
-<code><a href="../reference/compute_features.ML.html">compute_features.ML()</a></code> function. This function performs
-model training, hyperparameter tuning, and evaluation on the training
-data, and then applies the selected model to the test dataset.</p>
+<p>If a separate testing dataset is already available,
+<code>pipeML</code> allows you to train models and generate predictions
+in a single step using the <code><a href="../reference/compute_features.ML.html">compute_features.ML()</a></code> function.
+This function performs model training, hyperparameter tuning, and
+evaluation on the training data, and then applies the selected model to
+the test dataset.</p>
 <div class="section level3">
 <h3 id="classification-tasks-1">
 <strong>Classification tasks</strong><a class="anchor" aria-label="anchor" href="#classification-tasks-1"></a>
 </h3>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">data</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/data_example_classification.html">data_example_classification</a></span></span>
 <span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">data</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">target</span><span class="op">)</span></span>
 <span><span class="va">y</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">target</span></span>
@@ -407,7 +403,7 @@ data, and then applies the selected model to the test dataset.</p>
 <span></span>
 <span><span class="va">X_train</span> <span class="op">&lt;-</span> <span class="va">X</span><span class="op">[</span><span class="va">train_idx</span>, <span class="op">]</span></span>
 <span><span class="va">X_test</span>  <span class="op">&lt;-</span> <span class="va">X</span><span class="op">[</span><span class="op">-</span><span class="va">train_idx</span>, <span class="op">]</span></span></code></pre></div>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.ML.html">compute_features.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">X_train</span>, </span>
 <span>                           features_test <span class="op">=</span> <span class="va">X_test</span>, </span>
 <span>                           coldata <span class="op">=</span> <span class="va">data</span>,</span>
@@ -425,7 +421,7 @@ data, and then applies the selected model to the test dataset.</p>
 <h3 id="survival-tasks-1">
 <strong>Survival tasks</strong><a class="anchor" aria-label="anchor" href="#survival-tasks-1"></a>
 </h3>
-<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">data</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/data_example_survival.html">data_example_survival</a></span></span>
 <span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">data</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">time</span>, <span class="op">-</span><span class="va">status</span><span class="op">)</span></span>
 <span><span class="va">time</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">time</span></span>
@@ -442,7 +438,7 @@ data, and then applies the selected model to the test dataset.</p>
 <span></span>
 <span><span class="va">event_train</span> <span class="op">&lt;-</span> <span class="va">event</span><span class="op">[</span><span class="va">train_idx</span><span class="op">]</span></span>
 <span><span class="va">event_test</span>  <span class="op">&lt;-</span> <span class="va">event</span><span class="op">[</span><span class="op">-</span><span class="va">train_idx</span><span class="op">]</span></span></code></pre></div>
-<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.ML.html">compute_features.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">X_train</span>, </span>
 <span>                           features_test <span class="op">=</span> <span class="va">X_test</span>, </span>
 <span>                           coldata <span class="op">=</span> <span class="va">data</span>,</span>
@@ -471,7 +467,7 @@ variable</p>
 <p>Below, we demonstrate how to perform a LODO analysis using simulated
 datasets:</p>
 <p>Simulate datasets from different batches (‘cohorts’)</p>
-<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb24"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Simulate traitData with 3 cohorts</span></span>
@@ -494,7 +490,7 @@ datasets:</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">features_all</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"Feature"</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">15</span><span class="op">)</span></span></code></pre></div>
 <p>Perform LODO analysis using base function
 <code>compute_features.training.ML</code></p>
-<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb25"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">prediction</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="va">i</span> <span class="op">=</span> <span class="fl">1</span></span>
 <span><span class="kw">for</span> <span class="op">(</span><span class="va">cohort</span> <span class="kw">in</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">traitData</span><span class="op">$</span><span class="va">Cohort</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
@@ -543,7 +539,7 @@ datasets:</p>
 adapted in a case for multiple cohorts. This function is implemented
 inside <code>compute_prediction</code> to make the RO and PR curves.</p>
 <p>Extract prediction metrics and join</p>
-<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">roc_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">prediction</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">cohort</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">df</span> <span class="op">&lt;-</span> <span class="va">prediction</span><span class="op">[[</span><span class="va">cohort</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">Metrics</span></span>
 <span>  <span class="va">df</span><span class="op">$</span><span class="va">cohort</span> <span class="op">&lt;-</span> <span class="va">cohort</span></span>
@@ -562,7 +558,7 @@ inside <code>compute_prediction</code> to make the RO and PR curves.</p>
 <span>  upper <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply</a></span><span class="op">(</span><span class="va">prediction</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span><span class="op">$</span><span class="va">AUC</span><span class="op">$</span><span class="va">AUPRC</span><span class="op">$</span><span class="va">upper</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Plot RO and PR curves</p>
-<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_curves.html">get_curves</a></span><span class="op">(</span></span>
 <span>  data <span class="op">=</span> <span class="va">roc_data</span>,</span>
 <span>  color <span class="op">=</span> <span class="st">"cohort"</span>,</span>
@@ -633,9 +629,9 @@ to completely unseen data, producing more realistic performance
 estimates.</p>
 </div>
 <div class="section level3">
-<h3 id="step-1-define-a-base-feature-function-example-wgcna">
-<strong>Step 1 – Define a base feature function (example:
-WGCNA)</strong><a class="anchor" aria-label="anchor" href="#step-1-define-a-base-feature-function-example-wgcna"></a>
+<h3 id="step-1-define-a-base-feature-function-e-g--wgcna">
+<strong>Step 1 – Define a base feature function
+(e.g. WGCNA)</strong><a class="anchor" aria-label="anchor" href="#step-1-define-a-base-feature-function-e-g--wgcna"></a>
 </h3>
 <p><strong>Structure of the Base Feature Function</strong></p>
 <p>The function is designed around two operational modes:</p>
@@ -647,7 +643,9 @@ learns the feature structure from the input dataset.</li>
 <strong>Projection Mode</strong> (modules provided): The function
 applies a previously learned structure to new data.</li>
 </ul>
-<p>Why the Function Returns Two Objects?</p>
+<div class="section level4">
+<h4 id="why-the-function-returns-two-objects">Why the Function Returns Two Objects?<a class="anchor" aria-label="anchor" href="#why-the-function-returns-two-objects"></a>
+</h4>
 <ul>
 <li>
 <strong>features</strong> → always returned; the transformed
@@ -672,7 +670,7 @@ components); <code>NULL</code> for training</li>
 <strong>…</strong>: additional arguments specific to the algorithm
 used</li>
 </ul>
-<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb28"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">compute_features_modular</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">data</span>, <span class="va">structure</span> <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  </span>
 <span></span>
@@ -699,7 +697,7 @@ used</li>
 This is just an example: in practice, you can use any feature
 computation that depends on multiple samples, such as clustering, PCA,
 among others.</p>
-<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb29"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">compute_features_modular</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">counts</span>, <span class="va">power</span> <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">modules</span> <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span> <span class="op">{</span></span>
 <span></span>
 <span>  <span class="co">## Just preprocessing (IGNORE)</span></span>
@@ -735,6 +733,7 @@ among others.</p>
 <span>  <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>features <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">module_features</span><span class="op">)</span>, structure <span class="op">=</span> <span class="va">modules</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 </div>
+</div>
 <div class="section level3">
 <h3 id="step-2-make-the-function-suitable-for-pipeml">
 <strong>Step 2 – Make the function suitable for
@@ -758,7 +757,7 @@ held-out folds without influencing it.</li>
 <code>compute_features_modular</code> function</p>
 <div class="section level4">
 <h4 id="note">
-<strong>Note</strong><a class="anchor" aria-label="anchor" href="#note"></a>
+<strong>NOTE</strong><a class="anchor" aria-label="anchor" href="#note"></a>
 </h4>
 <p>In <code>pipeML</code> data corresponds to samples as rows and
 features as columns. If your <code>compute_features_modular()</code>
@@ -776,7 +775,7 @@ function</li>
 <p>Make sure <code>compute_features_modular()</code> returns a matrix
 with the features. If not, make sure to extract them before adding the
 target column</p>
-<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb30"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">prepare_custom_folds</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">data</span>, <span class="va">folds</span> <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">bestune</span> <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">...</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  </span>
 <span>  <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">bestune</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
@@ -857,7 +856,7 @@ target column</p>
 <p>Notice that each time I call the function
 <code>compute_features_modular()</code> I am setting my additional
 argument <code>power</code></p>
-<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb31"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">prepare_WGCNA_folds</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">data</span>, <span class="va">folds</span> <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">bestune</span> <span class="op">=</span> <span class="cn">NULL</span>, <span class="va">power</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  </span>
 <span>  <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">bestune</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
@@ -931,7 +930,7 @@ argument <code>power</code></p>
 <span>  <span class="op">}</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 <p>Load data example</p>
-<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb32"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">counts</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/counts_example.html">counts_example</a></span></span>
 <span><span class="va">coldata</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/coldata_example.html">coldata_example</a></span></span>
 <span></span>
@@ -960,7 +959,7 @@ corresponds to the additional parameters passed in
 to use when running your function. If your function does not have any
 parameters, you can ignore this argument and it will be set up to
 <code>NULL</code>.</p>
-<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb33"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_custom</span>   <span class="op">=</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">counts_train</span><span class="op">)</span>,</span>
 <span>                                            target_var     <span class="op">=</span> <span class="va">coldata_train</span><span class="op">$</span><span class="va">Response</span>,</span>
 <span>                                            task_type      <span class="op">=</span> <span class="st">"classification"</span>,</span>
@@ -974,15 +973,15 @@ parameters, you can ignore this argument and it will be set up to
 <p>Notice that <code>res_custom$Custom_output</code> contains the output
 features of your base function in case these are needed (e.g. for
 prediction - see next section)</p>
-<div class="sourceCode" id="cb36"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb34"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/str.html" class="external-link">str</a></span><span class="op">(</span><span class="va">res_custom</span><span class="op">$</span><span class="va">Custom_output</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">res_custom</span><span class="op">$</span><span class="va">Custom_output</span><span class="op">$</span><span class="va">features</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">res_custom</span><span class="op">$</span><span class="va">Custom_output</span><span class="op">$</span><span class="va">structure</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="tunable-hyperparameters-within-custom-fold-functions">
-<strong>Tunable hyperparameters within custom fold
-functions</strong><a class="anchor" aria-label="anchor" href="#tunable-hyperparameters-within-custom-fold-functions"></a>
+<h3 id="step-4---tunable-hyperparameters-within-custom-fold-functions-optional">
+<strong>Step 4 - Tunable hyperparameters within custom fold
+functions (optional)</strong><a class="anchor" aria-label="anchor" href="#step-4---tunable-hyperparameters-within-custom-fold-functions-optional"></a>
 </h3>
 <p>In some scenarios, the feature construction step may include
 parameters whose values can influence model performance. For example,
@@ -1011,7 +1010,7 @@ metric</li>
 parameters.</p>
 <p>For the <code>compute_features_modular</code> we are only going to
 add the tunable parameters in our function call</p>
-<div class="sourceCode" id="cb37"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb35"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">compute_features_modular</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span></span>
 <span>    <span class="va">counts</span>, </span>
 <span>    <span class="va">power</span> <span class="op">=</span> <span class="cn">NULL</span>,                  </span>
@@ -1069,287 +1068,293 @@ that have some modifications to account for parameters combinations</p>
 <p>Notice we have an additional parameter <code>ncores</code> that will
 control paralellization for evaluating all your runs (<strong>don’t
 remove it!</strong>)</p>
-<div class="sourceCode" id="cb38"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" tabindex="-1"></a>prepare_custom_folds_tuning <span class="ot">&lt;-</span> <span class="cf">function</span>(data, <span class="at">folds =</span> <span class="cn">NULL</span>, <span class="at">bestune =</span> <span class="cn">NULL</span>, <span class="at">ncores =</span> <span class="cn">NULL</span>, ...){</span>
-<span id="cb38-2"><a href="#cb38-2" tabindex="-1"></a>  </span>
-<span id="cb38-3"><a href="#cb38-3" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(bestune)) {</span>
-<span id="cb38-4"><a href="#cb38-4" tabindex="-1"></a>    </span>
-<span id="cb38-5"><a href="#cb38-5" tabindex="-1"></a>    obs_train <span class="ot">&lt;-</span> data<span class="sc">$</span>target</span>
-<span id="cb38-6"><a href="#cb38-6" tabindex="-1"></a>    data<span class="sc">$</span>target <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
-<span id="cb38-7"><a href="#cb38-7" tabindex="-1"></a>    </span>
-<span id="cb38-8"><a href="#cb38-8" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span id="cb38-9"><a href="#cb38-9" tabindex="-1"></a>    required_cols <span class="ot">&lt;-</span> <span class="fu">c</span>()<span class="co"># list your params separated by a comma</span></span>
-<span id="cb38-10"><a href="#cb38-10" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span id="cb38-11"><a href="#cb38-11" tabindex="-1"></a>    </span>
-<span id="cb38-12"><a href="#cb38-12" tabindex="-1"></a>    best_params <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="fu">is.data.frame</span>(bestune)) {</span>
-<span id="cb38-13"><a href="#cb38-13" tabindex="-1"></a>      <span class="cf">if</span> (<span class="fu">all</span>(required_cols <span class="sc">%in%</span> <span class="fu">names</span>(bestune))) {</span>
-<span id="cb38-14"><a href="#cb38-14" tabindex="-1"></a>        dplyr<span class="sc">::</span><span class="fu">select</span>(bestune, dplyr<span class="sc">::</span><span class="fu">all_of</span>(required_cols))</span>
-<span id="cb38-15"><a href="#cb38-15" tabindex="-1"></a>      }<span class="cf">else</span>{<span class="fu">stop</span>(<span class="st">"Not all tunable params found. Verify your function."</span>)}</span>
-<span id="cb38-16"><a href="#cb38-16" tabindex="-1"></a>    } <span class="cf">else</span> <span class="cf">if</span> (<span class="fu">is.list</span>(bestune)) {</span>
-<span id="cb38-17"><a href="#cb38-17" tabindex="-1"></a>      <span class="cf">if</span> (<span class="fu">all</span>(required_cols <span class="sc">%in%</span> <span class="fu">names</span>(bestune))) {</span>
-<span id="cb38-18"><a href="#cb38-18" tabindex="-1"></a>        tibble<span class="sc">::</span><span class="fu">as_tibble</span>(bestune[required_cols])</span>
-<span id="cb38-19"><a href="#cb38-19" tabindex="-1"></a>      }<span class="cf">else</span>{<span class="fu">stop</span>(<span class="st">"Not all tunable params found. Verify your function."</span>)}</span>
-<span id="cb38-20"><a href="#cb38-20" tabindex="-1"></a>    } <span class="cf">else</span> {</span>
-<span id="cb38-21"><a href="#cb38-21" tabindex="-1"></a>      <span class="fu">stop</span>(<span class="st">"`bestune` must be a data.frame or list."</span>)</span>
-<span id="cb38-22"><a href="#cb38-22" tabindex="-1"></a>    }</span>
-<span id="cb38-23"><a href="#cb38-23" tabindex="-1"></a>    </span>
-<span id="cb38-24"><a href="#cb38-24" tabindex="-1"></a>    </span>
-<span id="cb38-25"><a href="#cb38-25" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span id="cb38-26"><a href="#cb38-26" tabindex="-1"></a>    res_final <span class="ot">&lt;-</span> <span class="fu">compute_features_modular</span>(</span>
-<span id="cb38-27"><a href="#cb38-27" tabindex="-1"></a>      <span class="at">counts =</span> data,  </span>
-<span id="cb38-28"><a href="#cb38-28" tabindex="-1"></a>      <span class="co"># change param1, param2, ... for the names of your parameters</span></span>
-<span id="cb38-29"><a href="#cb38-29" tabindex="-1"></a>      <span class="at">param1 =</span> best_params<span class="sc">$</span>param1,</span>
-<span id="cb38-30"><a href="#cb38-30" tabindex="-1"></a>      <span class="at">param2 =</span> best_params<span class="sc">$</span>param2,</span>
-<span id="cb38-31"><a href="#cb38-31" tabindex="-1"></a>      <span class="at">param3 =</span> best_params<span class="sc">$</span>param3</span>
-<span id="cb38-32"><a href="#cb38-32" tabindex="-1"></a>      ...</span>
-<span id="cb38-33"><a href="#cb38-33" tabindex="-1"></a>    )</span>
-<span id="cb38-34"><a href="#cb38-34" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span id="cb38-35"><a href="#cb38-35" tabindex="-1"></a>    </span>
-<span id="cb38-36"><a href="#cb38-36" tabindex="-1"></a>    </span>
-<span id="cb38-37"><a href="#cb38-37" tabindex="-1"></a>    train_features_final <span class="ot">=</span> res_final<span class="sc">$</span>features  </span>
-<span id="cb38-38"><a href="#cb38-38" tabindex="-1"></a>    train_features_final<span class="sc">$</span>target <span class="ot">&lt;-</span> obs_train</span>
-<span id="cb38-39"><a href="#cb38-39" tabindex="-1"></a>    </span>
-<span id="cb38-40"><a href="#cb38-40" tabindex="-1"></a>    custom_output <span class="ot">&lt;-</span> res_final</span>
-<span id="cb38-41"><a href="#cb38-41" tabindex="-1"></a>    </span>
-<span id="cb38-42"><a href="#cb38-42" tabindex="-1"></a>    <span class="fu">return</span>(<span class="fu">list</span>(train_features_final, custom_output, bestune))</span>
-<span id="cb38-43"><a href="#cb38-43" tabindex="-1"></a>    </span>
-<span id="cb38-44"><a href="#cb38-44" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
-<span id="cb38-45"><a href="#cb38-45" tabindex="-1"></a></span>
-<span id="cb38-46"><a href="#cb38-46" tabindex="-1"></a>    </span>
-<span id="cb38-47"><a href="#cb38-47" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------    </span></span>
-<span id="cb38-48"><a href="#cb38-48" tabindex="-1"></a>    custom_grid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
-<span id="cb38-49"><a href="#cb38-49" tabindex="-1"></a>      <span class="at">param1 =</span> param1,</span>
-<span id="cb38-50"><a href="#cb38-50" tabindex="-1"></a>      <span class="at">param2 =</span> param2,</span>
-<span id="cb38-51"><a href="#cb38-51" tabindex="-1"></a>      <span class="at">param3 =</span> param3,</span>
-<span id="cb38-52"><a href="#cb38-52" tabindex="-1"></a>      ...,</span>
-<span id="cb38-53"><a href="#cb38-53" tabindex="-1"></a>      <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
-<span id="cb38-54"><a href="#cb38-54" tabindex="-1"></a>    )</span>
-<span id="cb38-55"><a href="#cb38-55" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span id="cb38-56"><a href="#cb38-56" tabindex="-1"></a>    </span>
-<span id="cb38-57"><a href="#cb38-57" tabindex="-1"></a>    </span>
-<span id="cb38-58"><a href="#cb38-58" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.null</span>(ncores)) ncores <span class="ot">&lt;-</span> parallel<span class="sc">::</span><span class="fu">detectCores</span>() <span class="sc">-</span> <span class="dv">2</span></span>
-<span id="cb38-59"><a href="#cb38-59" tabindex="-1"></a>    cl <span class="ot">&lt;-</span> parallel<span class="sc">::</span><span class="fu">makeCluster</span>(ncores)</span>
-<span id="cb38-60"><a href="#cb38-60" tabindex="-1"></a>    doParallel<span class="sc">::</span><span class="fu">registerDoParallel</span>(cl)</span>
-<span id="cb38-61"><a href="#cb38-61" tabindex="-1"></a>    </span>
-<span id="cb38-62"><a href="#cb38-62" tabindex="-1"></a>    processed_folds <span class="ot">&lt;-</span> foreach<span class="sc">::</span><span class="fu">foreach</span>(<span class="at">i =</span> <span class="fu">seq_along</span>(folds), <span class="at">.packages =</span> <span class="fu">c</span>(<span class="st">"dplyr"</span>),</span>
-<span id="cb38-63"><a href="#cb38-63" tabindex="-1"></a>                                        <span class="at">.export =</span> <span class="fu">c</span>(<span class="st">"compute_features_modular"</span>)) <span class="sc">%dopar%</span> {  </span>
-<span id="cb38-64"><a href="#cb38-64" tabindex="-1"></a>                                          </span>
-<span id="cb38-65"><a href="#cb38-65" tabindex="-1"></a>      train_idx <span class="ot">&lt;-</span> folds[[i]]</span>
-<span id="cb38-66"><a href="#cb38-66" tabindex="-1"></a>      test_idx  <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(<span class="fu">seq_len</span>(<span class="fu">nrow</span>(data)), train_idx)</span>
-<span id="cb38-67"><a href="#cb38-67" tabindex="-1"></a>      </span>
-<span id="cb38-68"><a href="#cb38-68" tabindex="-1"></a>      train_data <span class="ot">&lt;-</span> data[train_idx, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
-<span id="cb38-69"><a href="#cb38-69" tabindex="-1"></a>      obs_train <span class="ot">&lt;-</span> train_data<span class="sc">$</span>target</span>
-<span id="cb38-70"><a href="#cb38-70" tabindex="-1"></a>      train_data<span class="sc">$</span>target <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
-<span id="cb38-71"><a href="#cb38-71" tabindex="-1"></a>      </span>
-<span id="cb38-72"><a href="#cb38-72" tabindex="-1"></a>      fold_results <span class="ot">&lt;-</span> <span class="fu">lapply</span>(<span class="fu">seq_len</span>(<span class="fu">nrow</span>(param_grid)), <span class="cf">function</span>(j) {</span>
-<span id="cb38-73"><a href="#cb38-73" tabindex="-1"></a>        params <span class="ot">&lt;-</span> param_grid[j, ]</span>
-<span id="cb38-74"><a href="#cb38-74" tabindex="-1"></a>        </span>
-<span id="cb38-75"><a href="#cb38-75" tabindex="-1"></a>        </span>
-<span id="cb38-76"><a href="#cb38-76" tabindex="-1"></a>        </span>
-<span id="cb38-77"><a href="#cb38-77" tabindex="-1"></a>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span id="cb38-78"><a href="#cb38-78" tabindex="-1"></a>        res_train <span class="ot">&lt;-</span> <span class="fu">compute_features_modular</span>(</span>
-<span id="cb38-79"><a href="#cb38-79" tabindex="-1"></a>          <span class="at">counts =</span> train_data,  </span>
-<span id="cb38-80"><a href="#cb38-80" tabindex="-1"></a>          <span class="at">param1 =</span> params<span class="sc">$</span>param1,</span>
-<span id="cb38-81"><a href="#cb38-81" tabindex="-1"></a>          <span class="at">param2 =</span> params<span class="sc">$</span>param2,</span>
-<span id="cb38-82"><a href="#cb38-82" tabindex="-1"></a>          <span class="at">param3 =</span> params<span class="sc">$</span>param3,</span>
-<span id="cb38-83"><a href="#cb38-83" tabindex="-1"></a>          ...</span>
-<span id="cb38-84"><a href="#cb38-84" tabindex="-1"></a>        )</span>
-<span id="cb38-85"><a href="#cb38-85" tabindex="-1"></a>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span id="cb38-86"><a href="#cb38-86" tabindex="-1"></a>        </span>
-<span id="cb38-87"><a href="#cb38-87" tabindex="-1"></a>        </span>
-<span id="cb38-88"><a href="#cb38-88" tabindex="-1"></a>        </span>
-<span id="cb38-89"><a href="#cb38-89" tabindex="-1"></a>        train_features <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(res_train<span class="sc">$</span>features) </span>
-<span id="cb38-90"><a href="#cb38-90" tabindex="-1"></a>        train_features<span class="sc">$</span>target <span class="ot">&lt;-</span> obs_train</span>
-<span id="cb38-91"><a href="#cb38-91" tabindex="-1"></a>        </span>
-<span id="cb38-92"><a href="#cb38-92" tabindex="-1"></a>        test_data <span class="ot">&lt;-</span> data[test_idx, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
-<span id="cb38-93"><a href="#cb38-93" tabindex="-1"></a>        obs_test <span class="ot">&lt;-</span> test_data<span class="sc">$</span>target</span>
-<span id="cb38-94"><a href="#cb38-94" tabindex="-1"></a>        test_data<span class="sc">$</span>target <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
-<span id="cb38-95"><a href="#cb38-95" tabindex="-1"></a>        </span>
-<span id="cb38-96"><a href="#cb38-96" tabindex="-1"></a>        </span>
-<span id="cb38-97"><a href="#cb38-97" tabindex="-1"></a>        </span>
-<span id="cb38-98"><a href="#cb38-98" tabindex="-1"></a>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span id="cb38-99"><a href="#cb38-99" tabindex="-1"></a>        test_features <span class="ot">&lt;-</span> <span class="fu">compute_features_modular</span>(</span>
-<span id="cb38-100"><a href="#cb38-100" tabindex="-1"></a>          test_data, </span>
-<span id="cb38-101"><a href="#cb38-101" tabindex="-1"></a>          <span class="at">structure =</span> res_train<span class="sc">$</span>structure,  </span>
-<span id="cb38-102"><a href="#cb38-102" tabindex="-1"></a>          ...</span>
-<span id="cb38-103"><a href="#cb38-103" tabindex="-1"></a>        )</span>
-<span id="cb38-104"><a href="#cb38-104" tabindex="-1"></a>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span id="cb38-105"><a href="#cb38-105" tabindex="-1"></a>        </span>
-<span id="cb38-106"><a href="#cb38-106" tabindex="-1"></a>        </span>
-<span id="cb38-107"><a href="#cb38-107" tabindex="-1"></a>        </span>
-<span id="cb38-108"><a href="#cb38-108" tabindex="-1"></a>        test_features <span class="ot">=</span> test_features<span class="sc">$</span>features </span>
-<span id="cb38-109"><a href="#cb38-109" tabindex="-1"></a></span>
-<span id="cb38-110"><a href="#cb38-110" tabindex="-1"></a>        <span class="fu">list</span>(</span>
-<span id="cb38-111"><a href="#cb38-111" tabindex="-1"></a>          <span class="at">train_data =</span> train_features,</span>
-<span id="cb38-112"><a href="#cb38-112" tabindex="-1"></a>          <span class="at">test_data  =</span> test_features,</span>
-<span id="cb38-113"><a href="#cb38-113" tabindex="-1"></a>          <span class="at">obs_test   =</span> obs_test,</span>
-<span id="cb38-114"><a href="#cb38-114" tabindex="-1"></a>          <span class="at">rowIndex   =</span> test_idx,</span>
-<span id="cb38-115"><a href="#cb38-115" tabindex="-1"></a>          <span class="at">fold_name  =</span> <span class="fu">names</span>(folds)[i],</span>
-<span id="cb38-116"><a href="#cb38-116" tabindex="-1"></a>          <span class="at">params     =</span> params</span>
-<span id="cb38-117"><a href="#cb38-117" tabindex="-1"></a>        )</span>
-<span id="cb38-118"><a href="#cb38-118" tabindex="-1"></a>      })</span>
-<span id="cb38-119"><a href="#cb38-119" tabindex="-1"></a>      </span>
-<span id="cb38-120"><a href="#cb38-120" tabindex="-1"></a>      filename <span class="ot">&lt;-</span> <span class="fu">file.path</span>(<span class="st">"Results"</span>, <span class="fu">paste0</span>(<span class="st">"fold_"</span>, <span class="fu">names</span>(folds)[i], <span class="st">".rds"</span>))</span>
-<span id="cb38-121"><a href="#cb38-121" tabindex="-1"></a>      <span class="fu">saveRDS</span>(processed_folds[[i]], <span class="at">file =</span> filename)</span>
-<span id="cb38-122"><a href="#cb38-122" tabindex="-1"></a>      </span>
-<span id="cb38-123"><a href="#cb38-123" tabindex="-1"></a>      fold_results</span>
-<span id="cb38-124"><a href="#cb38-124" tabindex="-1"></a>      </span>
-<span id="cb38-125"><a href="#cb38-125" tabindex="-1"></a>    }</span>
-<span id="cb38-126"><a href="#cb38-126" tabindex="-1"></a>    </span>
-<span id="cb38-127"><a href="#cb38-127" tabindex="-1"></a>    parallel<span class="sc">::</span><span class="fu">stopCluster</span>(cl)</span>
-<span id="cb38-128"><a href="#cb38-128" tabindex="-1"></a>    foreach<span class="sc">::</span><span class="fu">registerDoSEQ</span>()</span>
-<span id="cb38-129"><a href="#cb38-129" tabindex="-1"></a>    <span class="fu">gc</span>()</span>
-<span id="cb38-130"><a href="#cb38-130" tabindex="-1"></a>    </span>
-<span id="cb38-131"><a href="#cb38-131" tabindex="-1"></a>  }</span>
-<span id="cb38-132"><a href="#cb38-132" tabindex="-1"></a>}</span></code></pre></div>
+<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a>prepare_custom_folds_tuning <span class="ot">&lt;-</span> <span class="cf">function</span>(data, </span>
+<span id="cb36-2"><a href="#cb36-2" tabindex="-1"></a>                                        <span class="at">folds =</span> <span class="cn">NULL</span>, </span>
+<span id="cb36-3"><a href="#cb36-3" tabindex="-1"></a>                                        <span class="at">bestune =</span> <span class="cn">NULL</span>, </span>
+<span id="cb36-4"><a href="#cb36-4" tabindex="-1"></a>                                        <span class="at">ncores =</span> <span class="cn">NULL</span>, ...){</span>
+<span id="cb36-5"><a href="#cb36-5" tabindex="-1"></a>  </span>
+<span id="cb36-6"><a href="#cb36-6" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(bestune)) {</span>
+<span id="cb36-7"><a href="#cb36-7" tabindex="-1"></a>    </span>
+<span id="cb36-8"><a href="#cb36-8" tabindex="-1"></a>    obs_train <span class="ot">&lt;-</span> data<span class="sc">$</span>target</span>
+<span id="cb36-9"><a href="#cb36-9" tabindex="-1"></a>    data<span class="sc">$</span>target <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb36-10"><a href="#cb36-10" tabindex="-1"></a>    </span>
+<span id="cb36-11"><a href="#cb36-11" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb36-12"><a href="#cb36-12" tabindex="-1"></a>    required_cols <span class="ot">&lt;-</span> <span class="fu">c</span>()<span class="co"># list your params separated by a comma</span></span>
+<span id="cb36-13"><a href="#cb36-13" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb36-14"><a href="#cb36-14" tabindex="-1"></a>    </span>
+<span id="cb36-15"><a href="#cb36-15" tabindex="-1"></a>    best_params <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="fu">is.data.frame</span>(bestune)) {</span>
+<span id="cb36-16"><a href="#cb36-16" tabindex="-1"></a>      <span class="cf">if</span> (<span class="fu">all</span>(required_cols <span class="sc">%in%</span> <span class="fu">names</span>(bestune))) {</span>
+<span id="cb36-17"><a href="#cb36-17" tabindex="-1"></a>        dplyr<span class="sc">::</span><span class="fu">select</span>(bestune, dplyr<span class="sc">::</span><span class="fu">all_of</span>(required_cols))</span>
+<span id="cb36-18"><a href="#cb36-18" tabindex="-1"></a>      }<span class="cf">else</span>{<span class="fu">stop</span>(<span class="st">"Not all tunable params found. Verify your function."</span>)}</span>
+<span id="cb36-19"><a href="#cb36-19" tabindex="-1"></a>    } <span class="cf">else</span> <span class="cf">if</span> (<span class="fu">is.list</span>(bestune)) {</span>
+<span id="cb36-20"><a href="#cb36-20" tabindex="-1"></a>      <span class="cf">if</span> (<span class="fu">all</span>(required_cols <span class="sc">%in%</span> <span class="fu">names</span>(bestune))) {</span>
+<span id="cb36-21"><a href="#cb36-21" tabindex="-1"></a>        tibble<span class="sc">::</span><span class="fu">as_tibble</span>(bestune[required_cols])</span>
+<span id="cb36-22"><a href="#cb36-22" tabindex="-1"></a>      }<span class="cf">else</span>{<span class="fu">stop</span>(<span class="st">"Not all tunable params found. Verify your function."</span>)}</span>
+<span id="cb36-23"><a href="#cb36-23" tabindex="-1"></a>    } <span class="cf">else</span> {</span>
+<span id="cb36-24"><a href="#cb36-24" tabindex="-1"></a>      <span class="fu">stop</span>(<span class="st">"`bestune` must be a data.frame or list."</span>)</span>
+<span id="cb36-25"><a href="#cb36-25" tabindex="-1"></a>    }</span>
+<span id="cb36-26"><a href="#cb36-26" tabindex="-1"></a>    </span>
+<span id="cb36-27"><a href="#cb36-27" tabindex="-1"></a>    </span>
+<span id="cb36-28"><a href="#cb36-28" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb36-29"><a href="#cb36-29" tabindex="-1"></a>    res_final <span class="ot">&lt;-</span> <span class="fu">compute_features_modular</span>(</span>
+<span id="cb36-30"><a href="#cb36-30" tabindex="-1"></a>      <span class="at">counts =</span> data,  </span>
+<span id="cb36-31"><a href="#cb36-31" tabindex="-1"></a>      <span class="co"># change param1, param2, ... for the names of your parameters</span></span>
+<span id="cb36-32"><a href="#cb36-32" tabindex="-1"></a>      <span class="at">param1 =</span> best_params<span class="sc">$</span>param1,</span>
+<span id="cb36-33"><a href="#cb36-33" tabindex="-1"></a>      <span class="at">param2 =</span> best_params<span class="sc">$</span>param2,</span>
+<span id="cb36-34"><a href="#cb36-34" tabindex="-1"></a>      <span class="at">param3 =</span> best_params<span class="sc">$</span>param3</span>
+<span id="cb36-35"><a href="#cb36-35" tabindex="-1"></a>      ...</span>
+<span id="cb36-36"><a href="#cb36-36" tabindex="-1"></a>    )</span>
+<span id="cb36-37"><a href="#cb36-37" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb36-38"><a href="#cb36-38" tabindex="-1"></a>    </span>
+<span id="cb36-39"><a href="#cb36-39" tabindex="-1"></a>    </span>
+<span id="cb36-40"><a href="#cb36-40" tabindex="-1"></a>    train_features_final <span class="ot">=</span> res_final<span class="sc">$</span>features  </span>
+<span id="cb36-41"><a href="#cb36-41" tabindex="-1"></a>    train_features_final<span class="sc">$</span>target <span class="ot">&lt;-</span> obs_train</span>
+<span id="cb36-42"><a href="#cb36-42" tabindex="-1"></a>    </span>
+<span id="cb36-43"><a href="#cb36-43" tabindex="-1"></a>    custom_output <span class="ot">&lt;-</span> res_final</span>
+<span id="cb36-44"><a href="#cb36-44" tabindex="-1"></a>    </span>
+<span id="cb36-45"><a href="#cb36-45" tabindex="-1"></a>    <span class="fu">return</span>(<span class="fu">list</span>(train_features_final, custom_output, bestune))</span>
+<span id="cb36-46"><a href="#cb36-46" tabindex="-1"></a>    </span>
+<span id="cb36-47"><a href="#cb36-47" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb36-48"><a href="#cb36-48" tabindex="-1"></a></span>
+<span id="cb36-49"><a href="#cb36-49" tabindex="-1"></a>    </span>
+<span id="cb36-50"><a href="#cb36-50" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------    </span></span>
+<span id="cb36-51"><a href="#cb36-51" tabindex="-1"></a>    custom_grid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
+<span id="cb36-52"><a href="#cb36-52" tabindex="-1"></a>      <span class="at">param1 =</span> param1,</span>
+<span id="cb36-53"><a href="#cb36-53" tabindex="-1"></a>      <span class="at">param2 =</span> param2,</span>
+<span id="cb36-54"><a href="#cb36-54" tabindex="-1"></a>      <span class="at">param3 =</span> param3,</span>
+<span id="cb36-55"><a href="#cb36-55" tabindex="-1"></a>      ...,</span>
+<span id="cb36-56"><a href="#cb36-56" tabindex="-1"></a>      <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
+<span id="cb36-57"><a href="#cb36-57" tabindex="-1"></a>    )</span>
+<span id="cb36-58"><a href="#cb36-58" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb36-59"><a href="#cb36-59" tabindex="-1"></a>    </span>
+<span id="cb36-60"><a href="#cb36-60" tabindex="-1"></a>    </span>
+<span id="cb36-61"><a href="#cb36-61" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.null</span>(ncores)) ncores <span class="ot">&lt;-</span> parallel<span class="sc">::</span><span class="fu">detectCores</span>() <span class="sc">-</span> <span class="dv">2</span></span>
+<span id="cb36-62"><a href="#cb36-62" tabindex="-1"></a>    cl <span class="ot">&lt;-</span> parallel<span class="sc">::</span><span class="fu">makeCluster</span>(ncores)</span>
+<span id="cb36-63"><a href="#cb36-63" tabindex="-1"></a>    doParallel<span class="sc">::</span><span class="fu">registerDoParallel</span>(cl)</span>
+<span id="cb36-64"><a href="#cb36-64" tabindex="-1"></a>    </span>
+<span id="cb36-65"><a href="#cb36-65" tabindex="-1"></a>    processed_folds <span class="ot">&lt;-</span> foreach<span class="sc">::</span><span class="fu">foreach</span>(<span class="at">i =</span> <span class="fu">seq_along</span>(folds), </span>
+<span id="cb36-66"><a href="#cb36-66" tabindex="-1"></a>                                        <span class="at">.packages =</span> <span class="fu">c</span>(<span class="st">"dplyr"</span>),</span>
+<span id="cb36-67"><a href="#cb36-67" tabindex="-1"></a>                                        <span class="at">.export =</span> <span class="fu">c</span>(<span class="st">"compute_features_modular"</span>)) </span>
+<span id="cb36-68"><a href="#cb36-68" tabindex="-1"></a>    <span class="sc">%dopar%</span> {  </span>
+<span id="cb36-69"><a href="#cb36-69" tabindex="-1"></a>                                          </span>
+<span id="cb36-70"><a href="#cb36-70" tabindex="-1"></a>      train_idx <span class="ot">&lt;-</span> folds[[i]]</span>
+<span id="cb36-71"><a href="#cb36-71" tabindex="-1"></a>      test_idx  <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(<span class="fu">seq_len</span>(<span class="fu">nrow</span>(data)), train_idx)</span>
+<span id="cb36-72"><a href="#cb36-72" tabindex="-1"></a>      </span>
+<span id="cb36-73"><a href="#cb36-73" tabindex="-1"></a>      train_data <span class="ot">&lt;-</span> data[train_idx, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb36-74"><a href="#cb36-74" tabindex="-1"></a>      obs_train <span class="ot">&lt;-</span> train_data<span class="sc">$</span>target</span>
+<span id="cb36-75"><a href="#cb36-75" tabindex="-1"></a>      train_data<span class="sc">$</span>target <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb36-76"><a href="#cb36-76" tabindex="-1"></a>      </span>
+<span id="cb36-77"><a href="#cb36-77" tabindex="-1"></a>      fold_results <span class="ot">&lt;-</span> <span class="fu">lapply</span>(<span class="fu">seq_len</span>(<span class="fu">nrow</span>(param_grid)), <span class="cf">function</span>(j) {</span>
+<span id="cb36-78"><a href="#cb36-78" tabindex="-1"></a>        params <span class="ot">&lt;-</span> param_grid[j, ]</span>
+<span id="cb36-79"><a href="#cb36-79" tabindex="-1"></a>        </span>
+<span id="cb36-80"><a href="#cb36-80" tabindex="-1"></a>        </span>
+<span id="cb36-81"><a href="#cb36-81" tabindex="-1"></a>        </span>
+<span id="cb36-82"><a href="#cb36-82" tabindex="-1"></a>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb36-83"><a href="#cb36-83" tabindex="-1"></a>        res_train <span class="ot">&lt;-</span> <span class="fu">compute_features_modular</span>(</span>
+<span id="cb36-84"><a href="#cb36-84" tabindex="-1"></a>          <span class="at">counts =</span> train_data,  </span>
+<span id="cb36-85"><a href="#cb36-85" tabindex="-1"></a>          <span class="at">param1 =</span> params<span class="sc">$</span>param1,</span>
+<span id="cb36-86"><a href="#cb36-86" tabindex="-1"></a>          <span class="at">param2 =</span> params<span class="sc">$</span>param2,</span>
+<span id="cb36-87"><a href="#cb36-87" tabindex="-1"></a>          <span class="at">param3 =</span> params<span class="sc">$</span>param3,</span>
+<span id="cb36-88"><a href="#cb36-88" tabindex="-1"></a>          ...</span>
+<span id="cb36-89"><a href="#cb36-89" tabindex="-1"></a>        )</span>
+<span id="cb36-90"><a href="#cb36-90" tabindex="-1"></a>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb36-91"><a href="#cb36-91" tabindex="-1"></a>        </span>
+<span id="cb36-92"><a href="#cb36-92" tabindex="-1"></a>        </span>
+<span id="cb36-93"><a href="#cb36-93" tabindex="-1"></a>        </span>
+<span id="cb36-94"><a href="#cb36-94" tabindex="-1"></a>        train_features <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(res_train<span class="sc">$</span>features) </span>
+<span id="cb36-95"><a href="#cb36-95" tabindex="-1"></a>        train_features<span class="sc">$</span>target <span class="ot">&lt;-</span> obs_train</span>
+<span id="cb36-96"><a href="#cb36-96" tabindex="-1"></a>        </span>
+<span id="cb36-97"><a href="#cb36-97" tabindex="-1"></a>        test_data <span class="ot">&lt;-</span> data[test_idx, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb36-98"><a href="#cb36-98" tabindex="-1"></a>        obs_test <span class="ot">&lt;-</span> test_data<span class="sc">$</span>target</span>
+<span id="cb36-99"><a href="#cb36-99" tabindex="-1"></a>        test_data<span class="sc">$</span>target <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb36-100"><a href="#cb36-100" tabindex="-1"></a>        </span>
+<span id="cb36-101"><a href="#cb36-101" tabindex="-1"></a>        </span>
+<span id="cb36-102"><a href="#cb36-102" tabindex="-1"></a>        </span>
+<span id="cb36-103"><a href="#cb36-103" tabindex="-1"></a>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb36-104"><a href="#cb36-104" tabindex="-1"></a>        test_features <span class="ot">&lt;-</span> <span class="fu">compute_features_modular</span>(</span>
+<span id="cb36-105"><a href="#cb36-105" tabindex="-1"></a>          test_data, </span>
+<span id="cb36-106"><a href="#cb36-106" tabindex="-1"></a>          <span class="at">structure =</span> res_train<span class="sc">$</span>structure,  </span>
+<span id="cb36-107"><a href="#cb36-107" tabindex="-1"></a>          ...</span>
+<span id="cb36-108"><a href="#cb36-108" tabindex="-1"></a>        )</span>
+<span id="cb36-109"><a href="#cb36-109" tabindex="-1"></a>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb36-110"><a href="#cb36-110" tabindex="-1"></a>        </span>
+<span id="cb36-111"><a href="#cb36-111" tabindex="-1"></a>        </span>
+<span id="cb36-112"><a href="#cb36-112" tabindex="-1"></a>        </span>
+<span id="cb36-113"><a href="#cb36-113" tabindex="-1"></a>        test_features <span class="ot">=</span> test_features<span class="sc">$</span>features </span>
+<span id="cb36-114"><a href="#cb36-114" tabindex="-1"></a></span>
+<span id="cb36-115"><a href="#cb36-115" tabindex="-1"></a>        <span class="fu">list</span>(</span>
+<span id="cb36-116"><a href="#cb36-116" tabindex="-1"></a>          <span class="at">train_data =</span> train_features,</span>
+<span id="cb36-117"><a href="#cb36-117" tabindex="-1"></a>          <span class="at">test_data  =</span> test_features,</span>
+<span id="cb36-118"><a href="#cb36-118" tabindex="-1"></a>          <span class="at">obs_test   =</span> obs_test,</span>
+<span id="cb36-119"><a href="#cb36-119" tabindex="-1"></a>          <span class="at">rowIndex   =</span> test_idx,</span>
+<span id="cb36-120"><a href="#cb36-120" tabindex="-1"></a>          <span class="at">fold_name  =</span> <span class="fu">names</span>(folds)[i],</span>
+<span id="cb36-121"><a href="#cb36-121" tabindex="-1"></a>          <span class="at">params     =</span> params</span>
+<span id="cb36-122"><a href="#cb36-122" tabindex="-1"></a>        )</span>
+<span id="cb36-123"><a href="#cb36-123" tabindex="-1"></a>      })</span>
+<span id="cb36-124"><a href="#cb36-124" tabindex="-1"></a>      </span>
+<span id="cb36-125"><a href="#cb36-125" tabindex="-1"></a>      filename <span class="ot">&lt;-</span> <span class="fu">file.path</span>(<span class="st">"Results"</span>, <span class="fu">paste0</span>(<span class="st">"fold_"</span>, <span class="fu">names</span>(folds)[i], <span class="st">".rds"</span>))</span>
+<span id="cb36-126"><a href="#cb36-126" tabindex="-1"></a>      <span class="fu">saveRDS</span>(processed_folds[[i]], <span class="at">file =</span> filename)</span>
+<span id="cb36-127"><a href="#cb36-127" tabindex="-1"></a>      </span>
+<span id="cb36-128"><a href="#cb36-128" tabindex="-1"></a>      fold_results</span>
+<span id="cb36-129"><a href="#cb36-129" tabindex="-1"></a>      </span>
+<span id="cb36-130"><a href="#cb36-130" tabindex="-1"></a>    }</span>
+<span id="cb36-131"><a href="#cb36-131" tabindex="-1"></a>    </span>
+<span id="cb36-132"><a href="#cb36-132" tabindex="-1"></a>    parallel<span class="sc">::</span><span class="fu">stopCluster</span>(cl)</span>
+<span id="cb36-133"><a href="#cb36-133" tabindex="-1"></a>    foreach<span class="sc">::</span><span class="fu">registerDoSEQ</span>()</span>
+<span id="cb36-134"><a href="#cb36-134" tabindex="-1"></a>    <span class="fu">gc</span>()</span>
+<span id="cb36-135"><a href="#cb36-135" tabindex="-1"></a>    </span>
+<span id="cb36-136"><a href="#cb36-136" tabindex="-1"></a>  }</span>
+<span id="cb36-137"><a href="#cb36-137" tabindex="-1"></a>}</span></code></pre></div>
 <p>In our case it would be:</p>
-<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">prepare_WGCNA_folds_modular</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span></span>
-<span>    <span class="va">data</span>,</span>
-<span>    <span class="va">folds</span> <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>    <span class="va">bestune</span> <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>    <span class="va">power</span> <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>    <span class="va">ncores</span> <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>    <span class="co">### tunable parameters</span></span>
-<span>    <span class="va">minModuleSize</span>,</span>
-<span>    <span class="va">mergeCutHeight</span>,</span>
-<span>    <span class="va">deepSplit</span></span>
-<span><span class="op">)</span> <span class="op">{</span></span>
-<span>  </span>
-<span>  <span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">bestune</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    </span>
-<span>    <span class="va">obs_train</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">target</span></span>
-<span>    <span class="va">data</span><span class="op">$</span><span class="va">target</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
-<span>    </span>
-<span>    </span>
-<span>    </span>
-<span>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span>    <span class="va">required_cols</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"minModuleSize"</span>, <span class="st">"mergeCutHeight"</span>, <span class="st">"deepSplit"</span><span class="op">)</span></span>
-<span>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span>    </span>
-<span>    </span>
-<span>    </span>
-<span>    <span class="va">best_params</span> <span class="op">&lt;-</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">is.data.frame</a></span><span class="op">(</span><span class="va">bestune</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>      <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="va">required_cols</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">bestune</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>        <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="va">bestune</span>, <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://tidyselect.r-lib.org/reference/all_of.html" class="external-link">all_of</a></span><span class="op">(</span><span class="va">required_cols</span><span class="op">)</span><span class="op">)</span></span>
-<span>      <span class="op">}</span><span class="kw">else</span><span class="op">{</span><span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"Not all tunable params found. Verify your function."</span><span class="op">)</span><span class="op">}</span></span>
-<span>    <span class="op">}</span> <span class="kw">else</span> <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">is.list</a></span><span class="op">(</span><span class="va">bestune</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>      <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/all.html" class="external-link">all</a></span><span class="op">(</span><span class="va">required_cols</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">bestune</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>        <span class="fu">tibble</span><span class="fu">::</span><span class="fu"><a href="https://tibble.tidyverse.org/reference/as_tibble.html" class="external-link">as_tibble</a></span><span class="op">(</span><span class="va">bestune</span><span class="op">[</span><span class="va">required_cols</span><span class="op">]</span><span class="op">)</span></span>
-<span>      <span class="op">}</span><span class="kw">else</span><span class="op">{</span><span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"Not all tunable params found. Verify your function."</span><span class="op">)</span><span class="op">}</span></span>
-<span>    <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>      <span class="kw"><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop</a></span><span class="op">(</span><span class="st">"`bestune` must be a data.frame or list."</span><span class="op">)</span></span>
-<span>    <span class="op">}</span></span>
-<span>    </span>
-<span>    </span>
-<span>    </span>
-<span>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span>    <span class="va">res_final</span> <span class="op">&lt;-</span> <span class="fu">compute_features_modular</span><span class="op">(</span></span>
-<span>      counts <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span>,</span>
-<span>      power <span class="op">=</span> <span class="va">power</span>,</span>
-<span>      <span class="co">## tunable parameters</span></span>
-<span>      minModuleSize <span class="op">=</span> <span class="va">best_params</span><span class="op">$</span><span class="va">minModuleSize</span>,</span>
-<span>      mergeCutHeight <span class="op">=</span> <span class="va">best_params</span><span class="op">$</span><span class="va">mergeCutHeight</span>,</span>
-<span>      deepSplit <span class="op">=</span> <span class="va">best_params</span><span class="op">$</span><span class="va">deepSplit</span></span>
-<span>    <span class="op">)</span></span>
-<span>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span>    </span>
-<span>    </span>
-<span>    </span>
-<span>    <span class="va">train_cell_data_final</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">res_final</span><span class="op">$</span><span class="va">features</span><span class="op">)</span></span>
-<span>    <span class="va">train_cell_data_final</span><span class="op">$</span><span class="va">target</span> <span class="op">&lt;-</span> <span class="va">obs_train</span></span>
-<span>    </span>
-<span>    <span class="va">custom_output</span> <span class="op">&lt;-</span> <span class="va">res_final</span></span>
-<span>    </span>
-<span>    <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">train_cell_data_final</span>, <span class="va">custom_output</span>, <span class="va">best_params</span><span class="op">)</span><span class="op">)</span></span>
-<span>    </span>
-<span>  <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
-<span>    </span>
-<span>    </span>
-<span>    </span>
-<span>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span>    <span class="va">custom_grid</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span></span>
-<span>      minModuleSize <span class="op">=</span> <span class="va">minModuleSize</span>,</span>
-<span>      mergeCutHeight <span class="op">=</span> <span class="va">mergeCutHeight</span>,</span>
-<span>      deepSplit <span class="op">=</span> <span class="va">deepSplit</span>,</span>
-<span>      stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span></span>
-<span>    <span class="op">)</span></span>
-<span>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span>    </span>
-<span>    </span>
-<span>    </span>
-<span>    <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">ncores</span><span class="op">)</span><span class="op">)</span> <span class="va">ncores</span> <span class="op">&lt;-</span> <span class="fu">parallel</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/parallel/detectCores.html" class="external-link">detectCores</a></span><span class="op">(</span><span class="op">)</span> <span class="op">-</span> <span class="fl">2</span></span>
-<span>    <span class="va">cl</span> <span class="op">&lt;-</span> <span class="fu">parallel</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/parallel/makeCluster.html" class="external-link">makeCluster</a></span><span class="op">(</span><span class="va">ncores</span><span class="op">)</span></span>
-<span>    <span class="fu">doParallel</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/doParallel/man/registerDoParallel.html" class="external-link">registerDoParallel</a></span><span class="op">(</span><span class="va">cl</span><span class="op">)</span></span>
-<span>    </span>
-<span>    <span class="va">processed_folds</span> <span class="op">&lt;-</span> <span class="fu">foreach</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/foreach/man/foreach.html" class="external-link">foreach</a></span><span class="op">(</span>i <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_along</a></span><span class="op">(</span><span class="va">folds</span><span class="op">)</span>, .packages <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"dplyr"</span><span class="op">)</span>,</span>
-<span>                                          .export <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"compute_features_modular"</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/pkg/foreach/man/foreach.html" class="external-link">%dopar%</a></span> <span class="op">{</span></span>
-<span>      </span>
-<span>      <span class="va">train_idx</span> <span class="op">&lt;-</span> <span class="va">folds</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span></span>
-<span>      <span class="va">test_idx</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/setops.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span><span class="op">)</span>, <span class="va">train_idx</span><span class="op">)</span></span>
-<span>      </span>
-<span>      <span class="va">train_data</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span><span class="va">train_idx</span>, , drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span></span>
-<span>      <span class="va">obs_train</span> <span class="op">&lt;-</span> <span class="va">train_data</span><span class="op">$</span><span class="va">target</span></span>
-<span>      <span class="va">train_data</span><span class="op">$</span><span class="va">target</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
-<span>      </span>
-<span>      <span class="va">fold_results</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">custom_grid</span><span class="op">)</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">j</span><span class="op">)</span> <span class="op">{</span></span>
-<span></span>
-<span>        <span class="va">params</span> <span class="op">&lt;-</span> <span class="va">custom_grid</span><span class="op">[</span><span class="va">j</span>, <span class="op">]</span></span>
-<span>        </span>
-<span>        </span>
-<span>        </span>
-<span>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span>        <span class="va">wgcna_train</span> <span class="op">&lt;-</span> <span class="fu">compute_features_modular</span><span class="op">(</span></span>
-<span>          counts <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">train_data</span><span class="op">)</span>,</span>
-<span>          power <span class="op">=</span> <span class="va">power</span>,</span>
-<span>          <span class="co">## tunable parameters</span></span>
-<span>          minModuleSize <span class="op">=</span> <span class="va">params</span><span class="op">$</span><span class="va">minModuleSize</span>,</span>
-<span>          mergeCutHeight <span class="op">=</span> <span class="va">params</span><span class="op">$</span><span class="va">mergeCutHeight</span>,</span>
-<span>          deepSplit <span class="op">=</span> <span class="va">params</span><span class="op">$</span><span class="va">deepSplit</span></span>
-<span>        <span class="op">)</span></span>
-<span>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span>        </span>
-<span>        </span>
-<span>        </span>
-<span>        <span class="va">train_features</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">wgcna_train</span><span class="op">$</span><span class="va">features</span><span class="op">)</span> </span>
-<span>        <span class="va">train_features</span><span class="op">$</span><span class="va">target</span> <span class="op">&lt;-</span> <span class="va">obs_train</span></span>
-<span>        </span>
-<span>        <span class="va">test_data</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span><span class="va">test_idx</span>, , drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span></span>
-<span>        <span class="va">obs_test</span> <span class="op">&lt;-</span> <span class="va">test_data</span><span class="op">$</span><span class="va">target</span></span>
-<span>        <span class="va">test_data</span><span class="op">$</span><span class="va">target</span> <span class="op">&lt;-</span> <span class="cn">NULL</span></span>
-<span>      </span>
-<span>        </span>
-<span>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span>        <span class="va">wgcna_test</span> <span class="op">&lt;-</span> <span class="fu">compute_features_modular</span><span class="op">(</span></span>
-<span>          counts <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">test_data</span><span class="op">)</span>,</span>
-<span>          modules <span class="op">=</span> <span class="va">wgcna_train</span><span class="op">$</span><span class="va">structure</span></span>
-<span>        <span class="op">)</span></span>
-<span>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
-<span>        </span>
-<span>        </span>
-<span>        <span class="va">test_features</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/as.data.frame.html" class="external-link">as.data.frame</a></span><span class="op">(</span><span class="va">wgcna_test</span><span class="op">$</span><span class="va">features</span><span class="op">)</span> </span>
-<span>        </span>
-<span>        <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
-<span>          train_data <span class="op">=</span> <span class="va">train_features</span>,</span>
-<span>          test_data <span class="op">=</span> <span class="va">test_features</span>,</span>
-<span>          obs_test <span class="op">=</span> <span class="va">obs_test</span>,</span>
-<span>          rowIndex <span class="op">=</span> <span class="va">test_idx</span>,</span>
-<span>          fold_name <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">folds</span><span class="op">)</span><span class="op">[</span><span class="va">i</span><span class="op">]</span>,</span>
-<span>          params <span class="op">=</span> <span class="va">params</span></span>
-<span>        <span class="op">)</span></span>
-<span>      <span class="op">}</span><span class="op">)</span></span>
-<span>      </span>
-<span>      <span class="va">filename</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="st">"Results"</span>, <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"fold_"</span>, <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">folds</span><span class="op">)</span><span class="op">[</span><span class="va">i</span><span class="op">]</span>, <span class="st">".rds"</span><span class="op">)</span><span class="op">)</span></span>
-<span>      <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html" class="external-link">saveRDS</a></span><span class="op">(</span><span class="va">fold_results</span>, file <span class="op">=</span> <span class="va">filename</span><span class="op">)</span></span>
-<span>      </span>
-<span>      <span class="va">fold_results</span></span>
-<span>    <span class="op">}</span></span>
-<span>    </span>
-<span>    <span class="fu">parallel</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/parallel/makeCluster.html" class="external-link">stopCluster</a></span><span class="op">(</span><span class="va">cl</span><span class="op">)</span></span>
-<span>    <span class="fu">foreach</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/foreach/man/registerDoSEQ.html" class="external-link">registerDoSEQ</a></span><span class="op">(</span><span class="op">)</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/gc.html" class="external-link">gc</a></span><span class="op">(</span><span class="op">)</span></span>
-<span>    </span>
-<span>  <span class="op">}</span></span>
-<span><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" tabindex="-1"></a>prepare_WGCNA_folds_modular <span class="ot">&lt;-</span> <span class="cf">function</span>(</span>
+<span id="cb37-2"><a href="#cb37-2" tabindex="-1"></a>    data,</span>
+<span id="cb37-3"><a href="#cb37-3" tabindex="-1"></a>    <span class="at">folds =</span> <span class="cn">NULL</span>,</span>
+<span id="cb37-4"><a href="#cb37-4" tabindex="-1"></a>    <span class="at">bestune =</span> <span class="cn">NULL</span>,</span>
+<span id="cb37-5"><a href="#cb37-5" tabindex="-1"></a>    <span class="at">power =</span> <span class="cn">NULL</span>,</span>
+<span id="cb37-6"><a href="#cb37-6" tabindex="-1"></a>    <span class="at">ncores =</span> <span class="cn">NULL</span>,</span>
+<span id="cb37-7"><a href="#cb37-7" tabindex="-1"></a>    <span class="do">### tunable parameters</span></span>
+<span id="cb37-8"><a href="#cb37-8" tabindex="-1"></a>    minModuleSize,</span>
+<span id="cb37-9"><a href="#cb37-9" tabindex="-1"></a>    mergeCutHeight,</span>
+<span id="cb37-10"><a href="#cb37-10" tabindex="-1"></a>    deepSplit</span>
+<span id="cb37-11"><a href="#cb37-11" tabindex="-1"></a>) {</span>
+<span id="cb37-12"><a href="#cb37-12" tabindex="-1"></a>  </span>
+<span id="cb37-13"><a href="#cb37-13" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(bestune)) {</span>
+<span id="cb37-14"><a href="#cb37-14" tabindex="-1"></a>    </span>
+<span id="cb37-15"><a href="#cb37-15" tabindex="-1"></a>    obs_train <span class="ot">&lt;-</span> data<span class="sc">$</span>target</span>
+<span id="cb37-16"><a href="#cb37-16" tabindex="-1"></a>    data<span class="sc">$</span>target <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb37-17"><a href="#cb37-17" tabindex="-1"></a>    </span>
+<span id="cb37-18"><a href="#cb37-18" tabindex="-1"></a>    </span>
+<span id="cb37-19"><a href="#cb37-19" tabindex="-1"></a>    </span>
+<span id="cb37-20"><a href="#cb37-20" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb37-21"><a href="#cb37-21" tabindex="-1"></a>    required_cols <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"minModuleSize"</span>, <span class="st">"mergeCutHeight"</span>, <span class="st">"deepSplit"</span>)</span>
+<span id="cb37-22"><a href="#cb37-22" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb37-23"><a href="#cb37-23" tabindex="-1"></a>    </span>
+<span id="cb37-24"><a href="#cb37-24" tabindex="-1"></a>    </span>
+<span id="cb37-25"><a href="#cb37-25" tabindex="-1"></a>    </span>
+<span id="cb37-26"><a href="#cb37-26" tabindex="-1"></a>    best_params <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="fu">is.data.frame</span>(bestune)) {</span>
+<span id="cb37-27"><a href="#cb37-27" tabindex="-1"></a>      <span class="cf">if</span> (<span class="fu">all</span>(required_cols <span class="sc">%in%</span> <span class="fu">names</span>(bestune))) {</span>
+<span id="cb37-28"><a href="#cb37-28" tabindex="-1"></a>        dplyr<span class="sc">::</span><span class="fu">select</span>(bestune, dplyr<span class="sc">::</span><span class="fu">all_of</span>(required_cols))</span>
+<span id="cb37-29"><a href="#cb37-29" tabindex="-1"></a>      }<span class="cf">else</span>{<span class="fu">stop</span>(<span class="st">"Not all tunable params found. Verify your function."</span>)}</span>
+<span id="cb37-30"><a href="#cb37-30" tabindex="-1"></a>    } <span class="cf">else</span> <span class="cf">if</span> (<span class="fu">is.list</span>(bestune)) {</span>
+<span id="cb37-31"><a href="#cb37-31" tabindex="-1"></a>      <span class="cf">if</span> (<span class="fu">all</span>(required_cols <span class="sc">%in%</span> <span class="fu">names</span>(bestune))) {</span>
+<span id="cb37-32"><a href="#cb37-32" tabindex="-1"></a>        tibble<span class="sc">::</span><span class="fu">as_tibble</span>(bestune[required_cols])</span>
+<span id="cb37-33"><a href="#cb37-33" tabindex="-1"></a>      }<span class="cf">else</span>{<span class="fu">stop</span>(<span class="st">"Not all tunable params found. Verify your function."</span>)}</span>
+<span id="cb37-34"><a href="#cb37-34" tabindex="-1"></a>    } <span class="cf">else</span> {</span>
+<span id="cb37-35"><a href="#cb37-35" tabindex="-1"></a>      <span class="fu">stop</span>(<span class="st">"`bestune` must be a data.frame or list."</span>)</span>
+<span id="cb37-36"><a href="#cb37-36" tabindex="-1"></a>    }</span>
+<span id="cb37-37"><a href="#cb37-37" tabindex="-1"></a>    </span>
+<span id="cb37-38"><a href="#cb37-38" tabindex="-1"></a>    </span>
+<span id="cb37-39"><a href="#cb37-39" tabindex="-1"></a>    </span>
+<span id="cb37-40"><a href="#cb37-40" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb37-41"><a href="#cb37-41" tabindex="-1"></a>    res_final <span class="ot">&lt;-</span> <span class="fu">compute_features_modular</span>(</span>
+<span id="cb37-42"><a href="#cb37-42" tabindex="-1"></a>      <span class="at">counts =</span> <span class="fu">t</span>(data),</span>
+<span id="cb37-43"><a href="#cb37-43" tabindex="-1"></a>      <span class="at">power =</span> power,</span>
+<span id="cb37-44"><a href="#cb37-44" tabindex="-1"></a>      <span class="do">## tunable parameters</span></span>
+<span id="cb37-45"><a href="#cb37-45" tabindex="-1"></a>      <span class="at">minModuleSize =</span> best_params<span class="sc">$</span>minModuleSize,</span>
+<span id="cb37-46"><a href="#cb37-46" tabindex="-1"></a>      <span class="at">mergeCutHeight =</span> best_params<span class="sc">$</span>mergeCutHeight,</span>
+<span id="cb37-47"><a href="#cb37-47" tabindex="-1"></a>      <span class="at">deepSplit =</span> best_params<span class="sc">$</span>deepSplit</span>
+<span id="cb37-48"><a href="#cb37-48" tabindex="-1"></a>    )</span>
+<span id="cb37-49"><a href="#cb37-49" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb37-50"><a href="#cb37-50" tabindex="-1"></a>    </span>
+<span id="cb37-51"><a href="#cb37-51" tabindex="-1"></a>    </span>
+<span id="cb37-52"><a href="#cb37-52" tabindex="-1"></a>    </span>
+<span id="cb37-53"><a href="#cb37-53" tabindex="-1"></a>    train_cell_data_final <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(res_final<span class="sc">$</span>features)</span>
+<span id="cb37-54"><a href="#cb37-54" tabindex="-1"></a>    train_cell_data_final<span class="sc">$</span>target <span class="ot">&lt;-</span> obs_train</span>
+<span id="cb37-55"><a href="#cb37-55" tabindex="-1"></a>    </span>
+<span id="cb37-56"><a href="#cb37-56" tabindex="-1"></a>    custom_output <span class="ot">&lt;-</span> res_final</span>
+<span id="cb37-57"><a href="#cb37-57" tabindex="-1"></a>    </span>
+<span id="cb37-58"><a href="#cb37-58" tabindex="-1"></a>    <span class="fu">return</span>(<span class="fu">list</span>(train_cell_data_final, custom_output, best_params))</span>
+<span id="cb37-59"><a href="#cb37-59" tabindex="-1"></a>    </span>
+<span id="cb37-60"><a href="#cb37-60" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb37-61"><a href="#cb37-61" tabindex="-1"></a>    </span>
+<span id="cb37-62"><a href="#cb37-62" tabindex="-1"></a>    </span>
+<span id="cb37-63"><a href="#cb37-63" tabindex="-1"></a>    </span>
+<span id="cb37-64"><a href="#cb37-64" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb37-65"><a href="#cb37-65" tabindex="-1"></a>    custom_grid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
+<span id="cb37-66"><a href="#cb37-66" tabindex="-1"></a>      <span class="at">minModuleSize =</span> minModuleSize,</span>
+<span id="cb37-67"><a href="#cb37-67" tabindex="-1"></a>      <span class="at">mergeCutHeight =</span> mergeCutHeight,</span>
+<span id="cb37-68"><a href="#cb37-68" tabindex="-1"></a>      <span class="at">deepSplit =</span> deepSplit,</span>
+<span id="cb37-69"><a href="#cb37-69" tabindex="-1"></a>      <span class="at">stringsAsFactors =</span> <span class="cn">FALSE</span></span>
+<span id="cb37-70"><a href="#cb37-70" tabindex="-1"></a>    )</span>
+<span id="cb37-71"><a href="#cb37-71" tabindex="-1"></a>    <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb37-72"><a href="#cb37-72" tabindex="-1"></a>    </span>
+<span id="cb37-73"><a href="#cb37-73" tabindex="-1"></a>    </span>
+<span id="cb37-74"><a href="#cb37-74" tabindex="-1"></a>    </span>
+<span id="cb37-75"><a href="#cb37-75" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.null</span>(ncores)) ncores <span class="ot">&lt;-</span> parallel<span class="sc">::</span><span class="fu">detectCores</span>() <span class="sc">-</span> <span class="dv">2</span></span>
+<span id="cb37-76"><a href="#cb37-76" tabindex="-1"></a>    cl <span class="ot">&lt;-</span> parallel<span class="sc">::</span><span class="fu">makeCluster</span>(ncores)</span>
+<span id="cb37-77"><a href="#cb37-77" tabindex="-1"></a>    doParallel<span class="sc">::</span><span class="fu">registerDoParallel</span>(cl)</span>
+<span id="cb37-78"><a href="#cb37-78" tabindex="-1"></a>    </span>
+<span id="cb37-79"><a href="#cb37-79" tabindex="-1"></a>    processed_folds <span class="ot">&lt;-</span> foreach<span class="sc">::</span><span class="fu">foreach</span>(<span class="at">i =</span> <span class="fu">seq_along</span>(folds), </span>
+<span id="cb37-80"><a href="#cb37-80" tabindex="-1"></a>                                        <span class="at">.packages =</span> <span class="fu">c</span>(<span class="st">"dplyr"</span>),</span>
+<span id="cb37-81"><a href="#cb37-81" tabindex="-1"></a>                                        <span class="at">.export =</span> <span class="fu">c</span>(<span class="st">"compute_features_modular"</span>)) </span>
+<span id="cb37-82"><a href="#cb37-82" tabindex="-1"></a>    <span class="sc">%dopar%</span> {</span>
+<span id="cb37-83"><a href="#cb37-83" tabindex="-1"></a>      </span>
+<span id="cb37-84"><a href="#cb37-84" tabindex="-1"></a>      train_idx <span class="ot">&lt;-</span> folds[[i]]</span>
+<span id="cb37-85"><a href="#cb37-85" tabindex="-1"></a>      test_idx <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(<span class="fu">seq_len</span>(<span class="fu">nrow</span>(data)), train_idx)</span>
+<span id="cb37-86"><a href="#cb37-86" tabindex="-1"></a>      </span>
+<span id="cb37-87"><a href="#cb37-87" tabindex="-1"></a>      train_data <span class="ot">&lt;-</span> data[train_idx, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb37-88"><a href="#cb37-88" tabindex="-1"></a>      obs_train <span class="ot">&lt;-</span> train_data<span class="sc">$</span>target</span>
+<span id="cb37-89"><a href="#cb37-89" tabindex="-1"></a>      train_data<span class="sc">$</span>target <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb37-90"><a href="#cb37-90" tabindex="-1"></a>      </span>
+<span id="cb37-91"><a href="#cb37-91" tabindex="-1"></a>      fold_results <span class="ot">&lt;-</span> <span class="fu">lapply</span>(<span class="fu">seq_len</span>(<span class="fu">nrow</span>(custom_grid)), <span class="cf">function</span>(j) {</span>
+<span id="cb37-92"><a href="#cb37-92" tabindex="-1"></a></span>
+<span id="cb37-93"><a href="#cb37-93" tabindex="-1"></a>        params <span class="ot">&lt;-</span> custom_grid[j, ]</span>
+<span id="cb37-94"><a href="#cb37-94" tabindex="-1"></a>        </span>
+<span id="cb37-95"><a href="#cb37-95" tabindex="-1"></a>        </span>
+<span id="cb37-96"><a href="#cb37-96" tabindex="-1"></a>        </span>
+<span id="cb37-97"><a href="#cb37-97" tabindex="-1"></a>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb37-98"><a href="#cb37-98" tabindex="-1"></a>        wgcna_train <span class="ot">&lt;-</span> <span class="fu">compute_features_modular</span>(</span>
+<span id="cb37-99"><a href="#cb37-99" tabindex="-1"></a>          <span class="at">counts =</span> <span class="fu">t</span>(train_data),</span>
+<span id="cb37-100"><a href="#cb37-100" tabindex="-1"></a>          <span class="at">power =</span> power,</span>
+<span id="cb37-101"><a href="#cb37-101" tabindex="-1"></a>          <span class="do">## tunable parameters</span></span>
+<span id="cb37-102"><a href="#cb37-102" tabindex="-1"></a>          <span class="at">minModuleSize =</span> params<span class="sc">$</span>minModuleSize,</span>
+<span id="cb37-103"><a href="#cb37-103" tabindex="-1"></a>          <span class="at">mergeCutHeight =</span> params<span class="sc">$</span>mergeCutHeight,</span>
+<span id="cb37-104"><a href="#cb37-104" tabindex="-1"></a>          <span class="at">deepSplit =</span> params<span class="sc">$</span>deepSplit</span>
+<span id="cb37-105"><a href="#cb37-105" tabindex="-1"></a>        )</span>
+<span id="cb37-106"><a href="#cb37-106" tabindex="-1"></a>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb37-107"><a href="#cb37-107" tabindex="-1"></a>        </span>
+<span id="cb37-108"><a href="#cb37-108" tabindex="-1"></a>        </span>
+<span id="cb37-109"><a href="#cb37-109" tabindex="-1"></a>        </span>
+<span id="cb37-110"><a href="#cb37-110" tabindex="-1"></a>        train_features <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(wgcna_train<span class="sc">$</span>features) </span>
+<span id="cb37-111"><a href="#cb37-111" tabindex="-1"></a>        train_features<span class="sc">$</span>target <span class="ot">&lt;-</span> obs_train</span>
+<span id="cb37-112"><a href="#cb37-112" tabindex="-1"></a>        </span>
+<span id="cb37-113"><a href="#cb37-113" tabindex="-1"></a>        test_data <span class="ot">&lt;-</span> data[test_idx, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb37-114"><a href="#cb37-114" tabindex="-1"></a>        obs_test <span class="ot">&lt;-</span> test_data<span class="sc">$</span>target</span>
+<span id="cb37-115"><a href="#cb37-115" tabindex="-1"></a>        test_data<span class="sc">$</span>target <span class="ot">&lt;-</span> <span class="cn">NULL</span></span>
+<span id="cb37-116"><a href="#cb37-116" tabindex="-1"></a>      </span>
+<span id="cb37-117"><a href="#cb37-117" tabindex="-1"></a>        </span>
+<span id="cb37-118"><a href="#cb37-118" tabindex="-1"></a>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb37-119"><a href="#cb37-119" tabindex="-1"></a>        wgcna_test <span class="ot">&lt;-</span> <span class="fu">compute_features_modular</span>(</span>
+<span id="cb37-120"><a href="#cb37-120" tabindex="-1"></a>          <span class="at">counts =</span> <span class="fu">t</span>(test_data),</span>
+<span id="cb37-121"><a href="#cb37-121" tabindex="-1"></a>          <span class="at">modules =</span> wgcna_train<span class="sc">$</span>structure</span>
+<span id="cb37-122"><a href="#cb37-122" tabindex="-1"></a>        )</span>
+<span id="cb37-123"><a href="#cb37-123" tabindex="-1"></a>        <span class="co"># -------------------- REPLACE THIS BLOCK --------------------</span></span>
+<span id="cb37-124"><a href="#cb37-124" tabindex="-1"></a>        </span>
+<span id="cb37-125"><a href="#cb37-125" tabindex="-1"></a>        </span>
+<span id="cb37-126"><a href="#cb37-126" tabindex="-1"></a>        test_features <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(wgcna_test<span class="sc">$</span>features) </span>
+<span id="cb37-127"><a href="#cb37-127" tabindex="-1"></a>        </span>
+<span id="cb37-128"><a href="#cb37-128" tabindex="-1"></a>        <span class="fu">list</span>(</span>
+<span id="cb37-129"><a href="#cb37-129" tabindex="-1"></a>          <span class="at">train_data =</span> train_features,</span>
+<span id="cb37-130"><a href="#cb37-130" tabindex="-1"></a>          <span class="at">test_data =</span> test_features,</span>
+<span id="cb37-131"><a href="#cb37-131" tabindex="-1"></a>          <span class="at">obs_test =</span> obs_test,</span>
+<span id="cb37-132"><a href="#cb37-132" tabindex="-1"></a>          <span class="at">rowIndex =</span> test_idx,</span>
+<span id="cb37-133"><a href="#cb37-133" tabindex="-1"></a>          <span class="at">fold_name =</span> <span class="fu">names</span>(folds)[i],</span>
+<span id="cb37-134"><a href="#cb37-134" tabindex="-1"></a>          <span class="at">params =</span> params</span>
+<span id="cb37-135"><a href="#cb37-135" tabindex="-1"></a>        )</span>
+<span id="cb37-136"><a href="#cb37-136" tabindex="-1"></a>      })</span>
+<span id="cb37-137"><a href="#cb37-137" tabindex="-1"></a>      </span>
+<span id="cb37-138"><a href="#cb37-138" tabindex="-1"></a>      filename <span class="ot">&lt;-</span> <span class="fu">file.path</span>(<span class="st">"Results"</span>, <span class="fu">paste0</span>(<span class="st">"fold_"</span>, <span class="fu">names</span>(folds)[i], <span class="st">".rds"</span>))</span>
+<span id="cb37-139"><a href="#cb37-139" tabindex="-1"></a>      <span class="fu">saveRDS</span>(fold_results, <span class="at">file =</span> filename)</span>
+<span id="cb37-140"><a href="#cb37-140" tabindex="-1"></a>      </span>
+<span id="cb37-141"><a href="#cb37-141" tabindex="-1"></a>      fold_results</span>
+<span id="cb37-142"><a href="#cb37-142" tabindex="-1"></a>    }</span>
+<span id="cb37-143"><a href="#cb37-143" tabindex="-1"></a>    </span>
+<span id="cb37-144"><a href="#cb37-144" tabindex="-1"></a>    parallel<span class="sc">::</span><span class="fu">stopCluster</span>(cl)</span>
+<span id="cb37-145"><a href="#cb37-145" tabindex="-1"></a>    foreach<span class="sc">::</span><span class="fu">registerDoSEQ</span>()</span>
+<span id="cb37-146"><a href="#cb37-146" tabindex="-1"></a>    <span class="fu">gc</span>()</span>
+<span id="cb37-147"><a href="#cb37-147" tabindex="-1"></a>    </span>
+<span id="cb37-148"><a href="#cb37-148" tabindex="-1"></a>  }</span>
+<span id="cb37-149"><a href="#cb37-149" tabindex="-1"></a>}</span></code></pre></div>
 <p>To enable this functionality, the user must specify the argument
 <code>fold_construction_args_tunable</code>, which contains the set of
 parameter values to be evaluated</p>
@@ -1384,7 +1389,7 @@ configurations</strong> for each feature combination.</p>
 <p><strong>27 (feature configurations) × 200 (model hyperparameter
 combinations) = 5400</strong> model fits, which are further multiplied
 by the number of folds and repetitions used in cross-validation.</p>
-<div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb38"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_params</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">counts_train</span><span class="op">)</span>, </span>
 <span>                                           target_var     <span class="op">=</span> <span class="va">coldata_train</span><span class="op">$</span><span class="va">Response</span>,</span>
 <span>                                           task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
@@ -1394,7 +1399,8 @@ by the number of folds and repetitions used in cross-validation.</p>
 <span>                                           n_rep <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>                                           return <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>                                           fold_construction_fun <span class="op">=</span> <span class="va">prepare_WGCNA_folds_modular</span>,</span>
-<span>                                           fold_construction_args_fixed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>power<span class="op">=</span><span class="fl">6</span>, ncores <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span>
+<span>                                           fold_construction_args_fixed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>power<span class="op">=</span><span class="fl">6</span>, </span>
+<span>                                                                               ncores <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>,</span>
 <span>                                           fold_construction_args_tunable <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>                                             minModuleSize <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">20</span><span class="op">)</span>,       </span>
 <span>                                             mergeCutHeight <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.35</span><span class="op">)</span>,</span>
@@ -1404,28 +1410,30 @@ by the number of folds and repetitions used in cross-validation.</p>
 combination of parameters which maximize the metric chosen.</p>
 <p>If you want to see the different AUROCs lead by the different
 combination, you can retrieve them by:</p>
-<div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">res_params</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">results</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
-<h3 id="step-4-prediction-on-test-data">
-<strong>Step 4 – Prediction on test data</strong><a class="anchor" aria-label="anchor" href="#step-4-prediction-on-test-data"></a>
+<h3 id="step-5-prediction-on-test-data">
+<strong>Step 5 – Prediction on test data</strong><a class="anchor" aria-label="anchor" href="#step-5-prediction-on-test-data"></a>
 </h3>
 <p>To apply the model to new data, compute the same type of features
 using the learned modules from the training set.</p>
-<div class="sourceCode" id="cb42"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb40"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">test</span> <span class="op">=</span> <span class="fu">compute_features_modular</span><span class="op">(</span><span class="va">counts_test</span>, modules <span class="op">=</span> <span class="va">res_custom</span><span class="op">$</span><span class="va">Custom_output</span><span class="op">$</span><span class="va">structure</span><span class="op">)</span></span>
 <span><span class="va">test_features</span> <span class="op">=</span> <span class="va">test</span><span class="op">$</span><span class="va">features</span></span></code></pre></div>
 <p>Prediction</p>
-<div class="sourceCode" id="cb43"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb41"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pred</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_prediction.html">compute_prediction</a></span><span class="op">(</span>model <span class="op">=</span> <span class="va">res_custom</span><span class="op">$</span><span class="va">Model</span>,</span>
 <span>                           test_data <span class="op">=</span> <span class="va">test_features</span>,</span>
 <span>                           target_var <span class="op">=</span> <span class="va">coldata_test</span><span class="op">$</span><span class="va">Response</span>,</span>
 <span>                           trait.positive <span class="op">=</span> <span class="st">"R"</span>,</span>
 <span>                           file.name <span class="op">=</span> <span class="st">"Custom_fold"</span>,</span>
 <span>                           return <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<p>Why do we need <code>bestune</code> argument even if I don’t have
-hyperparams in my function?</p>
+<div class="section level4">
+<h4 id="why-do-we-need-bestune-argument-even-if-i-dont-have-hyperparams-in-my-function">Why do we need <code>bestune</code> argument even if I don’t have
+hyperparams in my function?<a class="anchor" aria-label="anchor" href="#why-do-we-need-bestune-argument-even-if-i-dont-have-hyperparams-in-my-function"></a>
+</h4>
 <p>For this to work, your custom function must accept a
 <code>bestune</code> argument, which is used internally to inject the
 optimized parameter values found during the tuning step.</p>
@@ -1463,6 +1471,7 @@ existing frameworks and makes extensive use of the R packages
 <code>parsnip</code> and <code>censored</code>. If you use
 <code>pipeML</code> in your work, please cite our package along with
 these foundational packages.</p>
+</div>
 </div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

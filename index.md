@@ -1,7 +1,8 @@
 # pipeML
 
-A robust R machine learning pipeline for classification tasks and
-survival analysis
+A flexible and modular machine learning framework designed to support
+leakage-free model training through custom cross-validation fold
+construction
 
 ## Installation
 
@@ -38,27 +39,29 @@ machine learning applications.
 
 ## Key Features
 
-End-to-end ML workflow \* Integrated pipeline for feature selection,
-model training, validation, prediction, and interpretation
+### End-to-end ML workflow
 
-Leakage-aware validation
+- Integrated pipeline for feature selection, model training, validation,
+  prediction, and interpretation
+
+### Leakage-aware validation
 
 - Custom cross-validation fold construction
 - Support for fold-aware feature recomputation
 - Prevents information leakage when using dataset-dependent features
 
-Flexible model evaluation
+### Flexible model evaluation
 
 - Repeated and stratified k-fold cross-validation
 - Leave-one-dataset-out (LODO) evaluation for cross-cohort
   generalization
 
-Feature selection
+### Feature selection
 
 - Boruta-based feature selection
 - Optional correlation-based feature filtering
 
-Hyperparameter tuning
+### Hyperparameter tuning
 
 - Automatic optimization based on:
 
@@ -66,30 +69,33 @@ Hyperparameter tuning
   - AUPRC
   - Accuracy
 
-Model interpretation
+### Model interpretation
 
 - SHAP-based feature importance
 - Variable importance summaries
 - Performance visualization (ROC and PR curves)
 
-Ensemble learning
+### Ensemble learning
 
 - Model stacking
 
-Parallel computing
+### Parallel computing
 
 - Multi-core support for faster model training and cross-validation
 
-Custom workflows
+### Custom workflows
 
 - Users can define custom fold construction functions
 - These functions can receive a bestTune argument after hyperparameter
   optimization to retrain models on the full training dataset.
 
-Supported Machine Learning Methods
+## Supported Machine Learning Methods
 
-The current implementation supports multiple classification algorithms,
-including:
+### Classification algorithms:
+
+For classification tasks, we implemented a diverse set of classification
+algorithms that are benchmarked on the fly making extensive use of the R
+package `caret`.
 
 - Bagged classification trees
 - Random forests
@@ -102,32 +108,12 @@ including:
 - Support vector machines with linear and radial kernels
 - Extreme Gradient Boosting (XGBoost)
 
-Machine Learning Pipeline for Survival Tasks
+### Survival algorithms:
 
-For time-to-event outcomes, pipeML implements a unified survival
-modeling framework based on the parsnip and workflows ecosystems,
+For time-to-event outcomes, `pipeML` implements a unified survival
+modeling framework based on the `parsnip` and `workflows` ecosystems,
 enabling consistent training, hyperparameter tuning, and evaluation
 across multiple survival model families.
-
-Models are specified using a censored regression formulation and fitted
-using algorithm-specific computational engines. When applicable, model
-hyperparameters (e.g., regularization strength, mixing parameters, or
-number of trees) are optimized using grid search within the training
-data.
-
-All models are trained using cross-validation strategies consistent with
-the main pipeline, ensuring that feature construction and hyperparameter
-tuning are restricted to the training folds, preventing information
-leakage.
-
-Model performance is evaluated on held-out data using the Concordance
-Index (C-index), which measures the model’s ability to correctly rank
-survival times in the presence of right-censored observations.
-
-Supported survival models
-
-The current implementation supports multiple survival algorithms,
-including:
 
 - Cox proportional hazards model
 - Elastic net–regularized Cox regression
@@ -139,7 +125,7 @@ including:
 
 ## General usage
 
-Below are basic examples showing how to use pipeML.
+Below are basic examples showing how to use `pipeML`
 
 For a detailed tutorial, see [Get
 started](https://VeraPancaldiLab.github.io/pipeML/articles/pipeML.html)
@@ -148,11 +134,7 @@ started](https://VeraPancaldiLab.github.io/pipeML/articles/pipeML.html)
 library(pipeML)
 ```
 
-Training models
-
-[`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
-trains machine learning models using repeated and stratified k-fold
-cross-validation across all classification or survival models.
+### Training models
 
 ``` r
 res_ml = compute_features.training.ML(features_train, clinical$Response, "CR", 
@@ -160,21 +142,7 @@ res_ml = compute_features.training.ML(features_train, clinical$Response, "CR",
                                       n_rep = 10, file_name = "Test", ncores = 2, return = T)
 ```
 
-Predicting on new data
-
-Predictions on a new dataset can be generated using
-[`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md).
-
-The optimal classification threshold can be determined using different
-metrics. It outputs threshold-based metrics like:
-
-- Accuracy
-- Precision
-- Recall
-- Specificity
-- Sensitivity
-- F1
-- MCC
+### Predicting on new data
 
 ``` r
 pred = compute_prediction(res_ml, features_test, traitData_test$Response, 
@@ -182,13 +150,7 @@ pred = compute_prediction(res_ml, features_test, traitData_test$Response,
                           maximize = "Accuracy", return = T)
 ```
 
-Training and Testing Workflow
-
-[`compute_features.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.ML.md):
-This function is intended for training on a dataset and evaluating on a
-separate test dataset when is available. It automatically computes the
-prediction using the trained model in the testing set provided. It
-includes both previous functions.
+### Training and Testing Workflow
 
 ``` r
 res = compute_features.ML(tme_features_train[[i]], tme_features_test[[i]], 
