@@ -28,14 +28,14 @@ This tutorial demonstrates how to use the `pipeML` package for training and test
 # **Classification tasks**
 
 Load example data 
-```{r, eval = FALSE}
+```{r}
 data = pipeML::data_example_classification
 X <- data %>% dplyr::select(-target)
 y <- data$target
 ```
 
 For example purposes we make a Train/Test split
-```{r, eval = FALSE}
+```{r}
 set.seed(123)
 
 train_idx <- caret::createDataPartition(y, p = 0.8, list = FALSE)
@@ -50,7 +50,7 @@ y_test  <- y[-train_idx]
 ## **Train machine learning models for classification tasks**
 
 Train and tune models using repeated stratified k-fold cross-validation:
-```{r, eval = FALSE}
+```{r}
 res <- compute_features.training.ML(features_train = X_train, 
                                     target_var = y_train,
                                     task_type = "classification",
@@ -63,12 +63,12 @@ res <- compute_features.training.ML(features_train = X_train,
 ```
 
 Access the best-trained model:
-```{r, eval = FALSE}
+```{r}
 res$Model
 ```
 
 View all trained and tuned machine learning models:
-```{r, eval = FALSE}
+```{r}
 names(res$ML_Models)
 ```
 
@@ -79,23 +79,22 @@ knitr::include_graphics("figures/AUROC_classification.png")
 ## **Model prediction**
 
 After training, users can predict on new data by using the `compute_prediction()` function. You can specify which metric to maximize when determining the optimal classification threshold. Supported values for maximize include: "Accuracy", "Precision", "Recall", "Specificity", "Sensitivity", "F1", and "MCC".
-```{r, eval = FALSE}
+```{r}
 pred = compute_prediction(model = res$Model, 
                           test_data = X_test, 
                           target_var = y_test, 
                           task_type = "classification",
                           trait.positive = "1", 
-                          file.name = "Example_classification", 
-                          return = T)
+                          file.name = "Example_classification")
 ```
 
 Check predicitions
-```{r, eval = FALSE}
+```{r}
 head(pred$Predictions)
 ```
 
 Verify threshold-based predictions metrics
-```{r, eval = FALSE}
+```{r}
 head(pred$Metrics)
 ```
 
@@ -180,7 +179,7 @@ In survival analysis, the response variable is defined by two components:
 `pipeML` automates the training, evaluation, and interpretation of survival models using cross-validation and SHAP-based explanations.
 
 Load example dataset for survival
-```{r, eval = FALSE}
+```{r}
 data = pipeML::data_example_survival
 X <- data %>% dplyr::select(-time, -status)
 time <- data$time
@@ -188,7 +187,7 @@ event <- data$status
 ```
 
 Similar to the previous example, we will split our data in Train/Test
-```{r, eval = FALSE}
+```{r}
 set.seed(123)
 train_idx <- caret::createDataPartition(event, p = 0.7, list = FALSE)
 
@@ -205,7 +204,7 @@ event_test  <- event[-train_idx]
 ## **Train machine learning models for survival tasks**
 
 The function ` compute_features.training.ML()` can also train survival models by setting `task_type = "survival"`.
-```{r, eval = FALSE}
+```{r}
 res_survival <- compute_features.training.ML(
   features_train = X_train, 
   task_type = "survival",
@@ -214,20 +213,19 @@ res_survival <- compute_features.training.ML(
   k_folds = 2,
   n_rep = 1,
   file_name = "Example_survival",
-  ncores = 1,
-  return = TRUE
+  ncores = 1
 )
 
 ```
 
 Access to the best model 
-```{r, eval = FALSE}
+```{r}
 names(res_survival$ML_Models)
 res_survival$Model$Model_object
 ```
 
 Check training metrics
-```{r, eval = FALSE}
+```{r}
 head(res_survival$Model$Prediction_folds)
 ```
 
@@ -238,16 +236,14 @@ knitr::include_graphics("figures/cindex_survival.png")
 ## **Model prediction**
 
 After training, predictions can be generated using `compute_prediction()`.
-```{r, eval = FALSE}
+```{r}
 pred <- compute_prediction(
   model = res_survival$Model,
   test_data = X_test,
   task_type = "survival",
   time_var = time_test,
   event_var = event_test,
-  file.name = "Example_survival",
-  return = TRUE
-)
+  file.name = "Example_survival")
 ```
 
 Unlike classification models, survival models may return different types of predictions depending on the model used. Some models predict a risk score, while others predict expected survival time or survival probability.
@@ -360,7 +356,7 @@ If your data includes features from multiple cohorts, `pipeML` provides a flexib
 Below, we demonstrate how to perform a LODO analysis using simulated datasets:
 
 Simulate datasets from different batches ('cohorts')
-```{r, eval = FALSE}
+```{r}
 set.seed(123)
 
 # Simulate traitData with 3 cohorts
@@ -384,7 +380,7 @@ colnames(features_all) <- paste0("Feature", 1:15)
 ```
 
 Perform LODO analysis using base function `compute_features.training.ML`
-```{r, eval = FALSE}
+```{r}
 prediction = list()
 i = 1
 for (cohort in unique(traitData$Cohort)) {
@@ -434,7 +430,7 @@ for (cohort in unique(traitData$Cohort)) {
 For plotting we will make use of our `get_curves` function adapted in a case for multiple cohorts. This function is implemented inside `compute_prediction` to make the RO and PR curves.
 
 Extract prediction metrics and join
-```{r, eval = FALSE}
+```{r}
 roc_data <- lapply(names(prediction), function(cohort) {
   df <- prediction[[cohort]]$Metrics
   df$cohort <- cohort
@@ -554,7 +550,7 @@ compute_features_modular <- function(data, structure = NULL, ...) {
 ```
 
 Here we illustrate a correlation-based feature computation using **Weighted Gene Co-expression Network Analysis (WGCNA)**. This is just an example: in practice, you can use any feature computation that depends on multiple samples, such as clustering, PCA, among others.
-```{r, eval = FALSE}
+```{r}
 compute_features_modular <- function(counts, power = NULL, modules = NULL) {
 
   ## Just preprocessing (IGNORE)
@@ -693,7 +689,7 @@ prepare_custom_folds <- function(data, folds = NULL, bestune = NULL, ...) {
 Here we illustrate how the function will look applying our `compute_features_modular()` function
 
 Notice that each time I call the function `compute_features_modular()` I am setting my additional argument `power`
-```{r, eval = FALSE}
+```{r}
 prepare_WGCNA_folds <- function(data, folds = NULL, bestune = NULL, power) {
   
   if (!is.null(bestune)) {
@@ -769,7 +765,7 @@ prepare_WGCNA_folds <- function(data, folds = NULL, bestune = NULL, power) {
 ```
 
 Load data example 
-```{r, eval = FALSE}
+```{r}
 counts = pipeML::counts_example
 coldata = pipeML::coldata_example
 
@@ -790,7 +786,7 @@ Once your custom fold function is ready, pass it to `compute_features.training.M
 
 Note the argument  `fold_construction_args_fixed` corresponds to the additional parameters passed in `prepare_custom_folds()` function (in this example `prepare_WGCNA_folds()`). They should be set with the value to use when running your function. If your function does not have any parameters, you can ignore this argument and it will be set up to `NULL`.
 
-```{r, eval = FALSE}
+```{r}
 res_custom   = compute_features.training.ML(features_train = t(counts_train),
                                             target_var     = coldata_train$Response,
                                             task_type      = "classification",
@@ -804,7 +800,7 @@ res_custom   = compute_features.training.ML(features_train = t(counts_train),
 ```
 
 Notice that `res_custom$Custom_output` contains the output features of your base function in case these are needed (e.g. for prediction - see next section)
-```{r, eval= FALSE}
+```{r}
 str(res_custom$Custom_output)
 head(res_custom$Custom_output$features)
 head(res_custom$Custom_output$structure)
@@ -826,7 +822,7 @@ Briefly, the user provides a grid of candidate parameter values, and `pipeML` wi
 Before that, user needs to modify `compute_features_modular` and `prepare_custom_folds()` to account for all these parameters. 
 
 For the `compute_features_modular` we are only going to add the tunable parameters in our function call
-```{r, eval = FALSE}
+```{r}
 compute_features_modular <- function(
     counts, 
     power = NULL,                  
@@ -1025,7 +1021,7 @@ prepare_custom_folds_tuning <- function(data,
 ```
 
 In our case it would be:
-```{r, eval = FALSE}
+```{r}
 prepare_WGCNA_folds_modular <- function(
     data,
     folds = NULL,
@@ -1195,7 +1191,7 @@ Therefore, the total number of evaluated models becomes:
 
 **27 (feature configurations) × 200 (model hyperparameter combinations) = 5400** model fits, which are further multiplied by the number of folds and repetitions used in cross-validation.
 
-```{r, eval = FALSE}
+```{r, eval=FALSE}
 res_params <- compute_features.training.ML(features_train = t(counts_train), 
                                            target_var     = coldata_train$Response,
                                            task_type = "classification",
@@ -1208,35 +1204,29 @@ res_params <- compute_features.training.ML(features_train = t(counts_train),
                                            fold_construction_args_fixed = list(power=6, 
                                                                                ncores = 2),
                                            fold_construction_args_tunable = list(
-                                             minModuleSize = c(20),       
-                                             mergeCutHeight = c(0.35),
-                                             deepSplit = c(1, 2)           
+                                             minModuleSize = c(20, 50, 100),       
+                                             mergeCutHeight = c(0.15, 0.25, 0.35),
+                                             deepSplit = c(1, 2, 3)           
                                            ))
 ```
 
 `pipeML` will automatically train the model with the combination of parameters which maximize the metric chosen.
 
-If you want to see the different AUROCs lead by the different combination, you can retrieve them by:
-```{r, eval = FALSE}
-head(res_params$Model$results)
-```
-
 ## **Step 5 – Prediction on test data**
 
 To apply the model to new data, compute the same type of features using the learned modules from the training set.
-```{r, eval = FALSE}
+```{r}
 test = compute_features_modular(counts_test, modules = res_custom$Custom_output$structure)
 test_features = test$features
 ```
 
 Prediction
-```{r, eval = FALSE}
+```{r}
 pred <- compute_prediction(model = res_custom$Model,
                            test_data = test_features,
                            target_var = coldata_test$Response,
                            trait.positive = "R",
-                           file.name = "Custom_fold",
-                           return = TRUE)
+                           file.name = "Custom_fold")
 ```
 
 ### Why do we need `bestune` argument even if I don't have hyperparams in my function?
