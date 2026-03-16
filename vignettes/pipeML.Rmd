@@ -273,7 +273,7 @@ knitr::include_graphics("figures/KM.png")
 
 ## **Compute SHAP Values**
 
-We will used the same function `compute_shap_values` computed before but this time with the `task_type = "survival"`.
+We will use the same function `compute_shap_values` computed before but this time with the `task_type = "survival"`.
 ```{r, eval = FALSE}
 shap_survival <- compute_shap_values(
   model_trained = res_survival$Model,
