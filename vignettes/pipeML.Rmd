@@ -947,8 +947,8 @@ prepare_custom_folds_tuning <- function(data,
     
     processed_folds <- foreach::foreach(i = seq_along(folds), 
                                         .packages = c("dplyr"),
-                                        .export = c("compute_features_modular")) 
-    %dopar% {  
+                                        .export = c("compute_features_modular")
+                                       ) %dopar% {  
                                           
       train_idx <- folds[[i]]
       test_idx  <- setdiff(seq_len(nrow(data)), train_idx)
@@ -1102,8 +1102,8 @@ prepare_WGCNA_folds_modular <- function(
     
     processed_folds <- foreach::foreach(i = seq_along(folds), 
                                         .packages = c("dplyr"),
-                                        .export = c("compute_features_modular")) 
-    %dopar% {
+                                        .export = c("compute_features_modular")
+                                        ) %dopar% {
       
       train_idx <- folds[[i]]
       test_idx <- setdiff(seq_len(nrow(data)), train_idx)
