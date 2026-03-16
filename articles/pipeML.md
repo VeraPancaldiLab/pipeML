@@ -328,7 +328,7 @@ Figure 5. KM plot.
 
 ### **Compute SHAP Values**
 
-We will used the same function `compute_shap_values` computed before but
+We will use the same function `compute_shap_values` computed before but
 this time with the `task_type = "survival"`.
 
 ``` r
