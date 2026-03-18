@@ -551,6 +551,7 @@ compute_features_modular <- function(data, structure = NULL, ...) {
 
 Here we illustrate a correlation-based feature computation using **Weighted Gene Co-expression Network Analysis (WGCNA)**. This is just an example: in practice, you can use any feature computation that depends on multiple samples, such as clustering, PCA, among others.
 ```{r}
+library(WGCNA)
 compute_features_modular <- function(counts, power = NULL, modules = NULL) {
 
   ## Just preprocessing (IGNORE)
@@ -771,7 +772,7 @@ coldata = pipeML::coldata_example
 
 set.seed(123)
 
-train_idx <- caret::createDataPartition(coldata$Response, p = 0.7, list = FALSE)
+train_idx <- caret::createDataPartition(coldata$Response, p = 0.6, list = FALSE)
 
 counts_train <- counts[, train_idx]
 counts_test  <- counts[, -train_idx]
@@ -822,7 +823,7 @@ Briefly, the user provides a grid of candidate parameter values, and `pipeML` wi
 Before that, user needs to modify `compute_features_modular` and `prepare_custom_folds()` to account for all these parameters. 
 
 For the `compute_features_modular` we are only going to add the tunable parameters in our function call
-```{r}
+```{r, eval = FALSE}
 compute_features_modular <- function(
     counts, 
     power = NULL,                  
@@ -1021,7 +1022,7 @@ prepare_custom_folds_tuning <- function(data,
 ```
 
 In our case it would be:
-```{r}
+```{r, eval = FALSE}
 prepare_WGCNA_folds_modular <- function(
     data,
     folds = NULL,
@@ -1221,7 +1222,7 @@ test_features = test$features
 ```
 
 Prediction
-```{r}
+```{r, eval = F}
 pred <- compute_prediction(model = res_custom$Model,
                            test_data = test_features,
                            target_var = coldata_test$Response,

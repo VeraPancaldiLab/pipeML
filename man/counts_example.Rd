@@ -8,14 +8,13 @@
 A numeric matrix with genes as rows and samples as columns.
 }
 \source{
-Hugo W., Zaretsky J.M., Sun L., Song C., Moreno B.H., Hu-Lieskovan S., Berent-Maoz B., Pang J., Chmielowski B., Cherry G., et al.
-Genomic and Transcriptomic Features of Response to Anti-PD-1 Therapy in Metastatic Melanoma. Cell. 2016;165:35–44. doi: 10.1016/j.cell.2016.02.065
+Gide T.N., Quek C., Menzies A.M., Tasker A.T., Shang P., Holst J., Madore J., Lim S.Y., Velickovic R., Wongchenko M., et al. Distinct Immune Cell Populations Define Response to Anti-PD-1 Monotherapy and Anti-PD-1/Anti-CTLA-4 Combined Therapy. Cancer Cell. 2019;35:238–255. doi: 10.1016/j.ccell.2019.01.003.
 }
 \usage{
 counts_example
 }
 \description{
-Gene expression matrix from the Hugo et al. (2016) metastatic melanoma cohort.
+Gene expression matrix from the Gide et al. (2019) metastatic melanoma cohort.
 Rows correspond to genes (HUGO gene symbols) and columns to patient samples.
 This dataset is used to compute features for training machine learning models.
 }

@@ -53,7 +53,8 @@ Suggests:
     censored,
     flexsurv,
     coin,
-    aorsf
+    aorsf,
+    WGCNA
 LazyData: true
 LazyDataCompression: bzip2
 VignetteBuilder: knitr
