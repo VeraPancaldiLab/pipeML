@@ -204,7 +204,7 @@ event_test  <- event[-train_idx]
 ## **Train machine learning models for survival tasks**
 
 The function ` compute_features.training.ML()` can also train survival models by setting `task_type = "survival"`.
-```{r}
+```{r, eval = FALSE}
 res_survival <- compute_features.training.ML(
   features_train = X_train, 
   task_type = "survival",
@@ -219,13 +219,13 @@ res_survival <- compute_features.training.ML(
 ```
 
 Access to the best model 
-```{r}
+```{r, eval = FALSE}
 names(res_survival$ML_Models)
 res_survival$Model$Model_object
 ```
 
 Check training metrics
-```{r}
+```{r, eval = FALSE}
 head(res_survival$Model$Prediction_folds)
 ```
 
@@ -236,7 +236,7 @@ knitr::include_graphics("figures/cindex_survival.png")
 ## **Model prediction**
 
 After training, predictions can be generated using `compute_prediction()`.
-```{r}
+```{r, eval = FALSE}
 pred <- compute_prediction(
   model = res_survival$Model,
   test_data = X_test,
