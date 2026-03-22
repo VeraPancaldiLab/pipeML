@@ -50,7 +50,7 @@ For example purposes we make a Train/Test split
 ``` r
 set.seed(123)
 
-train_idx <- caret::createDataPartition(y, p = 0.8, list = FALSE)
+train_idx <- caret::createDataPartition(y, p = 0.7, list = FALSE)
 
 X_train <- X[train_idx, ]
 X_test  <- X[-train_idx, ]
@@ -107,8 +107,7 @@ pred = compute_prediction(model = res$Model,
                           target_var = y_test, 
                           task_type = "classification",
                           trait.positive = "1", 
-                          file.name = "Example_classification", 
-                          return = T)
+                          file.name = "Example_classification")
 ```
 
 Check predicitions
@@ -254,8 +253,7 @@ res_survival <- compute_features.training.ML(
   k_folds = 2,
   n_rep = 1,
   file_name = "Example_survival",
-  ncores = 1,
-  return = TRUE
+  ncores = 1
 )
 ```
 
@@ -288,9 +286,7 @@ pred <- compute_prediction(
   task_type = "survival",
   time_var = time_test,
   event_var = event_test,
-  file.name = "Example_survival",
-  return = TRUE
-)
+  file.name = "Example_survival")
 ```
 
 Unlike classification models, survival models may return different types
@@ -483,7 +479,7 @@ for (cohort in unique(traitData$Cohort)) {
                                      n_rep = 1, 
                                      LODO = TRUE,
                                      batch_var = traitData_train$Cohort, 
-                                     ncores = 2, 
+                                     ncores = 1, 
                                      return = F)
 
   #### ML predicting
@@ -659,6 +655,7 @@ an example: in practice, you can use any feature computation that
 depends on multiple samples, such as clustering, PCA, among others.
 
 ``` r
+library(WGCNA)
 compute_features_modular <- function(counts, power = NULL, modules = NULL) {
 
   ## Just preprocessing (IGNORE)
@@ -1096,8 +1093,8 @@ prepare_custom_folds_tuning <- function(data,
     
     processed_folds <- foreach::foreach(i = seq_along(folds), 
                                         .packages = c("dplyr"),
-                                        .export = c("compute_features_modular")) 
-    %dopar% {  
+                                        .export = c("compute_features_modular")
+                                       ) %dopar% {  
                                           
       train_idx <- folds[[i]]
       test_idx  <- setdiff(seq_len(nrow(data)), train_idx)
@@ -1252,8 +1249,8 @@ prepare_WGCNA_folds_modular <- function(
     
     processed_folds <- foreach::foreach(i = seq_along(folds), 
                                         .packages = c("dplyr"),
-                                        .export = c("compute_features_modular")) 
-    %dopar% {
+                                        .export = c("compute_features_modular")
+                                        ) %dopar% {
       
       train_idx <- folds[[i]]
       test_idx <- setdiff(seq_len(nrow(data)), train_idx)
@@ -1370,21 +1367,14 @@ res_params <- compute_features.training.ML(features_train = t(counts_train),
                                            fold_construction_args_fixed = list(power=6, 
                                                                                ncores = 2),
                                            fold_construction_args_tunable = list(
-                                             minModuleSize = c(20),       
-                                             mergeCutHeight = c(0.35),
-                                             deepSplit = c(1, 2)           
+                                             minModuleSize = c(20, 50, 100),       
+                                             mergeCutHeight = c(0.15, 0.25, 0.35),
+                                             deepSplit = c(1, 2, 3)           
                                            ))
 ```
 
 `pipeML` will automatically train the model with the combination of
 parameters which maximize the metric chosen.
-
-If you want to see the different AUROCs lead by the different
-combination, you can retrieve them by:
-
-``` r
-head(res_params$Model$results)
-```
 
 ### **Step 5 – Prediction on test data**
 
@@ -1403,8 +1393,7 @@ pred <- compute_prediction(model = res_custom$Model,
                            test_data = test_features,
                            target_var = coldata_test$Response,
                            trait.positive = "R",
-                           file.name = "Custom_fold",
-                           return = TRUE)
+                           file.name = "Custom_fold")
 ```
 
 #### Why do we need `bestune` argument even if I don’t have hyperparams in my function?

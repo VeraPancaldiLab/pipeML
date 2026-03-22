@@ -210,27 +210,40 @@
 <h3 id="training-models">Training models<a class="anchor" aria-label="anchor" href="#training-models"></a>
 </h3>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">res_ml</span> <span class="op">=</span> <span class="fu"><a href="reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span><span class="va">features_train</span>, <span class="va">clinical</span><span class="op">$</span><span class="va">Response</span>, <span class="st">"CR"</span>, </span>
-<span>                                      metric <span class="op">=</span> <span class="st">"AUROC"</span>, stack <span class="op">=</span> <span class="cn">F</span>, k_folds <span class="op">=</span> <span class="fl">5</span>, </span>
-<span>                                      n_rep <span class="op">=</span> <span class="fl">10</span>, file_name <span class="op">=</span> <span class="st">"Test"</span>, ncores <span class="op">=</span> <span class="fl">2</span>, return <span class="op">=</span> <span class="cn">T</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">X_train</span>, </span>
+<span>                                    target_var <span class="op">=</span> <span class="va">y_train</span>,</span>
+<span>                                    task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
+<span>                                    trait.positive <span class="op">=</span> <span class="st">"1"</span>,</span>
+<span>                                    metric <span class="op">=</span> <span class="st">"AUROC"</span>,</span>
+<span>                                    k_folds <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>                                    n_rep <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>                                    return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="predicting-on-new-data">Predicting on new data<a class="anchor" aria-label="anchor" href="#predicting-on-new-data"></a>
 </h3>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">pred</span> <span class="op">=</span> <span class="fu"><a href="reference/compute_prediction.html">compute_prediction</a></span><span class="op">(</span><span class="va">res_ml</span>, <span class="va">features_test</span>, <span class="va">traitData_test</span><span class="op">$</span><span class="va">Response</span>, </span>
-<span>                          <span class="st">"CR"</span>, stack <span class="op">=</span> <span class="cn">F</span>, file.name <span class="op">=</span> <span class="st">"Test"</span>, </span>
-<span>                          maximize <span class="op">=</span> <span class="st">"Accuracy"</span>, return <span class="op">=</span> <span class="cn">T</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">pred</span> <span class="op">=</span> <span class="fu"><a href="reference/compute_prediction.html">compute_prediction</a></span><span class="op">(</span>model <span class="op">=</span> <span class="va">res</span><span class="op">$</span><span class="va">Model</span>, </span>
+<span>                          test_data <span class="op">=</span> <span class="va">X_test</span>, </span>
+<span>                          target_var <span class="op">=</span> <span class="va">y_test</span>, </span>
+<span>                          task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
+<span>                          trait.positive <span class="op">=</span> <span class="st">"1"</span>, </span>
+<span>                          return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="training-and-testing-workflow">Training and Testing Workflow<a class="anchor" aria-label="anchor" href="#training-and-testing-workflow"></a>
 </h3>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">res</span> <span class="op">=</span> <span class="fu"><a href="reference/compute_features.ML.html">compute_features.ML</a></span><span class="op">(</span><span class="va">tme_features_train</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span>, <span class="va">tme_features_test</span><span class="op">[[</span><span class="va">i</span><span class="op">]</span><span class="op">]</span>, </span>
-<span>                          clinical <span class="op">=</span> <span class="va">traitData</span>, trait <span class="op">=</span> <span class="st">"Response"</span>, </span>
-<span>                          trait.positive <span class="op">=</span> <span class="st">"R"</span>, metric <span class="op">=</span> <span class="st">"AUROC"</span>, stack <span class="op">=</span> <span class="cn">F</span>, </span>
-<span>                          k_folds <span class="op">=</span> <span class="fl">2</span>, n_rep <span class="op">=</span> <span class="fl">1</span>, LODO <span class="op">=</span> <span class="cn">T</span>, batch_id <span class="op">=</span> <span class="st">"Cohort"</span>, </span>
-<span>                          ncores <span class="op">=</span> <span class="fl">2</span>, maximize <span class="op">=</span> <span class="st">"Accuracy"</span>, return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/compute_features.ML.html">compute_features.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">X_train</span>, </span>
+<span>                           features_test <span class="op">=</span> <span class="va">X_test</span>, </span>
+<span>                           coldata <span class="op">=</span> <span class="va">data</span>,</span>
+<span>                           task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
+<span>                           trait <span class="op">=</span> <span class="st">"target"</span>,</span>
+<span>                           trait.positive <span class="op">=</span> <span class="st">"1"</span>,</span>
+<span>                           metric <span class="op">=</span> <span class="st">"AUROC"</span>,</span>
+<span>                           k_folds <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>                           n_rep <span class="op">=</span> <span class="fl">10</span>,</span>
+<span>                           ncores <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -247,7 +260,7 @@
 <h2 id="citing-pipeml">Citing pipeML<a class="anchor" aria-label="anchor" href="#citing-pipeml"></a>
 </h2>
 <p>If you use <code>pipeML</code> in a scientific publication, we would appreciate citation to the :</p>
-<p>Hurtado M, Pancaldi V (2025). pipeML: A robust R machine learning pipeline for classification tasks and survival analysis. R package version 0.0.1, <a href="https://github.com/VeraPancaldiLab/pipeML" class="external-link uri">https://github.com/VeraPancaldiLab/pipeML</a>.</p>
+<p>Hurtado M, Pancaldi V (2026). pipeML: A flexible and modular machine learning framework designed to support leakage-free model training through custom cross-validation fold construction. R package version 0.0.1, <a href="https://verapancaldilab.github.io/pipeML" class="uri">https://verapancaldilab.github.io/pipeML</a></p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="license">

@@ -137,27 +137,40 @@ library(pipeML)
 ### Training models
 
 ``` r
-res_ml = compute_features.training.ML(features_train, clinical$Response, "CR", 
-                                      metric = "AUROC", stack = F, k_folds = 5, 
-                                      n_rep = 10, file_name = "Test", ncores = 2, return = T)
+res <- compute_features.training.ML(features_train = X_train, 
+                                    target_var = y_train,
+                                    task_type = "classification",
+                                    trait.positive = "1",
+                                    metric = "AUROC",
+                                    k_folds = 5,
+                                    n_rep = 10,
+                                    return = F)
 ```
 
 ### Predicting on new data
 
 ``` r
-pred = compute_prediction(res_ml, features_test, traitData_test$Response, 
-                          "CR", stack = F, file.name = "Test", 
-                          maximize = "Accuracy", return = T)
+pred = compute_prediction(model = res$Model, 
+                          test_data = X_test, 
+                          target_var = y_test, 
+                          task_type = "classification",
+                          trait.positive = "1", 
+                          return = F)
 ```
 
 ### Training and Testing Workflow
 
 ``` r
-res = compute_features.ML(tme_features_train[[i]], tme_features_test[[i]], 
-                          clinical = traitData, trait = "Response", 
-                          trait.positive = "R", metric = "AUROC", stack = F, 
-                          k_folds = 2, n_rep = 1, LODO = T, batch_id = "Cohort", 
-                          ncores = 2, maximize = "Accuracy", return = F)
+res <- compute_features.ML(features_train = X_train, 
+                           features_test = X_test, 
+                           coldata = data,
+                           task_type = "classification",
+                           trait = "target",
+                           trait.positive = "1",
+                           metric = "AUROC",
+                           k_folds = 5,
+                           n_rep = 10,
+                           ncores = 2)
 ```
 
 ## Issues
@@ -180,9 +193,10 @@ is the primary maintainer of this package.
 If you use `pipeML` in a scientific publication, we would appreciate
 citation to the :
 
-Hurtado M, Pancaldi V (2025). pipeML: A robust R machine learning
-pipeline for classification tasks and survival analysis. R package
-version 0.0.1, <https://github.com/VeraPancaldiLab/pipeML>.
+Hurtado M, Pancaldi V (2026). pipeML: A flexible and modular machine
+learning framework designed to support leakage-free model training
+through custom cross-validation fold construction. R package version
+0.0.1, <https://verapancaldilab.github.io/pipeML>
 
 # Package index
 
