@@ -1428,7 +1428,9 @@ This design allows a single custom fold-construction function to handle
 both hyperparameter tuning (exploration, parallelized) and final model
 preparation (exploitation, single optimized run).
 
-**NOTE:** `pipeML` is built on top of existing frameworks and makes
-extensive use of the R packages `caret`, `parnsip`, `tidymodels`,
-`parsnip` and `censored`. If you use `pipeML` in your work, please cite
-our package along with these foundational packages.
+## **References**
+
+`pipeML` is built on top of existing frameworks and makes extensive use
+of the R packages `caret`, `parnsip`, `tidymodels`, `parsnip` and
+`censored`. If you use `pipeML` in your work, please cite our package
+along with these foundational packages.
