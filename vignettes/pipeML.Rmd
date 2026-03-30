@@ -1,6 +1,9 @@
 ---
 title: "pipeML"
-output: rmarkdown::html_vignette
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 3
 vignette: >
   %\VignetteIndexEntry{pipeML}
   %\VignetteEngine{knitr::rmarkdown}
@@ -23,18 +26,35 @@ library(censored)
 library(doParallel)
 ```
 
-This tutorial demonstrates how to use the `pipeML` package for training and testing machine learning models. It introduces the main functions of the pipeline and guides you through additional functions for visualization. 
+This vignette demonstrates how to use `pipeML` to train, tune, and evaluate machine learning models for classification and survival tasks.
 
-# **Classification tasks**
+The content is organized into application-focused sections so you can jump directly to the workflow you need.
 
-Load example data 
+# Get Started
+
+`pipeML` provides two core workflows:
+
+- `compute_features.training.ML()`: train and tune models on a training set.
+- `compute_prediction()`: evaluate trained models on a test set.
+
+If you already have a test set prepared, you can also use:
+
+
+- `compute_features.ML()`: one-step training + prediction.
+
+
+# Classification and Survival
+
+## Classification Tasks
+
+Load example data:
 ```{r, eval=FALSE}
 data = pipeML::data_example_classification
 X <- data %>% dplyr::select(-target)
 y <- data$target
 ```
 
-For example purposes we make a Train/Test split
+For this example, make a train/test split:
 ```{r, eval=FALSE}
 set.seed(123)
 
@@ -47,7 +67,7 @@ y_train <- y[train_idx]
 y_test  <- y[-train_idx]
 ```
 
-## **Train machine learning models for classification tasks**
+### Train Models
 
 Train and tune models using repeated stratified k-fold cross-validation:
 ```{r, eval=FALSE}
@@ -76,7 +96,7 @@ names(res$ML_Models)
 knitr::include_graphics("figures/AUROC_classification.png")
 ```
 
-## **Model prediction**
+### Predict On Test Data
 
 After training, users can predict on new data by using the `compute_prediction()` function. You can specify which metric to maximize when determining the optimal classification threshold. Supported values for maximize include: "Accuracy", "Precision", "Recall", "Specificity", "Sensitivity", "F1", and "MCC".
 ```{r, eval=FALSE}
@@ -88,17 +108,17 @@ pred = compute_prediction(model = res$Model,
                           file.name = "Example_classification")
 ```
 
-Check predicitions
+Check predictions:
 ```{r, eval=FALSE}
 head(pred$Predictions)
 ```
 
-Verify threshold-based predictions metrics
+Inspect threshold-based prediction metrics:
 ```{r, eval=FALSE}
 head(pred$Metrics)
 ```
 
-If `return = TRUE`, `compute_prediction()` will saved the RO and PR curves in the `Results/` directory.
+If `return = TRUE`, `compute_prediction()` saves ROC and PR curves in the `Results/` directory.
 
 ```{r fig2, echo = FALSE, fig.cap="Figure 2. ROC curve.", fig.align='center', out.width='80%'}
 knitr::include_graphics("figures/ROC.png")
@@ -108,7 +128,7 @@ knitr::include_graphics("figures/ROC.png")
 knitr::include_graphics("figures/PR.png")
 ```
 
-## **Compute SHAP Values**
+### Compute SHAP Values
 
 SHAP values help interpret machine learning predictions by quantifying feature contributions.
 ```{r, eval = FALSE}
@@ -151,7 +171,7 @@ for (f in top_features) {
 }
 ```
 
-## **Model stacking**
+### Model Stacking
 
 To apply model stacking, set `stack = TRUE`:
 ```{r, eval = FALSE}
@@ -167,7 +187,7 @@ res <- compute_features.training.ML(features_train = X_train,
                                     return = F)
 ```
 
-# **Survival tasks**
+## Survival Tasks
 
 In addition to classification and regression tasks, `pipeML` supports survival analysis, allowing users to train machine learning models that predict time-to-event outcomes.
 
@@ -178,7 +198,7 @@ In survival analysis, the response variable is defined by two components:
 
 `pipeML` automates the training, evaluation, and interpretation of survival models using cross-validation and SHAP-based explanations.
 
-Load example dataset for survival
+Load example dataset for survival:
 ```{r, eval=FALSE}
 data = pipeML::data_example_survival
 X <- data %>% dplyr::select(-time, -status)
@@ -186,7 +206,7 @@ time <- data$time
 event <- data$status
 ```
 
-Similar to the previous example, we will split our data in Train/Test
+Similar to the previous example, split data into train/test:
 ```{r, eval=FALSE}
 set.seed(123)
 train_idx <- caret::createDataPartition(event, p = 0.7, list = FALSE)
@@ -201,9 +221,9 @@ event_train <- event[train_idx]
 event_test  <- event[-train_idx]
 ```
 
-## **Train machine learning models for survival tasks**
+### Train Models
 
-The function ` compute_features.training.ML()` can also train survival models by setting `task_type = "survival"`.
+The function `compute_features.training.ML()` can also train survival models by setting `task_type = "survival"`.
 ```{r, eval = FALSE}
 res_survival <- compute_features.training.ML(
   features_train = X_train, 
@@ -218,13 +238,13 @@ res_survival <- compute_features.training.ML(
 
 ```
 
-Access to the best model 
+Access the best model:
 ```{r, eval = FALSE}
 names(res_survival$ML_Models)
 res_survival$Model$Model_object
 ```
 
-Check training metrics
+Check training metrics:
 ```{r, eval = FALSE}
 head(res_survival$Model$Prediction_folds)
 ```
@@ -233,7 +253,7 @@ head(res_survival$Model$Prediction_folds)
 knitr::include_graphics("figures/cindex_survival.png")
 ```
 
-## **Model prediction**
+### Predict On Test Data
 
 After training, predictions can be generated using `compute_prediction()`.
 ```{r, eval = FALSE}
@@ -267,7 +287,7 @@ This allows `pipeML` to compute performance metrics such as the concordance inde
 knitr::include_graphics("figures/KM.png")
 ```
 
-## **Compute SHAP Values**
+### Compute SHAP Values
 
 We will use the same function `compute_shap_values` computed before but this time with the `task_type = "survival"`.
 ```{r, eval = FALSE}
@@ -282,11 +302,11 @@ shap_survival <- compute_shap_values(
 )
 ```
 
-# **ONE STEP: Training and prediction**
+## One-Step Training and Prediction
 
 If a separate testing dataset is already available, `pipeML` allows you to train models and generate predictions in a single step using the `compute_features.ML()` function. This function performs model training, hyperparameter tuning, and evaluation on the training data, and then applies the selected model to the test dataset.
 
-## **Classification tasks**
+### Classification Example
 ```{r, eval = FALSE}
 data = pipeML::data_example_classification
 X <- data %>% dplyr::select(-target)
@@ -315,7 +335,7 @@ res <- compute_features.ML(features_train = X_train,
                            return = FALSE)
 ```
 
-## **Survival tasks** 
+### Survival Example
 ```{r, eval = FALSE}
 data = pipeML::data_example_survival
 X <- data %>% dplyr::select(-time, -status)
@@ -349,9 +369,12 @@ res <- compute_features.ML(features_train = X_train,
                            return = FALSE)
 ```
 
-# **Leave one dataset out (LODO) analysis**
 
-If your data includes features from multiple cohorts, `pipeML` provides a flexible approach to perform **Leave-One-Dataset-Out (LODO) analysis**. This is achieved by applying k-fold stratified sampling across batches, ensuring that each fold preserves the batch structure while maintaining class balance. For this set `LODO = TRUE` and provided column name containing the batch information in the `batch_var` variable
+# Advanced
+
+## Leave-One-Dataset-Out (LODO) Analysis
+
+If your data includes features from multiple cohorts, `pipeML` provides a flexible approach to perform **Leave-One-Dataset-Out (LODO) analysis**. This is achieved by applying k-fold stratified sampling across batches, ensuring that each fold preserves the batch structure while maintaining class balance. To enable this, set `LODO = TRUE` and provide the column name containing batch information in `batch_var`.
 
 Below, we demonstrate how to perform a LODO analysis using simulated datasets:
 
@@ -427,7 +450,7 @@ for (cohort in unique(traitData$Cohort)) {
 }
 ```
 
-For plotting we will make use of our `get_curves` function adapted in a case for multiple cohorts. This function is implemented inside `compute_prediction` to make the RO and PR curves.
+For plotting, we use `get_curves()`, adapted for multiple cohorts. This function is used internally by `compute_prediction()` to generate ROC and PR curves.
 
 Extract prediction metrics and join
 ```{r, eval=FALSE}
@@ -450,7 +473,7 @@ auc_prc <- list(
 )
 ```
 
-Plot RO and PR curves
+Plot ROC and PR curves:
 ```{r, eval = FALSE}
 get_curves(
   data = roc_data,
@@ -464,7 +487,7 @@ get_curves(
 )
 ```
 
-```{r fig6, echo = FALSE, fig.cap="Figure 6. LODO RO curves.", fig.align='center', out.width='80%'}
+```{r fig6, echo = FALSE, fig.cap="Figure 6. LODO ROC curves.", fig.align='center', out.width='80%'}
 knitr::include_graphics("figures/RO_LODO.png")
 ```
 
@@ -472,7 +495,7 @@ knitr::include_graphics("figures/RO_LODO.png")
 knitr::include_graphics("figures/PR_LODO.png")
 ```
 
-# **Leakage-aware custom cross-validation**
+## Leakage-Aware Custom Cross-Validation
 
 A central design principle of `pipeML` is to prevent information leakage during model training and evaluation. In many machine learning workflows, feature engineering steps are applied to the full dataset before cross-validation, which can inadvertently introduce information from the test folds into the training process. This leads to overoptimistic performance estimates.
 
@@ -500,7 +523,7 @@ By recomputing these steps within each fold, `pipeML` ensures that:
 
 This approach closely mimics how the model would behave when applied to completely unseen data, producing more realistic performance estimates.
 
-## **Step 1 – Define a base feature function (e.g. WGCNA)**
+### Step 1 - Define a base feature function (e.g. WGCNA)
 
 **Structure of the Base Feature Function**
 
@@ -588,7 +611,7 @@ compute_features_modular <- function(counts, power = NULL, modules = NULL) {
 }
 ```
 
-## **Step 2 – Make the function suitable for `pipeML`**
+### Step 2 - Make the function suitable for `pipeML`
 
 We then need to extend and give the correct format to this function to make it suitable for running across folds inside `pipeML`
 
@@ -603,7 +626,7 @@ Users can easily adapt this template by replacing their previous `compute_featur
 
 In `pipeML` data corresponds to samples as rows and features as columns. If your `compute_features_modular()` needs features as rows, make sure to `t()` inside this function.
 
-The parameters `data`, `folds`, `besttune` are taking care inside `pipeML` automatically once `fold_construction_fun` is set. Be sure to not change the parameteres names or delete them! 
+The parameters `data`, `folds`, and `bestune` are handled by `pipeML` automatically once `fold_construction_fun` is set. Do not change these parameter names or remove them.
 
 - **...** : Additional parameters passed to your feature function
 
@@ -781,7 +804,7 @@ coldata_train <- coldata[train_idx,]
 coldata_test  <- coldata[-train_idx,]
 ```
 
-## **Step 3 – Run Custom k-fold Cross-Validation**
+### Step 3 - Run custom k-fold cross-validation
 
 Once your custom fold function is ready, pass it to `compute_features.training.ML()` via `fold_construction_fun`.
 
@@ -807,7 +830,7 @@ head(res_custom$Custom_output$features)
 head(res_custom$Custom_output$structure)
 ```
 
-## **Step 4 - Tunable hyperparameters within custom fold functions (optional)**
+### Step 4 - Tunable hyperparameters within custom fold functions (optional)
 
 In some scenarios, the feature construction step may include parameters whose values can influence model performance. For example, when computing WGCNA, parameters such as `soft-thresholding power`, `minimum module size`, `module merging threshold`, and `module splitting sensitivity` may affect the resulting features and therefore the downstream model performance.
 
@@ -880,7 +903,7 @@ compute_features_modular <- function(
 
 Then we will use this version of `prepare_custom_folds()` that have some modifications to account for parameters combinations
 
-Notice we have an additional parameter `ncores` that will control paralellization for evaluating all your runs (**don't remove it!**)
+Notice we have an additional parameter `ncores` that controls parallelization when evaluating all runs (**do not remove it!**).
 ```{r, eval= FALSE}
 prepare_custom_folds_tuning <- function(data, 
                                         folds = NULL, 
@@ -1213,7 +1236,7 @@ res_params <- compute_features.training.ML(features_train = t(counts_train),
 
 `pipeML` will automatically train the model with the combination of parameters which maximize the metric chosen.
 
-## **Step 5 – Prediction on test data**
+### Step 5 - Prediction on test data
 
 To apply the model to new data, compute the same type of features using the learned modules from the training set.
 ```{r, eval=FALSE}
@@ -1247,5 +1270,5 @@ This design allows a single custom fold-construction function to handle both hyp
 
 # **References**
 
-`pipeML` is built on top of existing frameworks and makes extensive use of the R packages `caret`, `parnsip`, `tidymodels`, `parsnip` and `censored`. If you use `pipeML` in your work, please cite our package along with these foundational packages. 
+`pipeML` is built on top of existing frameworks and makes extensive use of the R packages `caret`, `tidymodels`, `parsnip`, and `censored`. If you use `pipeML` in your work, please cite our package along with these foundational packages.
 

@@ -2,6 +2,24 @@ url: https://verapancaldilab.github.io/pipeML/
 template:
   bootstrap: 5
 
+navbar:
+  structure:
+    left: [get-started, reference, articles, news]
+    right: [search, github]
+  components:
+    get-started:
+      text: Get started
+      href: index.html
+    articles:
+      text: Articles
+      menu:
+      - text: pipeML vignette
+        href: articles/pipeML.html
+      - text: Classification and survival
+        href: articles/pipeML.html#classification-and-survival
+      - text: Advanced
+        href: articles/pipeML.html#advanced
+
 reference:
 - title: Main
   desc: >
