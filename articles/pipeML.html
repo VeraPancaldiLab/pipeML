@@ -34,8 +34,16 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="active nav-item"><a class="nav-link" href="../articles/pipeML.html">Get started</a></li>
+<li class="nav-item"><a class="nav-link" href="../index.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="active nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><a class="dropdown-item" href="../articles/pipeML.html">pipeML vignette</a></li>
+    <li><a class="dropdown-item" href="../articles/pipeML.html#classification-and-survival">Classification and survival</a></li>
+    <li><a class="dropdown-item" href="../articles/pipeML.html#advanced">Advanced</a></li>
+  </ul>
+</li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -90,20 +98,42 @@
 <span><span class="co">#&gt; Loading required package: foreach</span></span>
 <span><span class="co">#&gt; Loading required package: iterators</span></span>
 <span><span class="co">#&gt; Loading required package: parallel</span></span></code></pre></div>
-<p>This tutorial demonstrates how to use the <code>pipeML</code> package
-for training and testing machine learning models. It introduces the main
-functions of the pipeline and guides you through additional functions
-for visualization.</p>
+<p>This vignette demonstrates how to use <code>pipeML</code> to train,
+tune, and evaluate machine learning models for classification and
+survival tasks.</p>
+<p>The content is organized into application-focused sections so you can
+jump directly to the workflow you need.</p>
 <div class="section level2">
-<h2 id="classification-tasks">
-<strong>Classification tasks</strong><a class="anchor" aria-label="anchor" href="#classification-tasks"></a>
+<h2 id="get-started">Get Started<a class="anchor" aria-label="anchor" href="#get-started"></a>
 </h2>
-<p>Load example data</p>
+<p><code>pipeML</code> provides two core workflows:</p>
+<ul>
+<li>
+<code><a href="../reference/compute_features.training.ML.html">compute_features.training.ML()</a></code>: train and tune models
+on a training set.</li>
+<li>
+<code><a href="../reference/compute_prediction.html">compute_prediction()</a></code>: evaluate trained models on a test
+set.</li>
+</ul>
+<p>If you already have a test set prepared, you can also use:</p>
+<ul>
+<li>
+<code><a href="../reference/compute_features.ML.html">compute_features.ML()</a></code>: one-step training +
+prediction.</li>
+</ul>
+</div>
+<div class="section level2">
+<h2 id="classification-and-survival">Classification and Survival<a class="anchor" aria-label="anchor" href="#classification-and-survival"></a>
+</h2>
+<div class="section level3">
+<h3 id="classification-tasks">Classification Tasks<a class="anchor" aria-label="anchor" href="#classification-tasks"></a>
+</h3>
+<p>Load example data:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">data</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/data_example_classification.html">data_example_classification</a></span></span>
 <span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">data</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">target</span><span class="op">)</span></span>
 <span><span class="va">y</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">target</span></span></code></pre></div>
-<p>For example purposes we make a Train/Test split</p>
+<p>For this example, make a train/test split:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
 <span></span>
@@ -114,11 +144,9 @@ for visualization.</p>
 <span></span>
 <span><span class="va">y_train</span> <span class="op">&lt;-</span> <span class="va">y</span><span class="op">[</span><span class="va">train_idx</span><span class="op">]</span></span>
 <span><span class="va">y_test</span>  <span class="op">&lt;-</span> <span class="va">y</span><span class="op">[</span><span class="op">-</span><span class="va">train_idx</span><span class="op">]</span></span></code></pre></div>
-<div class="section level3">
-<h3 id="train-machine-learning-models-for-classification-tasks">
-<strong>Train machine learning models for classification
-tasks</strong><a class="anchor" aria-label="anchor" href="#train-machine-learning-models-for-classification-tasks"></a>
-</h3>
+<div class="section level4">
+<h4 id="train-models">Train Models<a class="anchor" aria-label="anchor" href="#train-models"></a>
+</h4>
 <p>Train and tune models using repeated stratified k-fold
 cross-validation:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
@@ -143,10 +171,9 @@ Figure 1. Models training performance.
 </p>
 </div>
 </div>
-<div class="section level3">
-<h3 id="model-prediction">
-<strong>Model prediction</strong><a class="anchor" aria-label="anchor" href="#model-prediction"></a>
-</h3>
+<div class="section level4">
+<h4 id="predict-on-test-data">Predict On Test Data<a class="anchor" aria-label="anchor" href="#predict-on-test-data"></a>
+</h4>
 <p>After training, users can predict on new data by using the
 <code><a href="../reference/compute_prediction.html">compute_prediction()</a></code> function. You can specify which metric
 to maximize when determining the optimal classification threshold.
@@ -159,14 +186,14 @@ Supported values for maximize include: “Accuracy”, “Precision”,
 <span>                          task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
 <span>                          trait.positive <span class="op">=</span> <span class="st">"1"</span>, </span>
 <span>                          file.name <span class="op">=</span> <span class="st">"Example_classification"</span><span class="op">)</span></span></code></pre></div>
-<p>Check predicitions</p>
+<p>Check predictions:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">pred</span><span class="op">$</span><span class="va">Predictions</span><span class="op">)</span></span></code></pre></div>
-<p>Verify threshold-based predictions metrics</p>
+<p>Inspect threshold-based prediction metrics:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">pred</span><span class="op">$</span><span class="va">Metrics</span><span class="op">)</span></span></code></pre></div>
-<p>If <code>return = TRUE</code>, <code><a href="../reference/compute_prediction.html">compute_prediction()</a></code> will
-saved the RO and PR curves in the <code>Results/</code> directory.</p>
+<p>If <code>return = TRUE</code>, <code><a href="../reference/compute_prediction.html">compute_prediction()</a></code>
+saves ROC and PR curves in the <code>Results/</code> directory.</p>
 <div class="figure" style="text-align: center">
 <img src="figures/ROC.png" class="r-plt" alt="Figure 2. ROC curve." width="80%"><p class="caption">
 Figure 2. ROC curve.
@@ -178,10 +205,9 @@ Figure 3. PR curve.
 </p>
 </div>
 </div>
-<div class="section level3">
-<h3 id="compute-shap-values">
-<strong>Compute SHAP Values</strong><a class="anchor" aria-label="anchor" href="#compute-shap-values"></a>
-</h3>
+<div class="section level4">
+<h4 id="compute-shap-values">Compute SHAP Values<a class="anchor" aria-label="anchor" href="#compute-shap-values"></a>
+</h4>
 <p>SHAP values help interpret machine learning predictions by
 quantifying feature contributions.</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
@@ -221,10 +247,9 @@ quantifying feature contributions.</p>
 <span>  <span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 </div>
-<div class="section level3">
-<h3 id="model-stacking">
-<strong>Model stacking</strong><a class="anchor" aria-label="anchor" href="#model-stacking"></a>
-</h3>
+<div class="section level4">
+<h4 id="model-stacking">Model Stacking<a class="anchor" aria-label="anchor" href="#model-stacking"></a>
+</h4>
 <p>To apply model stacking, set <code>stack = TRUE</code>:</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">X_train</span>, </span>
@@ -239,10 +264,9 @@ quantifying feature contributions.</p>
 <span>                                    return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
-<div class="section level2">
-<h2 id="survival-tasks">
-<strong>Survival tasks</strong><a class="anchor" aria-label="anchor" href="#survival-tasks"></a>
-</h2>
+<div class="section level3">
+<h3 id="survival-tasks">Survival Tasks<a class="anchor" aria-label="anchor" href="#survival-tasks"></a>
+</h3>
 <p>In addition to classification and regression tasks,
 <code>pipeML</code> supports survival analysis, allowing users to train
 machine learning models that predict time-to-event outcomes.</p>
@@ -258,14 +282,13 @@ or the observation was censored (0)</li>
 <p><code>pipeML</code> automates the training, evaluation, and
 interpretation of survival models using cross-validation and SHAP-based
 explanations.</p>
-<p>Load example dataset for survival</p>
+<p>Load example dataset for survival:</p>
 <div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">data</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/data_example_survival.html">data_example_survival</a></span></span>
 <span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">data</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">time</span>, <span class="op">-</span><span class="va">status</span><span class="op">)</span></span>
 <span><span class="va">time</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">time</span></span>
 <span><span class="va">event</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">status</span></span></code></pre></div>
-<p>Similar to the previous example, we will split our data in
-Train/Test</p>
+<p>Similar to the previous example, split data into train/test:</p>
 <div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
 <span><span class="va">train_idx</span> <span class="op">&lt;-</span> <span class="fu">caret</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/caret/man/createDataPartition.html" class="external-link">createDataPartition</a></span><span class="op">(</span><span class="va">event</span>, p <span class="op">=</span> <span class="fl">0.7</span>, list <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
@@ -278,11 +301,9 @@ Train/Test</p>
 <span></span>
 <span><span class="va">event_train</span> <span class="op">&lt;-</span> <span class="va">event</span><span class="op">[</span><span class="va">train_idx</span><span class="op">]</span></span>
 <span><span class="va">event_test</span>  <span class="op">&lt;-</span> <span class="va">event</span><span class="op">[</span><span class="op">-</span><span class="va">train_idx</span><span class="op">]</span></span></code></pre></div>
-<div class="section level3">
-<h3 id="train-machine-learning-models-for-survival-tasks">
-<strong>Train machine learning models for survival
-tasks</strong><a class="anchor" aria-label="anchor" href="#train-machine-learning-models-for-survival-tasks"></a>
-</h3>
+<div class="section level4">
+<h4 id="train-models-1">Train Models<a class="anchor" aria-label="anchor" href="#train-models-1"></a>
+</h4>
 <p>The function <code><a href="../reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> can also
 train survival models by setting
 <code>task_type = "survival"</code>.</p>
@@ -297,11 +318,11 @@ train survival models by setting
 <span>  file_name <span class="op">=</span> <span class="st">"Example_survival"</span>,</span>
 <span>  ncores <span class="op">=</span> <span class="fl">1</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Access to the best model</p>
+<p>Access the best model:</p>
 <div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">res_survival</span><span class="op">$</span><span class="va">ML_Models</span><span class="op">)</span></span>
 <span><span class="va">res_survival</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">Model_object</span></span></code></pre></div>
-<p>Check training metrics</p>
+<p>Check training metrics:</p>
 <div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">res_survival</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">Prediction_folds</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
@@ -310,10 +331,9 @@ Figure 4. Models training performance.
 </p>
 </div>
 </div>
-<div class="section level3">
-<h3 id="model-prediction-1">
-<strong>Model prediction</strong><a class="anchor" aria-label="anchor" href="#model-prediction-1"></a>
-</h3>
+<div class="section level4">
+<h4 id="predict-on-test-data-1">Predict On Test Data<a class="anchor" aria-label="anchor" href="#predict-on-test-data-1"></a>
+</h4>
 <p>After training, predictions can be generated using
 <code><a href="../reference/compute_prediction.html">compute_prediction()</a></code>.</p>
 <div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
@@ -355,10 +375,9 @@ Figure 5. KM plot.
 </p>
 </div>
 </div>
-<div class="section level3">
-<h3 id="compute-shap-values-1">
-<strong>Compute SHAP Values</strong><a class="anchor" aria-label="anchor" href="#compute-shap-values-1"></a>
-</h3>
+<div class="section level4">
+<h4 id="compute-shap-values-1">Compute SHAP Values<a class="anchor" aria-label="anchor" href="#compute-shap-values-1"></a>
+</h4>
 <p>We will use the same function <code>compute_shap_values</code>
 computed before but this time with the
 <code>task_type = "survival"</code>.</p>
@@ -374,20 +393,18 @@ computed before but this time with the
 <span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
-<div class="section level2">
-<h2 id="one-step-training-and-prediction">
-<strong>ONE STEP: Training and prediction</strong><a class="anchor" aria-label="anchor" href="#one-step-training-and-prediction"></a>
-</h2>
+<div class="section level3">
+<h3 id="one-step-training-and-prediction">One-Step Training and Prediction<a class="anchor" aria-label="anchor" href="#one-step-training-and-prediction"></a>
+</h3>
 <p>If a separate testing dataset is already available,
 <code>pipeML</code> allows you to train models and generate predictions
 in a single step using the <code><a href="../reference/compute_features.ML.html">compute_features.ML()</a></code> function.
 This function performs model training, hyperparameter tuning, and
 evaluation on the training data, and then applies the selected model to
 the test dataset.</p>
-<div class="section level3">
-<h3 id="classification-tasks-1">
-<strong>Classification tasks</strong><a class="anchor" aria-label="anchor" href="#classification-tasks-1"></a>
-</h3>
+<div class="section level4">
+<h4 id="classification-example">Classification Example<a class="anchor" aria-label="anchor" href="#classification-example"></a>
+</h4>
 <div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">data</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/data_example_classification.html">data_example_classification</a></span></span>
 <span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">data</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">target</span><span class="op">)</span></span>
@@ -413,10 +430,9 @@ the test dataset.</p>
 <span>                           file_name <span class="op">=</span> <span class="st">"Test"</span>,</span>
 <span>                           return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 </div>
-<div class="section level3">
-<h3 id="survival-tasks-1">
-<strong>Survival tasks</strong><a class="anchor" aria-label="anchor" href="#survival-tasks-1"></a>
-</h3>
+<div class="section level4">
+<h4 id="survival-example">Survival Example<a class="anchor" aria-label="anchor" href="#survival-example"></a>
+</h4>
 <div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">data</span> <span class="op">=</span> <span class="fu">pipeML</span><span class="fu">::</span><span class="va"><a href="../reference/data_example_survival.html">data_example_survival</a></span></span>
 <span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">data</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html" class="external-link">%&gt;%</a></span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html" class="external-link">select</a></span><span class="op">(</span><span class="op">-</span><span class="va">time</span>, <span class="op">-</span><span class="va">status</span><span class="op">)</span></span>
@@ -448,18 +464,20 @@ the test dataset.</p>
 <span>                           return <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
 </div>
 </div>
+</div>
 <div class="section level2">
-<h2 id="leave-one-dataset-out-lodo-analysis">
-<strong>Leave one dataset out (LODO) analysis</strong><a class="anchor" aria-label="anchor" href="#leave-one-dataset-out-lodo-analysis"></a>
+<h2 id="advanced">Advanced<a class="anchor" aria-label="anchor" href="#advanced"></a>
 </h2>
+<div class="section level3">
+<h3 id="leave-one-dataset-out-lodo-analysis">Leave-One-Dataset-Out (LODO) Analysis<a class="anchor" aria-label="anchor" href="#leave-one-dataset-out-lodo-analysis"></a>
+</h3>
 <p>If your data includes features from multiple cohorts,
 <code>pipeML</code> provides a flexible approach to perform
 <strong>Leave-One-Dataset-Out (LODO) analysis</strong>. This is achieved
 by applying k-fold stratified sampling across batches, ensuring that
 each fold preserves the batch structure while maintaining class balance.
-For this set <code>LODO = TRUE</code> and provided column name
-containing the batch information in the <code>batch_var</code>
-variable</p>
+To enable this, set <code>LODO = TRUE</code> and provide the column name
+containing batch information in <code>batch_var</code>.</p>
 <p>Below, we demonstrate how to perform a LODO analysis using simulated
 datasets:</p>
 <p>Simulate datasets from different batches (‘cohorts’)</p>
@@ -531,9 +549,9 @@ datasets:</p>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">prediction</span><span class="op">)</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">=</span> <span class="va">cohort</span></span>
 <span>  <span class="va">i</span> <span class="op">=</span> <span class="va">i</span> <span class="op">+</span> <span class="fl">1</span></span>
 <span><span class="op">}</span></span></code></pre></div>
-<p>For plotting we will make use of our <code>get_curves</code> function
-adapted in a case for multiple cohorts. This function is implemented
-inside <code>compute_prediction</code> to make the RO and PR curves.</p>
+<p>For plotting, we use <code><a href="../reference/get_curves.html">get_curves()</a></code>, adapted for multiple
+cohorts. This function is used internally by
+<code><a href="../reference/compute_prediction.html">compute_prediction()</a></code> to generate ROC and PR curves.</p>
 <p>Extract prediction metrics and join</p>
 <div class="sourceCode" id="cb26"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">roc_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">prediction</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">cohort</span><span class="op">)</span> <span class="op">{</span></span>
@@ -553,7 +571,7 @@ inside <code>compute_prediction</code> to make the RO and PR curves.</p>
 <span>  lower <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply</a></span><span class="op">(</span><span class="va">prediction</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span><span class="op">$</span><span class="va">AUC</span><span class="op">$</span><span class="va">AUPRC</span><span class="op">$</span><span class="va">lower</span><span class="op">)</span>,</span>
 <span>  upper <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply</a></span><span class="op">(</span><span class="va">prediction</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span><span class="op">$</span><span class="va">AUC</span><span class="op">$</span><span class="va">AUPRC</span><span class="op">$</span><span class="va">upper</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Plot RO and PR curves</p>
+<p>Plot ROC and PR curves:</p>
 <div class="sourceCode" id="cb27"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/get_curves.html">get_curves</a></span><span class="op">(</span></span>
 <span>  data <span class="op">=</span> <span class="va">roc_data</span>,</span>
@@ -566,8 +584,8 @@ inside <code>compute_prediction</code> to make the RO and PR curves.</p>
 <span>  height <span class="op">=</span> <span class="fl">9</span></span>
 <span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
-<img src="figures/RO_LODO.png" class="r-plt" alt="Figure 6. LODO RO curves." width="80%"><p class="caption">
-Figure 6. LODO RO curves.
+<img src="figures/RO_LODO.png" class="r-plt" alt="Figure 6. LODO ROC curves." width="80%"><p class="caption">
+Figure 6. LODO ROC curves.
 </p>
 </div>
 <div class="figure" style="text-align: center">
@@ -576,10 +594,9 @@ Figure 7. LODO PR curves.
 </p>
 </div>
 </div>
-<div class="section level2">
-<h2 id="leakage-aware-custom-cross-validation">
-<strong>Leakage-aware custom cross-validation</strong><a class="anchor" aria-label="anchor" href="#leakage-aware-custom-cross-validation"></a>
-</h2>
+<div class="section level3">
+<h3 id="leakage-aware-custom-cross-validation">Leakage-Aware Custom Cross-Validation<a class="anchor" aria-label="anchor" href="#leakage-aware-custom-cross-validation"></a>
+</h3>
 <p>A central design principle of <code>pipeML</code> is to prevent
 information leakage during model training and evaluation. In many
 machine learning workflows, feature engineering steps are applied to the
@@ -624,11 +641,9 @@ influencing it</li>
 to completely unseen data, producing more realistic performance
 estimates.</p>
 </div>
-<div class="section level3">
-<h3 id="step-1-define-a-base-feature-function-e-g--wgcna">
-<strong>Step 1 – Define a base feature function
-(e.g. WGCNA)</strong><a class="anchor" aria-label="anchor" href="#step-1-define-a-base-feature-function-e-g--wgcna"></a>
-</h3>
+<div class="section level4">
+<h4 id="step-1---define-a-base-feature-function-e-g--wgcna">Step 1 - Define a base feature function (e.g. WGCNA)<a class="anchor" aria-label="anchor" href="#step-1---define-a-base-feature-function-e-g--wgcna"></a>
+</h4>
 <p><strong>Structure of the Base Feature Function</strong></p>
 <p>The function is designed around two operational modes:</p>
 <ul>
@@ -639,6 +654,7 @@ learns the feature structure from the input dataset.</li>
 <strong>Projection Mode</strong> (modules provided): The function
 applies a previously learned structure to new data.</li>
 </ul>
+</div>
 <div class="section level4">
 <h4 id="why-the-function-returns-two-objects">Why the Function Returns Two Objects?<a class="anchor" aria-label="anchor" href="#why-the-function-returns-two-objects"></a>
 </h4>
@@ -730,12 +746,9 @@ among others.</p>
 <span>  <span class="kw"><a href="https://rdrr.io/r/base/function.html" class="external-link">return</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>features <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">module_features</span><span class="op">)</span>, structure <span class="op">=</span> <span class="va">modules</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 </div>
-</div>
-<div class="section level3">
-<h3 id="step-2-make-the-function-suitable-for-pipeml">
-<strong>Step 2 – Make the function suitable for
-<code>pipeML</code></strong><a class="anchor" aria-label="anchor" href="#step-2-make-the-function-suitable-for-pipeml"></a>
-</h3>
+<div class="section level4">
+<h4 id="step-2---make-the-function-suitable-for-pipeml">Step 2 - Make the function suitable for <code>pipeML</code><a class="anchor" aria-label="anchor" href="#step-2---make-the-function-suitable-for-pipeml"></a>
+</h4>
 <p>We then need to extend and give the correct format to this function
 to make it suitable for running across folds inside
 <code>pipeML</code></p>
@@ -752,6 +765,7 @@ held-out folds without influencing it.</li>
 </ul>
 <p>Users can easily adapt this template by replacing their previous
 <code>compute_features_modular</code> function</p>
+</div>
 <div class="section level4">
 <h4 id="note">
 <strong>NOTE</strong><a class="anchor" aria-label="anchor" href="#note"></a>
@@ -760,10 +774,10 @@ held-out folds without influencing it.</li>
 features as columns. If your <code>compute_features_modular()</code>
 needs features as rows, make sure to <code><a href="https://rdrr.io/r/base/t.html" class="external-link">t()</a></code> inside this
 function.</p>
-<p>The parameters <code>data</code>, <code>folds</code>,
-<code>besttune</code> are taking care inside <code>pipeML</code>
-automatically once <code>fold_construction_fun</code> is set. Be sure to
-not change the parameteres names or delete them!</p>
+<p>The parameters <code>data</code>, <code>folds</code>, and
+<code>bestune</code> are handled by <code>pipeML</code> automatically
+once <code>fold_construction_fun</code> is set. Do not change these
+parameter names or remove them.</p>
 <ul>
 <li>
 <strong>…</strong> : Additional parameters passed to your feature
@@ -941,11 +955,9 @@ argument <code>power</code></p>
 <span><span class="va">coldata_train</span> <span class="op">&lt;-</span> <span class="va">coldata</span><span class="op">[</span><span class="va">train_idx</span>,<span class="op">]</span></span>
 <span><span class="va">coldata_test</span>  <span class="op">&lt;-</span> <span class="va">coldata</span><span class="op">[</span><span class="op">-</span><span class="va">train_idx</span>,<span class="op">]</span></span></code></pre></div>
 </div>
-</div>
-<div class="section level3">
-<h3 id="step-3-run-custom-k-fold-cross-validation">
-<strong>Step 3 – Run Custom k-fold Cross-Validation</strong><a class="anchor" aria-label="anchor" href="#step-3-run-custom-k-fold-cross-validation"></a>
-</h3>
+<div class="section level4">
+<h4 id="step-3---run-custom-k-fold-cross-validation">Step 3 - Run custom k-fold cross-validation<a class="anchor" aria-label="anchor" href="#step-3---run-custom-k-fold-cross-validation"></a>
+</h4>
 <p>Once your custom fold function is ready, pass it to
 <code><a href="../reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> via
 <code>fold_construction_fun</code>.</p>
@@ -975,11 +987,10 @@ prediction - see next section)</p>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">res_custom</span><span class="op">$</span><span class="va">Custom_output</span><span class="op">$</span><span class="va">features</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">res_custom</span><span class="op">$</span><span class="va">Custom_output</span><span class="op">$</span><span class="va">structure</span><span class="op">)</span></span></code></pre></div>
 </div>
-<div class="section level3">
-<h3 id="step-4---tunable-hyperparameters-within-custom-fold-functions-optional">
-<strong>Step 4 - Tunable hyperparameters within custom fold
-functions (optional)</strong><a class="anchor" aria-label="anchor" href="#step-4---tunable-hyperparameters-within-custom-fold-functions-optional"></a>
-</h3>
+<div class="section level4">
+<h4 id="step-4---tunable-hyperparameters-within-custom-fold-functions-optional">Step 4 - Tunable hyperparameters within custom fold functions
+(optional)<a class="anchor" aria-label="anchor" href="#step-4---tunable-hyperparameters-within-custom-fold-functions-optional"></a>
+</h4>
 <p>In some scenarios, the feature construction step may include
 parameters whose values can influence model performance. For example,
 when computing WGCNA, parameters such as
@@ -1062,9 +1073,9 @@ add the tunable parameters in our function call</p>
 <span><span class="op">}</span></span></code></pre></div>
 <p>Then we will use this version of <code>prepare_custom_folds()</code>
 that have some modifications to account for parameters combinations</p>
-<p>Notice we have an additional parameter <code>ncores</code> that will
-control paralellization for evaluating all your runs (<strong>don’t
-remove it!</strong>)</p>
+<p>Notice we have an additional parameter <code>ncores</code> that
+controls parallelization when evaluating all runs (<strong>do not remove
+it!</strong>).</p>
 <div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" tabindex="-1"></a>prepare_custom_folds_tuning <span class="ot">&lt;-</span> <span class="cf">function</span>(data, </span>
 <span id="cb36-2"><a href="#cb36-2" tabindex="-1"></a>                                        <span class="at">folds =</span> <span class="cn">NULL</span>, </span>
 <span id="cb36-3"><a href="#cb36-3" tabindex="-1"></a>                                        <span class="at">bestune =</span> <span class="cn">NULL</span>, </span>
@@ -1407,10 +1418,9 @@ by the number of folds and repetitions used in cross-validation.</p>
 <p><code>pipeML</code> will automatically train the model with the
 combination of parameters which maximize the metric chosen.</p>
 </div>
-<div class="section level3">
-<h3 id="step-5-prediction-on-test-data">
-<strong>Step 5 – Prediction on test data</strong><a class="anchor" aria-label="anchor" href="#step-5-prediction-on-test-data"></a>
-</h3>
+<div class="section level4">
+<h4 id="step-5---prediction-on-test-data">Step 5 - Prediction on test data<a class="anchor" aria-label="anchor" href="#step-5---prediction-on-test-data"></a>
+</h4>
 <p>To apply the model to new data, compute the same type of features
 using the learned modules from the training set.</p>
 <div class="sourceCode" id="cb39"><pre class="downlit sourceCode r">
@@ -1423,6 +1433,7 @@ using the learned modules from the training set.</p>
 <span>                           target_var <span class="op">=</span> <span class="va">coldata_test</span><span class="op">$</span><span class="va">Response</span>,</span>
 <span>                           trait.positive <span class="op">=</span> <span class="st">"R"</span>,</span>
 <span>                           file.name <span class="op">=</span> <span class="st">"Custom_fold"</span><span class="op">)</span></span></code></pre></div>
+</div>
 <div class="section level4">
 <h4 id="why-do-we-need-bestune-argument-even-if-i-dont-have-hyperparams-in-my-function">Why do we need <code>bestune</code> argument even if I don’t have
 hyperparams in my function?<a class="anchor" aria-label="anchor" href="#why-do-we-need-bestune-argument-even-if-i-dont-have-hyperparams-in-my-function"></a>
@@ -1467,7 +1478,7 @@ model preparation (exploitation, single optimized run).</p>
 </h2>
 <p><code>pipeML</code> is built on top of existing frameworks and makes
 extensive use of the R packages <code>caret</code>,
-<code>parnsip</code>, <code>tidymodels</code>, <code>parsnip</code> and
+<code>tidymodels</code>, <code>parsnip</code>, and
 <code>censored</code>. If you use <code>pipeML</code> in your work,
 please cite our package along with these foundational packages.</p>
 </div>
