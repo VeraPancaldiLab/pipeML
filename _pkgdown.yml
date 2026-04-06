@@ -1,6 +1,8 @@
 url: https://verapancaldilab.github.io/pipeML/
 template:
   bootstrap: 5
+  bslib:
+    pkgdown-nav-height: 100px
 
 navbar:
   structure:
