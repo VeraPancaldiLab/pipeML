@@ -8,6 +8,9 @@ leakage-free model training through custom cross-validation fold
 construction
 
 <!-- badges: start -->
+
+[![R-CMD-check](https://github.com/VeraPancaldiLab/pipeML/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/VeraPancaldiLab/pipeML/actions/workflows/R-CMD-check.yaml)
+[![pkgdown](https://github.com/VeraPancaldiLab/pipeML/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/VeraPancaldiLab/pipeML/actions/workflows/pkgdown.yaml)
 <!-- badges: end -->
 
 ## Installation
