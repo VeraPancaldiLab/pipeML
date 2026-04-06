@@ -193,7 +193,7 @@ is the primary maintainer of this package.
 If you use `pipeML` in a scientific publication, we would appreciate
 citation to the :
 
-Hurtado, M., & Pancaldi, V. (2026). A new pipeline for cross-validation
-fold-aware machine learning prediction of clinical outcomes addresses
-hidden data-leakage in omics based ‘predictors’. bioRxiv.
-<https://doi.org/10.64898/2026.03.12.711429>
+Hurtado M, Pancaldi V (2026). pipeML: A flexible and modular machine
+learning framework designed to support leakage-free model training
+through custom cross-validation fold construction. R package version
+0.0.1, <https://verapancaldilab.github.io/pipeML>
