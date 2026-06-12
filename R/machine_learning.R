@@ -2577,6 +2577,9 @@ calculate_feature_importance_stacking = function(base_importance, base_models, m
 #' @export
 compute_prediction = function(model, test_data, target_var = NULL, trait.positive = NULL, task_type = "classification", time_var = NULL, event_var = NULL, stack = FALSE, file.name = NULL, return = FALSE){
 
+  # Sanitize test_data column names to match caret's internal make.names() conversion applied during training
+  colnames(test_data) <- make.names(colnames(test_data))
+
   # --------------------------------------
   # Classification task
   # --------------------------------------
@@ -2619,15 +2622,15 @@ compute_prediction = function(model, test_data, target_var = NULL, trait.positiv
     sens_spec = get_sensitivity_specificity(predict, target, method)
 
     auroc <- list(
-      mean  = calculate_auroc(sens_spec$fpr, sens_spec$Sensitivity),
-      lower = NA,
-      upper = NA
+      estimate = calculate_auroc(sens_spec$fpr, sens_spec$Sensitivity),
+      lower    = NA,
+      upper    = NA
     )
 
     auprc <- list(
-      mean  = calculate_auprc(sens_spec$Recall, sens_spec$Precision),
-      lower = NA,
-      upper = NA
+      estimate = calculate_auprc(sens_spec$Recall, sens_spec$Precision),
+      lower    = NA,
+      upper    = NA
     )
 
     #Bootstrap confidence intervals
@@ -3359,6 +3362,8 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 #' @export
 compute_shap_values <- function(model_trained, data_train, task_type = "classification", target_col = NULL,
                                 trait.positive, time_col = NULL, event_col = NULL, n_cores = 2, file.name = NULL) {
+                                  
+  sample_ids <- rownames(data_train)
 
   if(task_type == "classification"){
     if(is.null(target_col)) stop("target_col must be provided for classification tasks")
@@ -3375,7 +3380,7 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
       dplyr::select(-dplyr::all_of(target_col))
 
     pred_fun = function(object, newdata){
-      predict(object, newdata, type = "prob")[,yes]
+      predict(object, newdata, type = "prob")[,"yes"]
     }
 
     # Determine resamples from the model object
@@ -3423,12 +3428,20 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
   cl <- parallel::makeCluster(n_cores)
   doParallel::registerDoParallel(cl)
 
-  importance_list <- foreach::foreach(resample = resamples, .packages = c("dplyr", "caret", "censored", "pipeML")) %dopar% {
+  base_pkgs <- c("dplyr", "caret", "pipeML")
+  if (task_type == "survival") {
+    if (!requireNamespace("censored", quietly = TRUE))
+      stop("Package 'censored' is required for survival tasks. Install it with install.packages('censored').")
+    base_pkgs <- c(base_pkgs, "censored")
+  }
+
+  importance_list <- foreach::foreach(resample = resamples, .packages = base_pkgs) %dopar% {
 
       if(task_type == "classification"){
 
         test_index <- model_trained$pred %>%
           dplyr::filter(Resample == resample) %>%
+          dplyr::distinct(rowIndex) %>%
           dplyr::pull(rowIndex)
 
         train_data_fold <- data_train[-test_index, ]
@@ -3528,7 +3541,7 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
   # Combine and summarize importance results
   shap_df <- dplyr::bind_rows(importance_list)
 
-  plot_shap_stability(shap_df, file.name = file.name)
+  #plot_shap_stability(shap_df, file.name = file.name)
 
   shap_df <- shap_df %>%
     dplyr::group_by(Samples) %>%
@@ -3536,8 +3549,8 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
       dplyr::across(where(is.numeric), \(x) median(x, na.rm = TRUE)),
       .groups = "drop"
     ) %>%
-    dplyr::arrange(match(Samples, rownames(data_train))) %>%
-    data.frame()
+    dplyr::arrange(match(Samples, sample_ids)) %>%
+    as.data.frame()
 
   rownames(shap_df) <- shap_df$Samples
   shap_df$Samples <- NULL
@@ -4914,8 +4927,10 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
         cl <- parallel::makeCluster(ncores)
         doParallel::registerDoParallel(cl)
 
+        foreach_pkgs <- c("dplyr", "caret", "pipeML")
+        if (task_type == "survival") foreach_pkgs <- c(foreach_pkgs, "censored")
         models_all_params <- foreach::foreach(parameter_i = seq_along(result),
-                                              .packages = c("dplyr", "caret", "censored", "pipeML")) %dopar% {
+                                              .packages = foreach_pkgs) %dopar% {
 
                                                 train_data_i <- result[[parameter_i]][["train_data"]]
                                                 test_data_i  <- result[[parameter_i]][["test_data"]]
