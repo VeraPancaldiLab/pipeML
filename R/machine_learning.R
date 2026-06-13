@@ -158,7 +158,7 @@ merge_boruta_results = function(importance_values, decisions, file_name, iterati
 #'
 #' @export
 #'
-feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tentative = FALSE, doParallel = F, workers=NULL, file_name = NULL, threshold = NULL, return, verbose = T) {
+feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tentative = FALSE, doParallel = F, workers=NULL, file_name = NULL, threshold = NULL, return = TRUE, verbose = T) {
   if(doParallel){
     if(is.null(iterations) == T){
       stop("No iterations specified for running in parallel, please set a number. If you want to run feature selection once consider setting doParallel = F")
@@ -315,7 +315,8 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
 compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metric = "Accuracy", file_name = NULL, LODO = FALSE,
                              ncores = NULL, return = FALSE, fold_construction_fun = NULL,
                              fold_construction_args_fixed = NULL,
-                             fold_construction_args_tunable = NULL){
+                             fold_construction_args_tunable = NULL,
+                             fold_models_dir = "Results/fold_models"){
 
   ml_methods_names <- c("treebag", "rf", "C5.0",
                         "glmnet", "knn", "rpart", "lasso", "ridge",
@@ -472,7 +473,8 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metri
                do.call(compute_custom_k_fold_CV,
                          list(processed_folds = result[[parameter_i]],
                               ml_method = model_name,
-                              tuneGrid = tune_grid))
+                              tuneGrid = tune_grid,
+                              fold_models_dir = fold_models_dir))
             }
         )
 
@@ -505,7 +507,8 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metri
             do.call(compute_custom_k_fold_CV,
                     list(processed_folds = result,
                          ml_method = model_name,
-                         tuneGrid = tune_grid))
+                         tuneGrid = tune_grid,
+                         fold_models_dir = fold_models_dir))
 
 
           }
@@ -1224,6 +1227,29 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metri
 
     cat("Best ML model found: ", top_model, "\n")
 
+    # Prune saved fold model files to only keep those for the selected method + bestTune
+    if (!is.null(fold_construction_fun)) {
+      best_method_file <- model_names[[top_model]]
+      if (best_method_file %in% c("lasso", "ridge")) best_method_file <- "glmnet"
+      best_tune <- model$bestTune
+
+      all_fold_files <- list.files(fold_models_dir, pattern = "^fold_model_.*\\.rds$", full.names = TRUE)
+      method_pattern <- sprintf("_%s_\\d+\\.rds$", gsub("\\.", "\\\\.", best_method_file))
+      wrong_method   <- all_fold_files[!grepl(method_pattern, all_fold_files)]
+      if (length(wrong_method) > 0) file.remove(wrong_method)
+
+      right_method <- all_fold_files[grepl(method_pattern, all_fold_files)]
+      for (f in right_method) {
+        candidate <- readRDS(f)
+        hp_match <- is.null(best_tune) || nrow(best_tune) == 0 ||
+          all(mapply(function(col) {
+            col %in% names(candidate$hp) &&
+              isTRUE(all.equal(candidate$hp[[col]], best_tune[[col]], check.attributes = FALSE))
+          }, names(best_tune)))
+        if (!hp_match) file.remove(f)
+      }
+    }
+
     cat("Returning model trained\n")
 
     output = list("Model" = model, "ML_Models" = ensembleResults, "AUROC_median" = AUROC_median, "AUPRC_median" = AUPRC_median)
@@ -1282,7 +1308,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metri
 #' }
 #'
 #' @keywords internal
-compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
+compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid, fold_models_dir = "Results/fold_models") {
 
   train_data = processed_folds[["train_data"]]
   test_data = processed_folds[["test_data"]]
@@ -1307,6 +1333,20 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
     test_data <- test_data[, colnames(test_data) %in% model$coefnames]
     probs <- stats::predict(model, newdata = test_data, type = "prob")
     preds <- stats::predict(model, newdata = test_data)
+
+    # Save fold model for reuse in compute_shap_values (avoids retraining)
+    dir.create(fold_models_dir, recursive = TRUE, showWarnings = FALSE)
+    saveRDS(
+      list(
+        fit      = model,
+        hp       = hp,
+        X_train  = train_data[, setdiff(names(train_data), "target"), drop = FALSE],
+        X_test   = test_data,
+        test_idx = processed_folds$rowIndex
+      ),
+      file = file.path(fold_models_dir, sprintf("fold_model_%s_%s_%d.rds",
+                                                processed_folds$fold_name, ml_method, grid_row))
+    )
 
     # Prepare results
     rownames(hp) <- NULL
@@ -1409,7 +1449,8 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 compute_features.training.ML = function(features_train, task_type = c("classification", "survival"), target_var = NULL, trait.positive = NULL,
                                         time_var = NULL, event_var = NULL, metric = NULL, stack = FALSE, k_folds = 10, n_rep = 5, LODO = FALSE,
                                         batch_var = NULL, file_name = NULL, ncores = NULL, return = FALSE,
-                                        fold_construction_fun = NULL, fold_construction_args_fixed = NULL, fold_construction_args_tunable = NULL){
+                                        fold_construction_fun = NULL, fold_construction_args_fixed = NULL, fold_construction_args_tunable = NULL,
+                                        fold_models_dir = "Results/fold_models"){
 
   # ---------------------------------------------------------------------------
   # Validate task_type and required arguments
@@ -1456,7 +1497,8 @@ compute_features.training.ML = function(features_train, task_type = c("classific
     training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack,
                                  file_name = file_name, LODO = LODO, ncores = ncores, return= return,
                                  fold_construction_fun = fold_construction_fun, fold_construction_args_fixed = fold_construction_args_fixed,
-                                 fold_construction_args_tunable = fold_construction_args_tunable)
+                                 fold_construction_args_tunable = fold_construction_args_tunable,
+                                 fold_models_dir = fold_models_dir)
 
   }
 
@@ -1495,7 +1537,8 @@ compute_features.training.ML = function(features_train, task_type = c("classific
       return = return,
       fold_construction_fun = fold_construction_fun,
       fold_construction_args_fixed = fold_construction_args_fixed,
-      fold_construction_args_tunable = fold_construction_args_tunable
+      fold_construction_args_tunable = fold_construction_args_tunable,
+      fold_models_dir = fold_models_dir
     )
 
   }
@@ -1644,7 +1687,8 @@ compute_features.ML <- function(features_train, features_test, coldata,
     training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack,
                                  file_name = file_name, LODO = LODO, ncores = ncores, return= return,
                                  fold_construction_fun = fold_construction_fun, fold_construction_args_fixed = fold_construction_args_fixed,
-                                 fold_construction_args_tunable = fold_construction_args_tunable)
+                                 fold_construction_args_tunable = fold_construction_args_tunable,
+                                 fold_models_dir = fold_models_dir)
 
     ####################################################Predicting
     if(length(training)!=0){
@@ -3361,7 +3405,8 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 #' @import grDevices
 #' @export
 compute_shap_values <- function(model_trained, data_train, task_type = "classification", target_col = NULL,
-                                trait.positive, time_col = NULL, event_col = NULL, n_cores = 2, file.name = NULL) {
+                                trait.positive, time_col = NULL, event_col = NULL, n_cores = 2, file.name = NULL,
+                                fold_models_dir = "Results/fold_models") {
                                   
   sample_ids <- rownames(data_train)
 
@@ -3417,13 +3462,6 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
   # Get tuned hyperparameters
   filter_conditions <- model_trained$bestTune[1, , drop = FALSE]
 
-  # Filter predictions for best tune
-  # if (any(filter_conditions != "none")) {
-  #   for (col in names(filter_conditions)) {
-  #     model_trained$pred <- model_trained$pred[model_trained$pred[[col]] == filter_conditions[[col]], ]
-  #   }
-  # }
-
   # Register parallel backend
   cl <- parallel::makeCluster(n_cores)
   doParallel::registerDoParallel(cl)
@@ -3439,63 +3477,110 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
 
       if(task_type == "classification"){
 
-        test_index <- model_trained$pred %>%
-          dplyr::filter(Resample == resample) %>%
-          dplyr::distinct(rowIndex) %>%
-          dplyr::pull(rowIndex)
-
-        train_data_fold <- data_train[-test_index, ]
-        test_data_fold  <- data_train[test_index, ]
-
-        fit <- if (any(filter_conditions != "none")) {
-
-          caret::train(
-            target ~ .,
-            data = train_data_fold,
-            method = method,
-            trControl = caret::trainControl(method = "none", classProbs = TRUE),
-            tuneGrid = filter_conditions,
-            metric = "Accuracy"
-          )
-
-        } else {
-          caret::train(
-            target ~ .,
-            data = train_data_fold,
-            method = method,
-            trControl = caret::trainControl(method = "none", classProbs = TRUE),
-            metric = "Accuracy"
-          )
+        # Try to load a saved fold model from compute_custom_k_fold_CV
+        saved_files <- list.files(fold_models_dir,
+                                  pattern = sprintf("^fold_model_%s_%s_\\d+\\.rds$", resample, method),
+                                  full.names = TRUE)
+        loaded_fold <- NULL
+        if (length(saved_files) > 0) {
+          for (sf in saved_files) {
+            candidate <- readRDS(sf)
+            hp_match <- all(mapply(function(col) {
+              col %in% names(candidate$hp) &&
+                isTRUE(all.equal(candidate$hp[[col]], filter_conditions[[col]], check.attributes = FALSE))
+            }, names(filter_conditions)))
+            if (hp_match) { loaded_fold <- candidate; break }
+          }
         }
 
-        # Separating features from target
-        X_train <- train_data_fold[, setdiff(names(train_data_fold), "target")]
-        X_test  <- test_data_fold[, setdiff(names(test_data_fold), "target")]
+        if (!is.null(loaded_fold)) {
+          cat("Resample", resample, "— loaded saved fold model (skipping retrain)\n")
+          fit     <- loaded_fold$fit
+          X_train <- loaded_fold$X_train
+          X_test  <- loaded_fold$X_test
+          pred_probs <- pred_fun(fit, X_test)
+        } else {
+          cat("Resample", resample, "— no saved model found, retraining\n")
+          test_index <- model_trained$pred %>%
+            dplyr::filter(Resample == resample) %>%
+            dplyr::distinct(rowIndex) %>%
+            dplyr::pull(rowIndex)
 
-        pred_probs <- pred_fun(fit, X_test)
+          train_data_fold <- data_train[-test_index, ]
+          test_data_fold  <- data_train[test_index, ]
+
+          fit <- if (any(filter_conditions != "none")) {
+            caret::train(
+              target ~ .,
+              data = train_data_fold,
+              method = method,
+              trControl = caret::trainControl(method = "none", classProbs = TRUE),
+              tuneGrid = filter_conditions,
+              metric = "Accuracy"
+            )
+          } else {
+            caret::train(
+              target ~ .,
+              data = train_data_fold,
+              method = method,
+              trControl = caret::trainControl(method = "none", classProbs = TRUE),
+              metric = "Accuracy"
+            )
+          }
+
+          X_train    <- train_data_fold[, setdiff(names(train_data_fold), "target")]
+          X_test     <- test_data_fold[, setdiff(names(test_data_fold), "target")]
+          pred_probs <- pred_fun(fit, X_test)
+        }
 
       }else if(task_type == "survival"){
 
-        test_index <- model_trained$Resample_matrix %>%
-          dplyr::filter(Resample == resample) %>%
-          dplyr::pull(rowIndex)
+        # Try to load a saved fold model from compute_k_fold_CV_survival
+        saved_files <- list.files(fold_models_dir,
+                                  pattern = sprintf("^fold_model_%s_%s_\\d+\\.rds$", resample, method),
+                                  full.names = TRUE)
+        loaded_fold <- NULL
+        if (length(saved_files) > 0) {
+          for (sf in saved_files) {
+            candidate <- readRDS(sf)
+            if (is.null(filter_conditions) || nrow(candidate$hp) == 0) {
+              loaded_fold <- candidate; break
+            }
+            hp_match <- all(mapply(function(col) {
+              col %in% names(candidate$hp) &&
+                isTRUE(all.equal(candidate$hp[[col]], filter_conditions[[col]], check.attributes = FALSE))
+            }, names(filter_conditions)))
+            if (hp_match) { loaded_fold <- candidate; break }
+          }
+        }
 
-        train_data_fold <- data_train[-test_index, ]
-        test_data_fold  <- data_train[test_index, ]
+        if (!is.null(loaded_fold)) {
+          cat("Resample", resample, "— loaded saved fold model (skipping retrain)\n")
+          fit        <- loaded_fold$fit
+          X_train    <- loaded_fold$X_train
+          X_test     <- loaded_fold$X_test
+          pred_probs <- pred_fun(fit, X_test)
+        } else {
+          cat("Resample", resample, "— no saved model found, retraining\n")
+          test_index <- model_trained$Resample_matrix %>%
+            dplyr::filter(Resample == resample) %>%
+            dplyr::pull(rowIndex)
 
-        res = compute_ml_survival(train_data_fold, test_data_fold, outcome_col = time_col,
-                                  event_col = event_col, model = method,
-                                  models_hyperparameters = if (is.null(filter_conditions)) NULL else
-                                    list(filter_conditions),
-                                  return_model = T)
+          train_data_fold <- data_train[-test_index, ]
+          test_data_fold  <- data_train[test_index, ]
 
-        fit = res$Model
+          res = compute_ml_survival(train_data_fold, test_data_fold, outcome_col = time_col,
+                                    event_col = event_col, model = method,
+                                    models_hyperparameters = if (is.null(filter_conditions)) NULL else
+                                      list(filter_conditions),
+                                    return_model = T,
+                                    fold_models_dir = fold_models_dir)
 
-        # Separating features from target
-        X_test <- test_data_fold %>% select(-all_of(c(time_col, event_col)))
-        X_train <- train_data_fold %>% select(-all_of(c(time_col, event_col)))
-
-        pred_probs = res$Metrics$predictions
+          fit        <- res$Model
+          X_train    <- train_data_fold %>% dplyr::select(-dplyr::all_of(c(time_col, event_col)))
+          X_test     <- test_data_fold %>% dplyr::select(-dplyr::all_of(c(time_col, event_col)))
+          pred_probs <- res$Metrics$predictions
+        }
       }
 
 
@@ -3508,7 +3593,7 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
           X = X_train,
           pred_wrapper = pred_fun,
           newdata = X_test,
-          nsim = 1000,
+          nsim = 100,
           adjust = TRUE
         )
 
@@ -4512,7 +4597,8 @@ get_default_hyperparams <- function(model_name, train_x = NULL, levels = 5, v = 
 #' @keywords internal
 compute_ml_survival <- function(df_train, df_test = NULL,
                                 outcome_col, event_col,
-                                model, models_hyperparameters, return_model = F){
+                                model, models_hyperparameters, return_model = F,
+                                fold_models_dir = "Results/fold_models"){
   # ---------------------------------------------------------------------------
   # Define the model specification based on the chosen model
   # ---------------------------------------------------------------------------
@@ -4719,7 +4805,8 @@ compute_ml_survival <- function(df_train, df_test = NULL,
 compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, event_col, k_folds, n_rep, ncores, return = FALSE,
                                        LODO = FALSE, batch_id = NULL, file_name = NULL, fold_construction_fun = NULL,
                                        fold_construction_args_fixed = NULL,
-                                       fold_construction_args_tunable = NULL){
+                                       fold_construction_args_tunable = NULL,
+                                       fold_models_dir = "Results/fold_models"){
 
   # ---------------------------------------------------------------------------
   # Step 2: Merge features and outcomes
@@ -4858,7 +4945,8 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
                                            outcome_col = outcome_col, event_col = event_col,
                                            model = method,
                                            models_hyperparameters = if (is.null(hyperparams)) NULL else list(
-                                             current_params %>% dplyr::select(-.config_id)))
+                                             current_params %>% dplyr::select(-.config_id)),
+                                           fold_models_dir = fold_models_dir)
 
             if(!is.null(trained)){
               trained_df <- trained %>%
@@ -4976,9 +5064,26 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
                                                                                      outcome_col = outcome_col, event_col = event_col,
                                                                                      model = method,
                                                                                      models_hyperparameters = if (is.null(hyperparams)) NULL else list(
-                                                                                       current_params %>% dplyr::select(-.config_id)))
+                                                                                       current_params %>% dplyr::select(-.config_id)),
+                                                                                     return_model = TRUE)
 
-                                                      trained_df <- trained %>%
+                                                      # Save fold model for reuse in compute_shap_values
+                                                      train_i <- result[[parameter_i]][["train_data"]]
+                                                      test_i  <- result[[parameter_i]][["test_data"]]
+                                                      dir.create(fold_models_dir, recursive = TRUE, showWarnings = FALSE)
+                                                      saveRDS(
+                                                        list(
+                                                          fit      = trained$Model,
+                                                          hp       = current_params %>% dplyr::select(-.config_id),
+                                                          X_train  = train_i[, setdiff(names(train_i), c(outcome_col, event_col)), drop = FALSE],
+                                                          X_test   = test_i[, setdiff(names(test_i), c(outcome_col, event_col)), drop = FALSE],
+                                                          test_idx = result[[parameter_i]][["rowIndex"]]
+                                                        ),
+                                                        file = file.path(fold_models_dir, sprintf("fold_model_%s_%s_%d.rds",
+                                                                                                  paste0("Fold", fold_i), method, g))
+                                                      )
+
+                                                      trained_df <- trained$Metrics %>%
                                                         data.frame() %>%
                                                         dplyr::mutate(
                                                           model = method,
@@ -5040,9 +5145,26 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
                                              outcome_col = outcome_col, event_col = event_col,
                                              model = method,
                                              models_hyperparameters = if (is.null(hyperparams)) NULL else list(
-                                               current_params %>% dplyr::select(-.config_id)))
+                                               current_params %>% dplyr::select(-.config_id)),
+                                             return_model = TRUE)
 
-              trained_df <- trained %>%
+              # Save fold model for reuse in compute_shap_values
+              train_i <- result[["train_data"]]
+              test_i  <- result[["test_data"]]
+              dir.create(fold_models_dir, recursive = TRUE, showWarnings = FALSE)
+              saveRDS(
+                list(
+                  fit      = trained$Model,
+                  hp       = current_params %>% dplyr::select(-.config_id),
+                  X_train  = train_i[, setdiff(names(train_i), c(outcome_col, event_col)), drop = FALSE],
+                  X_test   = test_i[, setdiff(names(test_i), c(outcome_col, event_col)), drop = FALSE],
+                  test_idx = result[["rowIndex"]]
+                ),
+                file = file.path(fold_models_dir, sprintf("fold_model_%s_%s_%d.rds",
+                                                          paste0("Fold", fold_i), method, g))
+              )
+
+              trained_df <- trained$Metrics %>%
                 data.frame() %>%
                 dplyr::mutate(
                   model = method,
@@ -5163,13 +5285,35 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
 
   cat("Best ML model found: ", top_model, "\n")
 
+  # Prune saved fold model files to only keep those for the selected method + bestTune
+  if (!is.null(fold_construction_fun)) {
+    best_tune <- model_metrics$bestTune
+
+    all_fold_files <- list.files(fold_models_dir, pattern = "^fold_model_.*\\.rds$", full.names = TRUE)
+    method_pattern <- sprintf("_%s_\\d+\\.rds$", gsub("\\.", "\\\\.", top_model))
+    wrong_method   <- all_fold_files[!grepl(method_pattern, all_fold_files)]
+    if (length(wrong_method) > 0) file.remove(wrong_method)
+
+    right_method <- all_fold_files[grepl(method_pattern, all_fold_files)]
+    for (f in right_method) {
+      candidate <- readRDS(f)
+      hp_match <- is.null(best_tune) || nrow(best_tune) == 0 ||
+        all(mapply(function(col) {
+          col %in% names(candidate$hp) &&
+            isTRUE(all.equal(candidate$hp[[col]], best_tune[[col]], check.attributes = FALSE))
+        }, names(best_tune)))
+      if (!hp_match) file.remove(f)
+    }
+  }
+
   ############# Re-train only 'best model' to return ML model using tuned parameters
   model_metrics[["Model_object"]] <- compute_ml_survival(
                                         df_train = df_all,
                                         outcome_col = "time",
                                         event_col   = "event",
                                         model = top_model,
-                                        models_hyperparameters = list(model_metrics$bestTune)
+                                        models_hyperparameters = list(model_metrics$bestTune),
+                                        fold_models_dir = fold_models_dir
                                       )
 
   cat("Returning model trained\n")
