@@ -3473,6 +3473,16 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
     base_pkgs <- c(base_pkgs, "censored")
   }
 
+  # Pre-scan saved fold models and report before entering the parallel block
+  saved_resamples <- sapply(resamples, function(r) {
+    length(list.files(fold_models_dir,
+                      pattern = sprintf("^fold_model_%s_%s_\\d+\\.rds$", r, method),
+                      full.names = FALSE)) > 0
+  })
+  cat(sprintf("Fold models found for %d / %d resamples — %s will retrain\n",
+              sum(saved_resamples), length(resamples),
+              if (all(saved_resamples)) "none" else paste(names(saved_resamples)[!saved_resamples], collapse = ", ")))
+
   importance_list <- foreach::foreach(resample = resamples, .packages = base_pkgs) %dopar% {
 
       if(task_type == "classification"){
@@ -3494,13 +3504,11 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
         }
 
         if (!is.null(loaded_fold)) {
-          cat("Resample", resample, "— loaded saved fold model (skipping retrain)\n")
           fit     <- loaded_fold$fit
           X_train <- loaded_fold$X_train
           X_test  <- loaded_fold$X_test
           pred_probs <- pred_fun(fit, X_test)
         } else {
-          cat("Resample", resample, "— no saved model found, retraining\n")
           test_index <- model_trained$pred %>%
             dplyr::filter(Resample == resample) %>%
             dplyr::distinct(rowIndex) %>%
@@ -3561,7 +3569,6 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
           X_test     <- loaded_fold$X_test
           pred_probs <- pred_fun(fit, X_test)
         } else {
-          cat("Resample", resample, "— no saved model found, retraining\n")
           test_index <- model_trained$Resample_matrix %>%
             dplyr::filter(Resample == resample) %>%
             dplyr::pull(rowIndex)

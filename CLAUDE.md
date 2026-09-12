@@ -173,3 +173,42 @@ Edit `vignettes/pipeML.Rmd`. Run `devtools::build_vignettes()` to test locally. 
 - SHAP computation via `fastshap::explain()` can be memory-intensive on large datasets.
 - XGBoost parallel contention: when using `doParallel`, XGBoost nthread is set to 1 internally to prevent nested parallelism crashes.
 - The `docs/` directory is gitignored — pkgdown output is built and deployed by CI only.
+- `compute_shap_values(model_trained, ...)` expects the *actual* caret `train` object
+  (needs `$pred`, `$bestTune`, `$method`) — a caller passing a wrapper object one level
+  up (e.g. a custom pipeline's `list(Model = train_obj, ...)` instead of `train_obj`
+  itself) gets no error, just a silent `NULL` return with a "trivial predictions" warning,
+  since `unique(model_trained$pred$Resample)` evaluates to `NULL` and the `foreach` loop
+  over resamples runs zero iterations. Worth either validating the input class
+  (`stopifnot(inherits(model_trained, "train"))`) or documenting this failure mode more
+  visibly, since the warning message doesn't hint at "wrong object passed in."
+
+## Known Issues / TODO
+
+- **`compute_shap_values()`'s cost is extremely method-dependent, and this is invisible
+  to the caller until it's too late.** Measured empirically (melanoma LODO dataset,
+  ~250-300 x ~15 NMF-factor features, `nsim = 100`, one `fastshap::explain()` call per
+  CV resample): `glmnet` ≈ 16s/resample, `KNN` ≈ 25s/resample, but `svmRadial` ≈
+  **930s/resample** — a ~58x slowdown, because SVM/KNN-family predict methods are
+  computationally heavier per call (KNN recomputes distances to the full training set;
+  SVM's kernel evaluation is per-support-vector) and `fastshap::explain()` calls the
+  prediction function repeatedly (proportional to `nsim`) for every resample. With the
+  default `k_folds x n_rep` producing up to 100 resamples, an SVM-selected model can
+  turn what's normally a ~30min job into a ~26-hour one, with zero warning beforehand.
+  Concrete improvements worth making:
+  - **Expose `nsim`** as a `compute_shap_values()` parameter instead of the hardcoded
+    100 (`machine_learning.R` line ~3603) — callers with a slow-predict method could
+    trade precision for speed deliberately, instead of being stuck with a fixed cost
+    multiplier they can't control.
+  - **Expose which/how many resamples to explain**, rather than always looping over
+    every one of `unique(model_trained$pred$Resample)` — explaining a representative
+    subset (e.g. 10-20 of 100) would give an approximate-but-fast SHAP estimate on
+    request.
+  - **Print a per-resample time estimate after the first resample completes** (before
+    committing to the rest of the loop) — currently there's no feedback at all until
+    the whole thing finishes or the caller gives up waiting; even a single
+    `cat(sprintf("First resample took %.1fs; estimated total: %.1fmin for %d
+    resamples\n", ...))` after resample 1 would let users abort early with an informed
+    decision instead of guessing.
+  - Consider flagging known-slow methods (`svmRadial`, `svmLinear`, `knn`, and other
+    instance-/kernel-based predictors) with a `message()` up front suggesting a
+    reduced `nsim` or resample subset for those specifically.
