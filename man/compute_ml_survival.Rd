@@ -11,7 +11,8 @@ compute_ml_survival(
   event_col,
   model,
   models_hyperparameters,
-  return_model = F
+  return_model = F,
+  fold_models_dir = "Results/fold_models"
 )
 }
 \arguments{

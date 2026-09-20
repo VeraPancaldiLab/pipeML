@@ -18,7 +18,8 @@ compute_k_fold_CV_survival(
   file_name = NULL,
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
-  fold_construction_args_tunable = NULL
+  fold_construction_args_tunable = NULL,
+  fold_models_dir = "Results/fold_models"
 )
 }
 \arguments{

@@ -8,7 +8,6 @@ compute_k_fold_CV(
   train_data,
   k_folds,
   n_rep,
-  stacking = FALSE,
   metric = "Accuracy",
   file_name = NULL,
   LODO = FALSE,
@@ -16,7 +15,8 @@ compute_k_fold_CV(
   return = FALSE,
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
-  fold_construction_args_tunable = NULL
+  fold_construction_args_tunable = NULL,
+  fold_models_dir = "Results/fold_models"
 )
 }
 \arguments{
@@ -28,8 +28,6 @@ Default is 5.}
 
 \item{n_rep}{Integer. Number of repetitions of the k-fold cross-validation.
 Default is 100.}
-
-\item{stacking}{Logical. Whether to perform model stacking. Default is \code{FALSE}.}
 
 \item{metric}{Character. Performance metric used for hyperparameter tuning
 and model evaluation. Supported values include \code{"Accuracy"},
@@ -68,19 +66,10 @@ A list containing:
 \item The selected machine learning model
 \item All trained machine learning models
 }
-
-If \code{stacking = TRUE}, the list will also include:
-\itemize{
-\item Base models
-\item Meta-learner
-\item Matrix of weighted feature importance (see
-\code{calculate_feature_importance_stacking()})
-}
 }
 \description{
 Internal function that performs repeated stratified k-fold cross-validation
 to train and tune hyperparameters across multiple machine learning models.
-Optionally, it can perform model stacking and Boruta-based feature selection.
 Model performance is evaluated using user-specified metrics such as Accuracy,
 AUROC, or AUPRC.
 }

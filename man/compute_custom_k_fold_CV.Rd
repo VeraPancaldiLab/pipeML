@@ -4,7 +4,12 @@
 \alias{compute_custom_k_fold_CV}
 \title{Train and evaluate machine learning models on custom cross-validation folds}
 \usage{
-compute_custom_k_fold_CV(processed_folds, ml_method, tuneGrid)
+compute_custom_k_fold_CV(
+  processed_folds,
+  ml_method,
+  tuneGrid,
+  fold_models_dir = "Results/fold_models"
+)
 }
 \arguments{
 \item{processed_folds}{A list of folds. Each fold should contain processed

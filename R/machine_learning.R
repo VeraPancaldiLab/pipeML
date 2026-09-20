@@ -262,7 +262,6 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
 #'
 #' Internal function that performs repeated stratified k-fold cross-validation
 #' to train and tune hyperparameters across multiple machine learning models.
-#' Optionally, it can perform model stacking and Boruta-based feature selection.
 #' Model performance is evaluated using user-specified metrics such as Accuracy,
 #' AUROC, or AUPRC.
 #'
@@ -272,7 +271,6 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
 #'   Default is 5.
 #' @param n_rep Integer. Number of repetitions of the k-fold cross-validation.
 #'   Default is 100.
-#' @param stacking Logical. Whether to perform model stacking. Default is \code{FALSE}.
 #' @param metric Character. Performance metric used for hyperparameter tuning
 #'   and model evaluation. Supported values include \code{"Accuracy"},
 #'   \code{"AUROC"}, and \code{"AUPRC"}.
@@ -303,16 +301,8 @@ feature.selection.boruta <- function(data, iterations = NULL, fix = FALSE, tenta
 #'   \item All trained machine learning models
 #' }
 #'
-#' If \code{stacking = TRUE}, the list will also include:
-#' \itemize{
-#'   \item Base models
-#'   \item Meta-learner
-#'   \item Matrix of weighted feature importance (see
-#'   \code{calculate_feature_importance_stacking()})
-#' }
-#'
 #' @keywords internal
-compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metric = "Accuracy", file_name = NULL, LODO = FALSE,
+compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "Accuracy", file_name = NULL, LODO = FALSE,
                              ncores = NULL, return = FALSE, fold_construction_fun = NULL,
                              fold_construction_args_fixed = NULL,
                              fold_construction_args_tunable = NULL,
@@ -624,6 +614,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metri
         return(model)
       })
 
+      names(models) <- names(hyperparams) # lapply() over names(models) above strips names, restore them
       custom_outputs = NULL
 
     }else{ #### There is custom fold function
@@ -736,8 +727,6 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metri
   }
 
   ############### Collect ML models
-  names(models) = names(hyperparams)
-
   fit.treebag <- models$BAG
   fit.rf <- models$RF
   fit.c50 <- models$C50
@@ -750,13 +739,11 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metri
   fit.svm_linear <- models$SVM_linear
   fit.xgbTree <- models$XGboost
 
-  ############################################# These predictions are use for the meta-learner because it needs the predictions from the models in the complete dataset (might change in the future)
+  ############################################# These predictions on the full training data are used to discard models that predict a single constant value (see the filtering step below)
 
   if(is.null(fold_construction_fun)){
 
     ###Prediction with best tuned hyper-parameters (Missing to add platt scaling to calibrated probabilities (when tested it didnt converge, need to be checked)) See https://www.cs.cornell.edu/~alexn/papers/calibration.icml05.crc.rev3.pdf
-
-    # -------------------------------------> Missing: Train models with bestTune from CV (only for meta-learner: stacking)
 
     ###Bagged CART
 
@@ -1169,98 +1156,56 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, stacking = FALSE, metri
   model_predictions = Filter(Negate(is.null), model_predictions) #Discard not useful predictions
   ensembleResults = ensembleResults[names(model_predictions)] #Discard not useful models based on predictions
 
-  model_predictions = do.call(cbind, model_predictions) #Join as data frame
-
   #Clean memory
   rm(fit.treebag, fit.rf, fit.c50, fit.knn, fit.cart, fit.glmnet, fit.lasso, fit.ridge, fit.svm_radial, fit.svm_linear)
   gc()
 
-
-  if(stacking){
-    features = colnames(train_data)[colnames(train_data) != "target"]
-
-    #Base models using ML models with best accuracy or AUC from each family
-    if(metric == "Accuracy"){
-      base_models = compute_cv_accuracy(ensembleResults, base_models = T, file_name = file_name, return = return)
-    }else if(metric == "AUROC" || metric == "AUPRC"){
-      base_models = compute_cv_AUC(ensembleResults, base_models = T, file_name = file_name, AUC_type = metric, return = return)
-    }
-
-    cat("Meta-learners ML model based on GLM\n")
-
-    features_predictions = model_predictions %>%
-      t() %>%
-      data.frame() %>%
-      tibble::rownames_to_column("Models") %>%
-      dplyr::filter(grepl(paste0("\\b(", paste(base_models$Base_models, collapse = "|"), ")\\b"), Models)) %>%
-      tibble::column_to_rownames("Models") %>%
-      t() %>%
-      data.frame()
-
-    meta_features = cbind(features_predictions, "true_label" = train_data$target)
-
-    trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = F, classProbs = TRUE, savePredictions=T)
-    meta_learner <- caret::train(true_label ~ ., data = meta_features, method = "glmnet", trControl = trainControl) #Staking based on simple logistic regression
-
-    output = list("Meta_learner" = meta_learner, "Base_models" = base_models$Base_models, "ML_models" = ensembleResults)
-
-    ####################################################################### To be done, which output to retrieve when stacking is done? Multiple ML models used different cell groups depending on optimization
-    # if(is.null(custom_output) == F){
-    #   output[[length(output)+1]] = custom_outputs[[top_model]]
-    #   names(output)[length(output)] = "Custom_output"
-    # }
-
-  }else{
-
-    #Top model with best accuracy or AUC
-    if(metric == "Accuracy"){
-      metrics = compute_cv_accuracy(ensembleResults, file_name = file_name, return = return)
-    }else if(metric == "AUROC" || metric == "AUPRC"){
-      metrics = compute_cv_AUC(ensembleResults, file_name = file_name, AUC_type = metric, return = return)
-    }
-
-    top_model = metrics[["Top_model"]]
-    AUROC_median = metrics[["AUROC"]]
-    AUPRC_median = metrics[["AUPRC"]]
-
-    model = ensembleResults[[top_model]]
-
-    cat("Best ML model found: ", top_model, "\n")
-
-    # Prune saved fold model files to only keep those for the selected method + bestTune
-    if (!is.null(fold_construction_fun)) {
-      best_method_file <- model_names[[top_model]]
-      if (best_method_file %in% c("lasso", "ridge")) best_method_file <- "glmnet"
-      best_tune <- model$bestTune
-
-      all_fold_files <- list.files(fold_models_dir, pattern = "^fold_model_.*\\.rds$", full.names = TRUE)
-      method_pattern <- sprintf("_%s_\\d+\\.rds$", gsub("\\.", "\\\\.", best_method_file))
-      wrong_method   <- all_fold_files[!grepl(method_pattern, all_fold_files)]
-      if (length(wrong_method) > 0) file.remove(wrong_method)
-
-      right_method <- all_fold_files[grepl(method_pattern, all_fold_files)]
-      for (f in right_method) {
-        candidate <- readRDS(f)
-        hp_match <- is.null(best_tune) || nrow(best_tune) == 0 ||
-          all(mapply(function(col) {
-            col %in% names(candidate$hp) &&
-              isTRUE(all.equal(candidate$hp[[col]], best_tune[[col]], check.attributes = FALSE))
-          }, names(best_tune)))
-        if (!hp_match) file.remove(f)
-      }
-    }
-
-    cat("Returning model trained\n")
-
-    output = list("Model" = model, "ML_Models" = ensembleResults, "AUROC_median" = AUROC_median, "AUPRC_median" = AUPRC_median)
-
-    if(!is.null(custom_outputs) && !any(sapply(custom_outputs, is.null))){ #Check whether custom_output exists or not
-      output[[length(output)+1]] = custom_outputs[[top_model]]
-      names(output)[length(output)] = "Custom_output"
-    }
-
+  #Top model with best accuracy or AUC
+  if(metric == "Accuracy"){
+    metrics = compute_cv_accuracy(ensembleResults, file_name = file_name, return = return)
+  }else if(metric == "AUROC" || metric == "AUPRC"){
+    metrics = compute_cv_AUC(ensembleResults, file_name = file_name, AUC_type = metric, return = return)
   }
 
+  top_model = metrics[["Top_model"]]
+  AUROC_median = metrics[["AUROC"]]
+  AUPRC_median = metrics[["AUPRC"]]
+
+  model = ensembleResults[[top_model]]
+
+  cat("Best ML model found: ", top_model, "\n")
+
+  # Prune saved fold model files to only keep those for the selected method + bestTune
+  if (!is.null(fold_construction_fun)) {
+    best_method_file <- model_names[[top_model]]
+    if (best_method_file %in% c("lasso", "ridge")) best_method_file <- "glmnet"
+    best_tune <- model$bestTune
+
+    all_fold_files <- list.files(fold_models_dir, pattern = "^fold_model_.*\\.rds$", full.names = TRUE)
+    method_pattern <- sprintf("_%s_\\d+\\.rds$", gsub("\\.", "\\\\.", best_method_file))
+    wrong_method   <- all_fold_files[!grepl(method_pattern, all_fold_files)]
+    if (length(wrong_method) > 0) file.remove(wrong_method)
+
+    right_method <- all_fold_files[grepl(method_pattern, all_fold_files)]
+    for (f in right_method) {
+      candidate <- readRDS(f)
+      hp_match <- is.null(best_tune) || nrow(best_tune) == 0 ||
+        all(mapply(function(col) {
+          col %in% names(candidate$hp) &&
+            isTRUE(all.equal(candidate$hp[[col]], best_tune[[col]], check.attributes = FALSE))
+        }, names(best_tune)))
+      if (!hp_match) file.remove(f)
+    }
+  }
+
+  cat("Returning model trained\n")
+
+  output = list("Model" = model, "ML_Models" = ensembleResults, "AUROC_median" = AUROC_median, "AUPRC_median" = AUPRC_median)
+
+  if(!is.null(custom_outputs) && !any(sapply(custom_outputs, is.null))){ #Check whether custom_output exists or not
+    output[[length(output)+1]] = custom_outputs[[top_model]]
+    names(output)[length(output)] = "Custom_output"
+  }
 
   return(output)
 
@@ -1374,10 +1319,10 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid, fold_
 }
 
 
-#' Train machine learning or survival models with optional stacking and custom cross-validation
+#' Train machine learning or survival models with custom cross-validation
 #'
 #' This function trains one or more machine learning models using repeated k-fold cross-validation,
-#' with optional model stacking, feature selection, and support for both classification and survival tasks.
+#' with optional feature selection, and support for both classification and survival tasks.
 #' It allows flexible cross-validation schemes, including:
 #' \itemize{
 #'   \item Standard stratified k-fold cross-validation
@@ -1401,7 +1346,6 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid, fold_
 #'     \item \code{"AUPRC"} — area under the precision-recall curve
 #'     \item \code{"C-index"} — concordance index (for survival tasks)
 #'   }
-#' @param stack Logical. Perform model stacking (ensemble meta-learning). Default: \code{FALSE}.
 #' @param k_folds Integer. Number of folds for cross-validation. Default: 10.
 #' @param n_rep Integer. Number of repetitions for repeated CV. Default: 5.
 #' @param LODO Logical. If \code{TRUE}, constructs folds stratified by cohort (LODO scheme).
@@ -1423,6 +1367,8 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid, fold_
 #'   }
 #' @param fold_construction_args_fixed List of arguments passed to \code{fold_construction_fun} that remain fixed across CV and final training.
 #' @param fold_construction_args_tunable List of arguments passed to \code{fold_construction_fun} for hyperparameter tuning.
+#' @param fold_models_dir Character. Directory where per-fold models are saved/read from when
+#'   \code{fold_construction_fun} is used. Default: \code{"Results/fold_models"}.
 #'
 #' @details
 #' The function provides:
@@ -1438,7 +1384,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid, fold_
 #'
 #' @return A list containing:
 #' \itemize{
-#'   \item Trained model(s) or meta-learner (if \code{stack = TRUE})
+#'   \item Trained model(s)
 #'   \item Features used for training
 #'   \item Cross-validation performance results and plots
 #'   \item Best hyperparameter configuration (if applicable)
@@ -1447,7 +1393,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid, fold_
 #'
 #' @export
 compute_features.training.ML = function(features_train, task_type = c("classification", "survival"), target_var = NULL, trait.positive = NULL,
-                                        time_var = NULL, event_var = NULL, metric = NULL, stack = FALSE, k_folds = 10, n_rep = 5, LODO = FALSE,
+                                        time_var = NULL, event_var = NULL, metric = NULL, k_folds = 10, n_rep = 5, LODO = FALSE,
                                         batch_var = NULL, file_name = NULL, ncores = NULL, return = FALSE,
                                         fold_construction_fun = NULL, fold_construction_args_fixed = NULL, fold_construction_args_tunable = NULL,
                                         fold_models_dir = "Results/fold_models"){
@@ -1494,7 +1440,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
     }
 
     #Cross-validation training
-    training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack,
+    training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric,
                                  file_name = file_name, LODO = LODO, ncores = ncores, return= return,
                                  fold_construction_fun = fold_construction_fun, fold_construction_args_fixed = fold_construction_args_fixed,
                                  fold_construction_args_tunable = fold_construction_args_tunable,
@@ -1557,7 +1503,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #'
 #' This function trains and evaluates machine learning models using cross-validation on training data
 #' and then evaluates performance on independent test data. It supports both **classification** and
-#' **survival analysis** tasks, including hyperparameter tuning, model stacking, and cohort-based
+#' **survival analysis** tasks, including hyperparameter tuning and cohort-based
 #' (Leave-One-Dataset-Out, LODO) validation. For survival models, it computes the **C-index**
 #' and generates Kaplan–Meier plots stratified by predicted risk.
 #'
@@ -1579,7 +1525,6 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #'     \item Classification: \code{"Accuracy"}, \code{"AUROC"}, \code{"AUPRC"}.
 #'     \item Survival: evaluated using concordance index (C-index).
 #'   }
-#' @param stack Logical. Perform model stacking (ensemble meta-learning). Default: \code{FALSE}.
 #' @param k_folds Integer. Number of folds for cross-validation. Default: 10.
 #' @param n_rep Integer. Number of repetitions for cross-validation. Default: 5.
 #' @param LODO Logical. If \code{TRUE}, performs Leave-One-Dataset-Out cross-validation based on cohorts.
@@ -1592,6 +1537,8 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #' @param fold_construction_args_fixed List. Fixed arguments passed to \code{fold_construction_fun} for both CV and final training.
 #' @param fold_construction_args_tunable List. Arguments passed to \code{fold_construction_fun} defining hyperparameters to explore during CV.
 #' @param return Logical. Whether to return and save plots/results. Default: \code{FALSE}.
+#' @param fold_models_dir Character. Directory where per-fold models are saved/read from when
+#'   \code{fold_construction_fun} is used. Default: \code{"Results/fold_models"}.
 #'
 #' @details
 #' For **classification tasks**, the function performs repeated k-fold cross-validation
@@ -1648,13 +1595,14 @@ compute_features.ML <- function(features_train, features_test, coldata,
                                 task_type = c("classification", "survival"),
                                 trait = NULL, trait.positive = NULL,
                                 time_var = NULL, event_var = NULL,
-                                metric = "Accuracy", stack = FALSE,
+                                metric = "Accuracy",
                                 k_folds = 10, n_rep = 5, LODO = FALSE,
                                 batch_id = NULL, file_name = NULL, ncores = NULL,
                                 return = FALSE,
                                 fold_construction_fun = NULL,
                                 fold_construction_args_fixed = NULL,
-                                fold_construction_args_tunable = NULL){
+                                fold_construction_args_tunable = NULL,
+                                fold_models_dir = "Results/fold_models"){
 
   # ---------------------------------------------------------------------------
   # === CASE 1: CLASSIFICATION TASK ==========================================
@@ -1684,7 +1632,7 @@ compute_features.ML <- function(features_train, features_test, coldata,
     }
 
     #Cross-validation training
-    training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric, stacking = stack,
+    training = compute_k_fold_CV(train_data, k_folds = k_folds, n_rep = n_rep, metric = metric,
                                  file_name = file_name, LODO = LODO, ncores = ncores, return= return,
                                  fold_construction_fun = fold_construction_fun, fold_construction_args_fixed = fold_construction_args_fixed,
                                  fold_construction_args_tunable = fold_construction_args_tunable,
@@ -1694,11 +1642,7 @@ compute_features.ML <- function(features_train, features_test, coldata,
     if(length(training)!=0){
       ####################### Testing set
 
-      if(stack){
-        prediction = compute_prediction(training$Model, features_test, traitData_test[,trait], trait.positive, stack = TRUE, file.name = file_name, return = return)
-      }else{
-        prediction = compute_prediction(training$Model, features_test, traitData_test[,trait], trait.positive, stack = FALSE, file.name = file_name, return = return)
-      }
+      prediction = compute_prediction(training$Model, features_test, traitData_test[,trait], trait.positive, file.name = file_name, return = return)
 
       auc_roc_score = prediction[["AUC"]][["AUROC"]]
       auc_prc_score = prediction[["AUC"]][["AUPRC"]]
@@ -1778,206 +1722,15 @@ compute_features.ML <- function(features_train, features_test, coldata,
 
 }
 
-#' @title Internal: Plot Pooled AUROC and AUPRC Performance Curves
-#'
-#' @description
-#' Internal function to read multiple `.rds` files containing machine learning results,
-#' pool the AUROC and AUPRC metrics, and generate boxplots summarizing performance
-#' across iterations. Median values are annotated on the plots.
-#'
-#' @param file.name Character. Name used as a prefix when saving output plots.
-#' @param folder_path Character. Path to the directory containing the `.rds` files with ML model results.
-#'
-#' @details
-#' Each `.rds` file is expected to contain a list with a `result$AUC` element,
-#' including both `AUROC` and `AUPRC` values. The function saves two PDF files in the
-#' `Results/` directory:
-#' \itemize{
-#'   \item Boxplot of AUROC values with median annotation
-#'   \item Boxplot of AUPRC values with median annotation
-#' }
-#' No value is returned to the R environment.
-#'
-#' @keywords internal
-get_pooled_roc_curves = function(file.name, folder_path){
-
-  # Get a list of all RDS files in the folder
-  res <- list.files(folder_path, pattern = "\\.rds$", full.names = TRUE)
-
-  # Initialize cumulative data frame
-  cumulative_data <- data.frame(AUC_roc = numeric(),
-                                AUC_prc = numeric(),
-                                Cohort = character(),
-                                stringsAsFactors = FALSE)
-
-  for (file in res) {
-    model <- readRDS(file)
-
-    auc_roc <- model[["result"]][["AUC"]][["AUROC"]]
-    auc_prc <- model[["result"]][["AUC"]][["AUPRC"]]
-
-    # Append metrics to cumulative data
-    cumulative_data <- rbind(cumulative_data,
-                             data.frame(AUC_roc = auc_roc,
-                                        AUC_prc = auc_prc,
-                                        Cohort = file.name))
-  }
-
-  #########Boxplot
-  iterations = nrow(cumulative_data)
-
-  median_auc_roc = cumulative_data %>%
-    dplyr::group_by(Cohort) %>%
-    dplyr::summarize(medianAUROC = median(AUC_roc))
-
-  median_auc_prc = cumulative_data %>%
-    dplyr::group_by(Cohort) %>%
-    dplyr::summarize(medianAUPRC = median(AUC_prc))
-
-  # Plot boxplot with median AUC annotations
-  plot_roc = ggplot2::ggplot(cumulative_data, ggplot2::aes(x = Cohort, y = AUC_roc, fill = Cohort)) +
-    ggplot2::geom_boxplot() +
-    ggplot2::labs(title = paste0("Distribution of AUROC values across ", iterations, " splits"),
-         x = "Model",
-         y = "AUROC") +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(legend.position = "right") +
-    ggplot2::geom_text(data = median_auc_roc, ggplot2::aes(x = Cohort, y = max(cumulative_data$AUC_roc),
-                                                           label = paste("Median AUROC:", round(medianAUROC, 3))),
-                       size = 4, color = "black", vjust = -0.5)
-
-  grDevices::pdf(paste0("Results/Boxplot_AUROC_performance_", file.name, ".pdf"))
-  print(plot_roc)
-  grDevices::dev.off()
-
-  plot_prc = ggplot2::ggplot(cumulative_data, ggplot2::aes(x = Cohort, y = AUC_prc, fill = Cohort)) +
-    ggplot2::geom_boxplot() +
-    ggplot2::labs(title = paste0("Distribution of AUPRC values across ", iterations, " splits"),
-         x = "Model",
-         y = "AUPRC") +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(legend.position = "right") +
-    ggplot2::geom_text(data = median_auc_prc, ggplot2::aes(x = Cohort, y = max(cumulative_data$AUC_prc),
-                                                           label = paste("Median AUPRC:", round(medianAUPRC, 3))),
-              size = 4, color = "black", vjust = -0.5)
-
-  grDevices::pdf(paste0("Results/Boxplot_AUPRC_performance_", file.name, ".pdf"))
-  print(plot_prc)
-  grDevices::dev.off()
-
-}
-
-#' @title Internal: Plot Pooled AUROC and AUPRC Boxplots Across Multiple Folders
-#'
-#' @description
-#' Internal function to aggregate AUROC and AUPRC metrics from multiple folders (e.g., different cohorts or models),
-#' and generate comparative boxplots showing model performance across groups.
-#'
-#' @param folder_paths Character vector. Paths to folders containing `.rds` files with ML model results.
-#' @param file_name Character. Prefix used when saving the resulting PDF plots.
-#' @param width Numeric. Width of the saved plots in inches. Default is 12.
-#' @param height Numeric. Height of the saved plots in inches. Default is 8.
-#'
-#' @details
-#' Each `.rds` file should contain a list with a `result$AUC` element including numeric values
-#' for both `AUROC` and `AUPRC`. Folder names are used as grouping labels in the plots.
-#' Red dashed horizontal lines are drawn at a reference value (0.7) for visual interpretation.
-#' Two PDF files are saved in the `Results/` directory:
-#' \itemize{
-#'   \item `Boxplots_AUROC_performance_<file_name>.pdf`
-#'   \item `Boxplots_AUPRC_performance_<file_name>.pdf`
-#' }
-#' No object is returned to the R environment.
-#'
-#' @keywords internal
-get_pooled_boxplots = function(folder_paths, file_name, width = 12, height = 8) {
-
-  # Initialize cumulative data frame
-  cumulative_data <- data.frame(AUC_roc = numeric(),
-                                AUC_prc = numeric(),
-                                Cohort = character(),
-                                Folder = character(),
-                                stringsAsFactors = FALSE)
-
-  for (folder_path in folder_paths) {
-
-    # Extract folder name for labeling
-    folder_name <- basename(folder_path)
-
-    # Get a list of all RDS files in the folder
-    res <- list.files(folder_path, pattern = "\\.rds$", full.names = TRUE)
-
-    for (file in res) {
-      model <- readRDS(file)
-
-      auc_roc <- model[["result"]][["AUC"]][["AUROC"]]
-      auc_prc <- model[["result"]][["AUC"]][["AUPRC"]]
-
-      # Append metrics to cumulative data
-      cumulative_data <- rbind(cumulative_data,
-                               data.frame(AUC_roc = auc_roc,
-                                          AUC_prc = auc_prc,
-                                          Cohort = basename(file),
-                                          Folder = folder_name))
-    }
-  }
-
-  ######### AUROC Boxplots #########
-  grDevices::pdf(paste0("Results/Boxplots_AUROC_performance_", file_name, ".pdf"), width = width, height = height)
-
-  folder_data <- cumulative_data %>% dplyr::filter(Folder == folder_name)
-  iterations <- nrow(folder_data)
-
-  plot_roc <- ggplot2::ggplot(cumulative_data, ggplot2::aes(x = Folder, y = AUC_roc, fill = Folder)) +
-    ggplot2::geom_boxplot() +
-    ggplot2::geom_hline(yintercept = 0.7, linetype = "dashed", color = "red", linewidth = 1) +  # Red horizontal line
-    ggplot2::coord_cartesian(ylim = c(0.2, 0.9)) +  # Set y-axis limits
-    ggplot2::labs(title = paste0("ML models using TME features across ", iterations, " iterations"),
-                  x = "Features",
-                  y = "AUROC") +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(
-      text = element_text(size = 16),       # Increase overall text size
-      axis.text = element_text(size = 14),  # Increase axis tick labels
-      axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x-axis labels diagonally
-      axis.title = element_text(size = 16), # Increase axis titles
-      plot.title = element_text(size = 18, face = "bold"), # Increase title size
-      legend.text = element_text(size = 14),
-      legend.title = element_text(size = 16)
-    )
-
-  print(plot_roc)
-
-  grDevices::dev.off()
-
-  ######### AUPRC Boxplots #########
-  grDevices::pdf(paste0("Results/Boxplots_AUPRC_performance_", file_name, ".pdf"), width = width, height = height)
-
-  plot_prc <- ggplot2::ggplot(cumulative_data, ggplot2::aes(x = Folder, y = AUC_prc, fill = Folder)) +
-    ggplot2::geom_boxplot() +
-    ggplot2::geom_hline(yintercept = 0.7, linetype = "dashed", color = "red", linewidth = 1) +  # Red horizontal line
-    ggplot2::coord_cartesian(ylim = c(0, 1)) +  # Set y-axis limits
-    ggplot2::labs(title = paste0("LODO analysis - AUPRC Distribution (", iterations, " splits)"),
-         x = "Model",
-         y = "AUPRC") +
-    ggplot2::theme_minimal()
-
-  print(plot_prc)
-
-  grDevices::dev.off()
-
-}
-
 #' @title Internal: Compute Cross-Validation Accuracy for ML Models
 #'
 #' @description
 #' Internal function to extract cross-validated accuracy from a list of trained machine learning models,
-#' summarize their median and variability, optionally generate a barplot, and select base models for stacking.
+#' summarize their median and variability, and optionally generate a barplot.
 #'
 #' @param models Named list of trained ML models. Each model must contain a \code{$resample} data frame
 #'   with a column named \code{Accuracy}.
 #' @param file_name Optional character. Prefix for saving the accuracy barplot as a PDF in the \code{Results/} directory.
-#' @param base_models Logical. If \code{TRUE}, selects base models using \code{choose_base_models()} for stacking.
 #' @param return Logical. If \code{TRUE}, saves a barplot of model accuracy values in the \code{Results/} directory.
 #'
 #' @return
@@ -1985,17 +1738,15 @@ get_pooled_boxplots = function(folder_paths, file_name, width = 12, height = 8) 
 #' \itemize{
 #'   \item \code{Accuracy}: Data frame summarizing the median and MAD of accuracy for each model.
 #'   \item \code{Top_model}: Character string with the model name having the highest median accuracy.
-#'   \item \code{Base_models} (optional): Character vector of selected base models if \code{base_models = TRUE}.
 #' }
 #'
 #' @details
 #' The function assumes that each model contains a \code{$resample} component with an \code{Accuracy} column.
 #' Median and MAD (median absolute deviation) of accuracy are computed for each model.
 #' If \code{return = TRUE}, a PDF barplot with error bars is created.
-#' When \code{base_models = TRUE}, \code{choose_base_models()} is called to select models for stacking.
 #'
 #' @keywords internal
-compute_cv_accuracy = function(models, file_name = NULL, base_models = FALSE, return = TRUE){
+compute_cv_accuracy = function(models, file_name = NULL, return = TRUE){
 
   # Bind accuracy values from each model
   accuracy = list()
@@ -2036,15 +1787,7 @@ compute_cv_accuracy = function(models, file_name = NULL, base_models = FALSE, re
     grDevices::dev.off()
   }
 
-  if(base_models == T){
-    cat("Choosing base models for stacking.......................................\n\n")
-    base_models = choose_base_models(models, metric = "Accuracy")
-    cat("Models chosen are:", paste0(base_models, collapse = ", "), "\n\n")
-    return(list("Accuracy" = res_accuracy, "Top_model" = top_model, "Base_models" = base_models))
-  }else{
-    return(list("Accuracy" = res_accuracy, "Top_model" = top_model))
-  }
-
+  return(list("Accuracy" = res_accuracy, "Top_model" = top_model))
 
 }
 
@@ -2052,11 +1795,10 @@ compute_cv_accuracy = function(models, file_name = NULL, base_models = FALSE, re
 #'
 #' @description
 #' Internal function to summarize cross-validated AUROC and AUPRC values from a list of trained machine learning models.
-#' Computes median and MAD for each model, optionally generates barplots, and can select base models for stacking.
+#' Computes median and MAD for each model and optionally generates barplots.
 #'
 #' @param models Named list of trained ML models. Each model must contain a \code{$resample} data frame with \code{AUROC} and \code{AUPRC} columns.
 #' @param file_name Optional character string. Prefix for saving AUROC/AUPRC plots in the \code{Results/} directory.
-#' @param base_models Logical. If \code{TRUE}, selects a subset of models as base learners for stacking using \code{choose_base_models()}.
 #' @param AUC_type Character. Either \code{"AUROC"} or \code{"AUPRC"}, used to select the top-performing model.
 #' @param return Logical. If \code{TRUE}, saves barplots of AUROC and AUPRC values in the \code{Results/} directory.
 #'
@@ -2065,11 +1807,10 @@ compute_cv_accuracy = function(models, file_name = NULL, base_models = FALSE, re
 #'   \item{\code{AUROC}}{Data frame with median and MAD of AUROC for each model.}
 #'   \item{\code{AUPRC}}{Data frame with median and MAD of AUPRC for each model.}
 #'   \item{\code{Top_model}}{Character string: the model with the highest median value for the selected metric (\code{AUC_type}).}
-#'   \item{\code{Base_models}}{(Optional) Character vector of selected base models if \code{base_models = TRUE}.}
 #' }
 #'
 #' @keywords internal
-compute_cv_AUC = function(models, file_name = NULL, base_models = FALSE, AUC_type = "AUROC", return = TRUE){
+compute_cv_AUC = function(models, file_name = NULL, AUC_type = "AUROC", return = TRUE){
 
   if(!(AUC_type %in% c("AUROC", "AUPRC"))){
     stop("AUC type provided don't correspond neither to ROC or PRC")
@@ -2151,94 +1892,8 @@ compute_cv_AUC = function(models, file_name = NULL, base_models = FALSE, AUC_typ
     dplyr::slice(1) %>%
     dplyr::pull(model)
 
-  if(base_models == TRUE){ ### For stacking
-    cat("Choosing base models for stacking.......................................\n\n")
-    base_models = choose_base_models(models, metric = AUC_type)
-    cat("Models chosen are:", paste0(base_models, collapse = ", "), "\n\n")
-    return(list("AUROC" = res_auroc, "AUPRC" = res_auprc, "Top_model" = top_model, "Base_models" = base_models))
-  }else{
-    return(list("AUROC" = res_auroc, "AUPRC" = res_auprc, "Top_model" = top_model))
-  }
+  return(list("AUROC" = res_auroc, "AUPRC" = res_auprc, "Top_model" = top_model))
 
-}
-
-#' Choose Top Base Models for Stacking Based on Accuracy or AUC Scores
-#'
-#' This function selects three base models for stacking based on either Accuracy or AUC metrics. It chooses the top models from
-#' different categories (e.g., tree-based methods, linear models, instance-based methods) according to the specified metric.
-#'
-#' @param models A list of trained machine learning models. Each model must contain a \code{resample} data frame with
-#'   performance metrics (Accuracy, AUROC, AUPRC) from cross-validation.
-#' @param metric A character string specifying the metric to use for model selection. Can be either "Accuracy", "AUROC", or "AUPRC".
-#'   Default is "Accuracy".
-#'
-#' @return A character vector containing the names of the top models selected based on the specified metric.
-#'
-#' @keywords internal
-#' @examples
-#' \dontrun{
-#' base_models = choose_base_models(models = ml_models, metric = "AUROC")
-#' }
-choose_base_models = function(models, metric = "Accuracy"){
-
-  #Bind accuracy values from each model
-  resample_df = list()
-  for (i in 1:length(models)){
-    resample_df[[i]] = models[[i]]$resample %>%
-      dplyr::mutate(model = names(models)[i])
-    names(resample_df)[i] = names(models)[i]
-  }
-  resample_df = do.call(rbind, resample_df)
-
-  if(metric == "Accuracy"){
-    #Prepare data frame for ploting
-    resample_df <- resample_df %>%
-      dplyr::group_by(model) %>%
-      dplyr::summarise(Accuracy = median(Accuracy))
-  }else if(metric == "AUROC"){
-    #Prepare data frame for ploting
-    resample_df <- resample_df %>%
-      dplyr::group_by(model) %>%
-      dplyr::summarise(AUROC = median(AUROC))
-  }else if(metric == "AUPRC"){
-    #Prepare data frame for ploting
-    resample_df <- resample_df %>%
-      dplyr::group_by(model) %>%
-      dplyr::summarise(AUPRC = median(AUPRC))
-  }
-
-  resample_df <- resample_df %>%
-    dplyr::mutate(Category = dplyr::case_when(
-      model %in% c("BAG", "C50", "CART", "RF", "XGboost") ~ "Tree-based Methods",
-      model %in% c("GLM", "LDA", "GLMNET", "LASSO", "RIDGE") ~ "Linear Models",
-      model %in% c("KNN", "SVM_linear", "SVM_radial") ~ "Instance-based Methods",
-      TRUE ~ "Other"  # In case there are models not in the above lists
-    ))
-
-  if(metric == "Accuracy"){
-    groupped_df <- resample_df %>%
-      dplyr::group_by(Category) %>%
-      dplyr::filter(Accuracy == max(Accuracy)) %>%
-      dplyr::ungroup()
-  }else if(metric == "AUROC"){
-    groupped_df <- resample_df %>%
-      dplyr::group_by(Category) %>%
-      dplyr::filter(AUROC == max(AUROC)) %>%
-      dplyr::ungroup()
-  }else if(metric == "AUPRC"){
-    groupped_df <- resample_df %>%
-      dplyr::group_by(Category) %>%
-      dplyr::filter(AUPRC == max(AUPRC)) %>%
-      dplyr::ungroup()
-  }else{
-    stop("No metric defined")
-  }
-
-  #Retrieve top model based on accuracy/auc
-  base_models <- groupped_df %>%
-    dplyr::pull(model)
-
-  return(base_models)
 }
 
 #' @title Internal: Calculate AUROC from Resample Predictions
@@ -2484,90 +2139,6 @@ calculate_auprc <- function(recall, precision) {
   return(auprc)
 }
 
-#' Compute Weighted Feature Importance from Base Models and Meta-Learner for Stacking Models
-#'
-#' This function computes the feature importance by weighing the feature importances from
-#' multiple base models in a stacking ensemble, combined with the meta-learner's model importance.
-#' The final importance score for each feature is calculated by multiplying the base model's
-#' feature importance with the meta-learner's weight for each base model.
-#'
-#' @param base_importance A list where each element corresponds to a base model and contains a data frame
-#'                        with feature importances. Each data frame should have a column called `importance`
-#'                        (either for the positive class or overall, depending on the type of model).
-#' @param base_models A character vector with the names of the base models whose feature importances are
-#'                    provided in `base_importance`.
-#' @param meta_learner A `caret` object representing the trained meta-learner model. This model is used to
-#'                     obtain weights for each base model, based on their performance in the ensemble.
-#'
-#' @return A data frame with two columns:
-#'   \item{features}{The feature names.}
-#'   \item{final_importance}{The final weighted importance score for each feature, calculated by summing
-#'                           the weighted importances across all base models. Features are sorted in descending
-#'                           order of their final importance score.}
-#'
-#' @details
-#' The function extracts feature importance values from the base models, then computes the weighted importance
-#' for each feature based on the meta-learner's performance. The meta-learner's feature importance is normalized
-#' to ensure the sum of the importances across all models is 1, and it is used as the weight for each base model.
-#' The feature importances from all base models are then aggregated and weighted by their respective meta-learner
-#' importance scores.
-#'
-#' @seealso \code{\link[caret]{varImp}}
-#'
-#' @import caret
-#' @import dplyr
-#' @import tibble
-#' @keywords internal
-calculate_feature_importance_stacking = function(base_importance, base_models, meta_learner){
-
-  #Extract features importance values within each base model for the meta-learner
-  base_importance_list = list()
-  for (i in 1:length(base_models)) {
-    check = ncol(base_importance[[base_models[i]]][["importance"]])
-    if(check > 1){ #Means importance is given for each class
-      base_importance_list[[i]] = base_importance[[base_models[i]]][["importance"]] %>%
-        tibble::rownames_to_column("features") %>%
-        dplyr::select(features, yes) %>% #Take only importance for positive class
-        dplyr::rename(importance = yes)
-    }else{
-      base_importance_list[[i]] = base_importance[[base_models[i]]][["importance"]] %>%
-        tibble::rownames_to_column("features") %>%
-        dplyr::rename(importance = Overall)
-    }
-    names(base_importance_list)[i] = base_models[i]
-  }
-
-  #Combine all base model importances in one data frame and add the model name
-  combined_importance <- dplyr::bind_rows(
-    lapply(names(base_importance_list), function(model) {
-      base_importance_list[[model]] %>%
-        data.frame() %>%
-        dplyr::mutate(model = model)
-    })
-  )
-
-  #Calculate base-models importance for the meta-learner
-  meta_importance = caret::varImp(meta_learner, scale = FALSE)$importance %>%
-    tibble::rownames_to_column("model")
-
-  #Normalize the meta-learner's importance scores so they sum to 1
-  meta_importance$Overall <- meta_importance$Overall / sum(meta_importance$Overall)
-
-  #Combine features importance within base models with the overall importance for meta-learner
-  combined_importance <- combined_importance %>%
-    dplyr::left_join(meta_importance, by = "model") %>%
-    dplyr::mutate(weighted_importance = importance * Overall) # importance is from base, Overall is from meta
-
-  #Sum the weighted importance by feature across all models
-  final_importance <- combined_importance %>%
-    dplyr::group_by(features) %>%
-    dplyr::summarise(final_importance = sum(weighted_importance, na.rm = TRUE)) %>%
-    dplyr::arrange(desc(final_importance))
-
-  return(final_importance)
-
-}
-
 #' Compute Prediction Metrics for a Trained Machine Learning Model
 #'
 #' Computes prediction metrics for a trained machine learning model, including the confusion matrix,
@@ -2584,7 +2155,6 @@ calculate_feature_importance_stacking = function(base_importance, base_models, m
 #' @param task_type Character. Either \code{"classification"} or \code{"survival"}.
 #' @param time_var Column or vector of survival/follow-up times (required for survival tasks).
 #' @param event_var Column or vector of event indicators (1 = event, 0 = censored; required for survival tasks).
-#' @param stack Logical. If TRUE, uses meta-learner predictions for stacked models (classification only).
 #' @param file.name Character. Filename prefix for saving plots (optional). If NULL, plots are not saved.
 #' @param return Logical. Whether to return metrics, predictions, and plots. Default = FALSE.
 #'
@@ -2599,7 +2169,7 @@ calculate_feature_importance_stacking = function(base_importance, base_models, m
 #' @details
 #' For **classification**, the function:
 #' \enumerate{
-#'   \item Uses the trained model (or meta-learner if \code{stack = TRUE}) to predict probabilities for the test data.
+#'   \item Uses the trained model to predict probabilities for the test data.
 #'   \item Computes performance metrics across thresholds and selects the optimal threshold based on a chosen metric.
 #'   \item Calculates AUROC and AUPRC and optionally bootstrapped confidence intervals.
 #'   \item Generates ROC, PRC, and confusion matrix plots if \code{return = TRUE} and \code{file.name} is provided.
@@ -2619,7 +2189,7 @@ calculate_feature_importance_stacking = function(base_importance, base_models, m
 #' @import reshape2
 #' @import grDevices
 #' @export
-compute_prediction = function(model, test_data, target_var = NULL, trait.positive = NULL, task_type = "classification", time_var = NULL, event_var = NULL, stack = FALSE, file.name = NULL, return = FALSE){
+compute_prediction = function(model, test_data, target_var = NULL, trait.positive = NULL, task_type = "classification", time_var = NULL, event_var = NULL, file.name = NULL, return = FALSE){
 
   # Sanitize test_data column names to match caret's internal make.names() conversion applied during training
   colnames(test_data) <- make.names(colnames(test_data))
@@ -2634,33 +2204,15 @@ compute_prediction = function(model, test_data, target_var = NULL, trait.positiv
 
     cat("Predicting target variable using provided ML model.................................................\n")
 
-    if(stack == FALSE){
-      test_data = test_data[,colnames(test_data)%in%model[["coefnames"]]] #Only use features defined in the model
-      features <- colnames(test_data)
-      method = model$method
-      are_equal = dplyr::setequal(model[["coefnames"]], features)
-      if(are_equal == F){
-        stop("Testing set does not count with the same features as model")
-      }
-      #Predict target variable
-      predict <- data.frame(stats::predict(model, test_data, type = "prob"))
-    }else{
-      super.learner = model$Meta_learner
-      ml.models = model$ML_models
-      base.models = model$Base_models
-      method = "Meta-learner"
-
-      #Learning from simple meta-learner
-      base_predictions = list()
-      for (i in 1:length(base.models)) {
-        base_predictions[[i]] = stats::predict(ml.models[[base.models[i]]], test_data, type = "prob")$yes
-        names(base_predictions)[i] = base.models[i]
-      }
-
-      base_predictions = do.call(cbind, base_predictions)
-
-      predict = data.frame(stats::predict(super.learner, base_predictions, type = "prob"))
+    test_data = test_data[,colnames(test_data)%in%model[["coefnames"]]] #Only use features defined in the model
+    features <- colnames(test_data)
+    method = model$method
+    are_equal = dplyr::setequal(model[["coefnames"]], features)
+    if(are_equal == F){
+      stop("Testing set does not count with the same features as model")
     }
+    #Predict target variable
+    predict <- data.frame(stats::predict(model, test_data, type = "prob"))
 
     #Get metrics
     sens_spec = get_sensitivity_specificity(predict, target, method)
@@ -2718,24 +2270,18 @@ compute_prediction = function(model, test_data, target_var = NULL, trait.positiv
     cat("Predicting survival outcomes using provided ML model...\n")
 
     # Predict survival using pre-trained model
-    if(!stack){
-      test_data = test_data %>%
-        dplyr::mutate("event" = event_var,
-                      "time" = time_var)
+    test_data = test_data %>%
+      dplyr::mutate("event" = event_var,
+                    "time" = time_var)
 
-      # Standard survival model
-      prediction = predict_and_evaluate_survival(model$Model_object, test_data, "time", "event")
+    prediction = predict_and_evaluate_survival(model$Model_object, test_data, "time", "event")
 
-      # Kaplan-Meier plot
-      if(return == TRUE){
-        plot_survival_performance(df_test = test_data, prediction = prediction, n_groups = 2, file_name = file.name) ## Add customization of n_groups
-      }
-
-      test_data$.pred = as.numeric(unlist(prediction$preds))
-
-    } else {
-      stop("Stacked survival models not yet implemented")
+    # Kaplan-Meier plot
+    if(return == TRUE){
+      plot_survival_performance(df_test = test_data, prediction = prediction, n_groups = 2, file_name = file.name) ## Add customization of n_groups
     }
+
+    test_data$.pred = as.numeric(unlist(prediction$preds))
 
     cat("\nPrediction finished!.................................................\n")
 
@@ -2975,108 +2521,6 @@ get_curves = function(data, spec = "Specificity", sens = "Sensitivity", reca = "
   print(prc)
   grDevices::dev.off()
 
-}
-
-#' Extract ML models from a directory based on specific AUC score
-#'
-#' This function searches a directory for machine learning models and filters them based on a
-#' specified AUC threshold for either the ROC or Precision-Recall curves. It returns a list of
-#' model file names that meet the specified AUC criteria.
-#'
-#' @param folder_path A character string specifying the directory path where the machine learning
-#'                    models are stored.
-#' @param metric A character string indicating which AUC metric to use. Choose either "ROC" or "PRC".
-#' @param AUC A numeric value representing the minimum acceptable AUC score for the models.
-#'
-#' @return A character vector with the file paths of the ML models that meet the AUC criteria.
-#' @keywords internal
-#'
-find.ML.models = function(folder_path, metric, AUC){
-
-  #Read ML models
-  res <- list.files(folder_path, pattern = "\\.rds$", full.names = TRUE)
-
-  # Remove ML models with result NULL or AUC scores below threshold (parameter = "AUC")
-  valid_indices <- logical(length(res))
-  for (i in seq_along(res)) {
-    model <- tryCatch(readRDS(res[i]), error = function(e) NULL)
-    if (!is.null(model) && !is.null(model[["result"]])) {
-      auc_value <- if (metric == "ROC") {
-        model[["result"]][["AUC"]][["AUROC"]]
-      } else if (metric == "PRC") {
-        model[["result"]][["AUC"]][["AUPRC"]]
-      } else {
-        stop("Metric selected for AUC doesn't exist. Choose between ROC or PRC")
-      }
-      valid_indices[i] <- auc_value <= AUC
-    }
-  }
-
-  # Filter files based on valid indices
-  res <- res[valid_indices]
-
-  if (length(res) == 0) {
-    stop("No ML models with AUC below ", AUC, " were found. Try with another value.")
-  }
-
-  return(res)
-
-}
-
-#' Align Feature Importance Based on Direction of Association
-#'
-#' Adjusts variable importance values according to the direction of association with the target variable.
-#' Positive coefficients retain the original importance sign, while negative coefficients flip it.
-#'
-#' @param model A trained machine learning model object containing \code{result$Variable_importance},
-#'   \code{result$Cell_groups}, and \code{result$Model}.
-#'
-#' @return A data frame of feature importance values with aligned signs in the \code{final_importance} column.
-#'
-#' @details
-#' This function fits a univariate logistic regression of each feature against the outcome,
-#' then multiplies the original importance by 1 or -1 depending on the sign of the regression coefficient.
-#'
-#' @keywords internal
-feature.importance.alignment = function(model){
-
-  #positive and negative class are defined based on the factor() from trait (this have been defined in compute_ML() function already)
-  importance = model[["result"]][["Variable_importance"]]
-  features_values = model[["result"]][["Cell_groups"]][[1]]
-  trait = model[["result"]][["Model"]][["trainingData"]]
-
-  for (i in 1:ncol(features_values)) {
-    logreg = stats::glm(trait$.outcome ~ features_values[,i], family = binomial) #Calculate logistic regression using cell groups values and trait outcome from training
-    beta = logreg$coefficients[[2]] #Extract beta coefficient from regression
-    idx = which(importance$features == colnames(features_values)[i])
-    if(beta >= 0){ #If beta is positive means positive association to positive target variable
-      importance$final_importance[idx] = importance$final_importance[idx]*1
-    }else{ #If beta is negative means there is a reduced likelihood of being in the positive class
-      importance$final_importance[idx] = importance$final_importance[idx]*-1
-    }
-  }
-
-  return(importance)
-}
-
-#' DEPRECATED: Perform Platt Scaling for Probability Calibration
-#'
-#' Fits a logistic regression model to calibrate predicted probabilities.
-#'
-#' @param obs Vector of observed binary outcomes.
-#' @param yes Vector of predicted probabilities for the positive class.
-#'
-#' @return Numeric vector of calibrated probabilities.
-#'
-#' @keywords internal
-compute_platt.scaling = function(obs, yes){ ####DEPRECATED
-  data = data.frame(obs = obs, yes = yes) #Create df from obs and yes to avoid nested problems using dplyr() when grouping by resamples
-  # Fit a logistic regression model
-  glm_model = stats::glm(obs ~ yes, family = binomial, data = data)
-  # Predict calibrated probabilities
-  calibrated_prob = as.numeric(predict(glm_model, type = "response")) # "response" returns only probabilities for 'yes', we dont specify new_data argument cause we are predicting on the same set where the training was done
-
-  return(as.numeric(calibrated_prob))
 }
 
 #' Construct Stratified Cohort Folds for Cross-Validation
@@ -3380,6 +2824,9 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 #' @param event_col Character. Column name representing survival event indicator. Required if `task_type = "survival"`.
 #' @param n_cores Integer. Number of cores for parallel computation. Default is 2.
 #' @param file.name Character. Optional filename prefix for saving SHAP stability plots. If `NULL`, plots are not saved.
+#' @param fold_models_dir Character. Directory where per-fold models saved during training
+#'   (by \code{compute_custom_k_fold_CV} or \code{compute_k_fold_CV_survival}) are read from,
+#'   to avoid retraining each resample. Default: \code{"Results/fold_models"}.
 #'
 #' @return A data frame containing SHAP values for all features, averaged across resamples, with rows corresponding
 #'   to training samples and columns to features.

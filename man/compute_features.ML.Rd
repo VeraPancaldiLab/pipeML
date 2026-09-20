@@ -14,7 +14,6 @@ compute_features.ML(
   time_var = NULL,
   event_var = NULL,
   metric = "Accuracy",
-  stack = FALSE,
   k_folds = 10,
   n_rep = 5,
   LODO = FALSE,
@@ -24,7 +23,8 @@ compute_features.ML(
   return = FALSE,
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
-  fold_construction_args_tunable = NULL
+  fold_construction_args_tunable = NULL,
+  fold_models_dir = "Results/fold_models"
 )
 }
 \arguments{
@@ -55,8 +55,6 @@ Ensures all performance metrics and interpretability analyses consistently treat
 \item Survival: evaluated using concordance index (C-index).
 }}
 
-\item{stack}{Logical. Perform model stacking (ensemble meta-learning). Default: \code{FALSE}.}
-
 \item{k_folds}{Integer. Number of folds for cross-validation. Default: 10.}
 
 \item{n_rep}{Integer. Number of repetitions for cross-validation. Default: 5.}
@@ -78,6 +76,9 @@ Must accept a \code{bestune} argument internally to inject optimized hyperparame
 \item{fold_construction_args_fixed}{List. Fixed arguments passed to \code{fold_construction_fun} for both CV and final training.}
 
 \item{fold_construction_args_tunable}{List. Arguments passed to \code{fold_construction_fun} defining hyperparameters to explore during CV.}
+
+\item{fold_models_dir}{Character. Directory where per-fold models are saved/read from when
+\code{fold_construction_fun} is used. Default: \code{"Results/fold_models"}.}
 }
 \value{
 A named list containing:
@@ -94,7 +95,7 @@ A named list containing:
 \description{
 This function trains and evaluates machine learning models using cross-validation on training data
 and then evaluates performance on independent test data. It supports both \strong{classification} and
-\strong{survival analysis} tasks, including hyperparameter tuning, model stacking, and cohort-based
+\strong{survival analysis} tasks, including hyperparameter tuning and cohort-based
 (Leave-One-Dataset-Out, LODO) validation. For survival models, it computes the \strong{C-index}
 and generates Kaplan–Meier plots stratified by predicted risk.
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/machine_learning.R
 \name{compute_features.training.ML}
 \alias{compute_features.training.ML}
-\title{Train machine learning or survival models with optional stacking and custom cross-validation}
+\title{Train machine learning or survival models with custom cross-validation}
 \usage{
 compute_features.training.ML(
   features_train,
@@ -12,7 +12,6 @@ compute_features.training.ML(
   time_var = NULL,
   event_var = NULL,
   metric = NULL,
-  stack = FALSE,
   k_folds = 10,
   n_rep = 5,
   LODO = FALSE,
@@ -22,7 +21,8 @@ compute_features.training.ML(
   return = FALSE,
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
-  fold_construction_args_tunable = NULL
+  fold_construction_args_tunable = NULL,
+  fold_models_dir = "Results/fold_models"
 )
 }
 \arguments{
@@ -45,8 +45,6 @@ compute_features.training.ML(
 \item \code{"AUPRC"} — area under the precision-recall curve
 \item \code{"C-index"} — concordance index (for survival tasks)
 }}
-
-\item{stack}{Logical. Perform model stacking (ensemble meta-learning). Default: \code{FALSE}.}
 
 \item{k_folds}{Integer. Number of folds for cross-validation. Default: 10.}
 
@@ -78,11 +76,14 @@ The function should save individual folds as \code{"Results/fold_*.rds"} with:
 \item{fold_construction_args_fixed}{List of arguments passed to \code{fold_construction_fun} that remain fixed across CV and final training.}
 
 \item{fold_construction_args_tunable}{List of arguments passed to \code{fold_construction_fun} for hyperparameter tuning.}
+
+\item{fold_models_dir}{Character. Directory where per-fold models are saved/read from when
+\code{fold_construction_fun} is used. Default: \code{"Results/fold_models"}.}
 }
 \value{
 A list containing:
 \itemize{
-\item Trained model(s) or meta-learner (if \code{stack = TRUE})
+\item Trained model(s)
 \item Features used for training
 \item Cross-validation performance results and plots
 \item Best hyperparameter configuration (if applicable)
@@ -90,7 +91,7 @@ A list containing:
 }
 \description{
 This function trains one or more machine learning models using repeated k-fold cross-validation,
-with optional model stacking, feature selection, and support for both classification and survival tasks.
+with optional feature selection, and support for both classification and survival tasks.
 It allows flexible cross-validation schemes, including:
 \itemize{
 \item Standard stratified k-fold cross-validation

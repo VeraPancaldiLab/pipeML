@@ -209,22 +209,6 @@ for (f in top_features) {
 }
 ```
 
-### Model Stacking
-
-To apply model stacking, set `stack = TRUE`:
-```{r, eval = FALSE}
-res <- compute_features.training.ML(features_train = X_train, 
-                                    target_var = y_train,
-                                    task_type = "classification",
-                                    trait.positive = "1",
-                                    metric = "AUROC",
-                                    stack = T,
-                                    k_folds = 2,
-                                    n_rep = 1,
-                                    file_name = "Example_classification",
-                                    return = F)
-```
-
 ## Survival Tasks
 
 In addition to classification and regression tasks, `pipeML` supports survival analysis, allowing users to train machine learning models that predict time-to-event outcomes.

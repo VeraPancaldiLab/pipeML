@@ -13,7 +13,8 @@ compute_shap_values(
   time_col = NULL,
   event_col = NULL,
   n_cores = 2,
-  file.name = NULL
+  file.name = NULL,
+  fold_models_dir = "Results/fold_models"
 )
 }
 \arguments{
@@ -35,6 +36,10 @@ which includes cross-validation resamples.}
 \item{n_cores}{Integer. Number of cores for parallel computation. Default is 2.}
 
 \item{file.name}{Character. Optional filename prefix for saving SHAP stability plots. If \code{NULL}, plots are not saved.}
+
+\item{fold_models_dir}{Character. Directory where per-fold models saved during training
+(by \code{compute_custom_k_fold_CV} or \code{compute_k_fold_CV_survival}) are read from,
+to avoid retraining each resample. Default: \code{"Results/fold_models"}.}
 }
 \value{
 A data frame containing SHAP values for all features, averaged across resamples, with rows corresponding

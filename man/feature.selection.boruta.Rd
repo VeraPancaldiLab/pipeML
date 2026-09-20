@@ -13,7 +13,7 @@ feature.selection.boruta(
   workers = NULL,
   file_name = NULL,
   threshold = NULL,
-  return,
+  return = TRUE,
   verbose = T
 )
 }

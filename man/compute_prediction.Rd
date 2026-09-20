@@ -12,7 +12,6 @@ compute_prediction(
   task_type = "classification",
   time_var = NULL,
   event_var = NULL,
-  stack = FALSE,
   file.name = NULL,
   return = FALSE
 )
@@ -32,8 +31,6 @@ compute_prediction(
 \item{time_var}{Column or vector of survival/follow-up times (required for survival tasks).}
 
 \item{event_var}{Column or vector of event indicators (1 = event, 0 = censored; required for survival tasks).}
-
-\item{stack}{Logical. If TRUE, uses meta-learner predictions for stacked models (classification only).}
 
 \item{file.name}{Character. Filename prefix for saving plots (optional). If NULL, plots are not saved.}
 
@@ -58,7 +55,7 @@ optionally generates Kaplan–Meier plots.
 \details{
 For \strong{classification}, the function:
 \enumerate{
-\item Uses the trained model (or meta-learner if \code{stack = TRUE}) to predict probabilities for the test data.
+\item Uses the trained model to predict probabilities for the test data.
 \item Computes performance metrics across thresholds and selects the optimal threshold based on a chosen metric.
 \item Calculates AUROC and AUPRC and optionally bootstrapped confidence intervals.
 \item Generates ROC, PRC, and confusion matrix plots if \code{return = TRUE} and \code{file.name} is provided.

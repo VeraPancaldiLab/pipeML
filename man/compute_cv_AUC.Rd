@@ -4,20 +4,12 @@
 \alias{compute_cv_AUC}
 \title{Internal: Compute Cross-Validated AUROC and AUPRC for ML Models}
 \usage{
-compute_cv_AUC(
-  models,
-  file_name = NULL,
-  base_models = FALSE,
-  AUC_type = "AUROC",
-  return = TRUE
-)
+compute_cv_AUC(models, file_name = NULL, AUC_type = "AUROC", return = TRUE)
 }
 \arguments{
 \item{models}{Named list of trained ML models. Each model must contain a \code{$resample} data frame with \code{AUROC} and \code{AUPRC} columns.}
 
 \item{file_name}{Optional character string. Prefix for saving AUROC/AUPRC plots in the \code{Results/} directory.}
-
-\item{base_models}{Logical. If \code{TRUE}, selects a subset of models as base learners for stacking using \code{choose_base_models()}.}
 
 \item{AUC_type}{Character. Either \code{"AUROC"} or \code{"AUPRC"}, used to select the top-performing model.}
 
@@ -29,11 +21,10 @@ A list containing:
 \item{\code{AUROC}}{Data frame with median and MAD of AUROC for each model.}
 \item{\code{AUPRC}}{Data frame with median and MAD of AUPRC for each model.}
 \item{\code{Top_model}}{Character string: the model with the highest median value for the selected metric (\code{AUC_type}).}
-\item{\code{Base_models}}{(Optional) Character vector of selected base models if \code{base_models = TRUE}.}
 }
 }
 \description{
 Internal function to summarize cross-validated AUROC and AUPRC values from a list of trained machine learning models.
-Computes median and MAD for each model, optionally generates barplots, and can select base models for stacking.
+Computes median and MAD for each model and optionally generates barplots.
 }
 \keyword{internal}

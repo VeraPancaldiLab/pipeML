@@ -4,20 +4,13 @@
 \alias{compute_cv_accuracy}
 \title{Internal: Compute Cross-Validation Accuracy for ML Models}
 \usage{
-compute_cv_accuracy(
-  models,
-  file_name = NULL,
-  base_models = FALSE,
-  return = TRUE
-)
+compute_cv_accuracy(models, file_name = NULL, return = TRUE)
 }
 \arguments{
 \item{models}{Named list of trained ML models. Each model must contain a \code{$resample} data frame
 with a column named \code{Accuracy}.}
 
 \item{file_name}{Optional character. Prefix for saving the accuracy barplot as a PDF in the \code{Results/} directory.}
-
-\item{base_models}{Logical. If \code{TRUE}, selects base models using \code{choose_base_models()} for stacking.}
 
 \item{return}{Logical. If \code{TRUE}, saves a barplot of model accuracy values in the \code{Results/} directory.}
 }
@@ -26,17 +19,15 @@ A list containing:
 \itemize{
 \item \code{Accuracy}: Data frame summarizing the median and MAD of accuracy for each model.
 \item \code{Top_model}: Character string with the model name having the highest median accuracy.
-\item \code{Base_models} (optional): Character vector of selected base models if \code{base_models = TRUE}.
 }
 }
 \description{
 Internal function to extract cross-validated accuracy from a list of trained machine learning models,
-summarize their median and variability, optionally generate a barplot, and select base models for stacking.
+summarize their median and variability, and optionally generate a barplot.
 }
 \details{
 The function assumes that each model contains a \code{$resample} component with an \code{Accuracy} column.
 Median and MAD (median absolute deviation) of accuracy are computed for each model.
 If \code{return = TRUE}, a PDF barplot with error bars is created.
-When \code{base_models = TRUE}, \code{choose_base_models()} is called to select models for stacking.
 }
 \keyword{internal}
