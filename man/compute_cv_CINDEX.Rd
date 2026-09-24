@@ -19,7 +19,7 @@ a \code{Resample_matrix} data frame with columns:
 a default naming convention.}
 
 \item{plot_results}{Logical (default = TRUE). If \code{TRUE}, generates a PDF bar plot
-showing median C-index ± MAD per model.}
+showing median C-index +/- MAD per model.}
 }
 \value{
 A list with:
@@ -39,7 +39,7 @@ and optionally generates a bar plot summarizing performance.
 \itemize{
 \item Median C-index represents typical discrimination performance across folds.
 \item MAD provides robust variability estimation of C-index values.
-\item The optional plot displays model performance with error bars ± MAD.
+\item The optional plot displays model performance with error bars +/- MAD.
 }
 }
 \seealso{

@@ -75,7 +75,6 @@ pipeline. </i>
 
 ### Feature selection
 
-- Boruta-based feature selection
 - Optional correlation-based feature filtering
 
 ### Hyperparameter tuning
@@ -91,10 +90,6 @@ pipeline. </i>
 - SHAP-based feature importance
 - Variable importance summaries
 - Performance visualization (ROC and PR curves)
-
-### Ensemble learning
-
-- Model stacking
 
 ### Parallel computing
 

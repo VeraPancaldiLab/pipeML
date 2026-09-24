@@ -220,6 +220,11 @@ In survival analysis, the response variable is defined by two components:
 
 `pipeML` automates the training, evaluation, and interpretation of survival models using cross-validation and SHAP-based explanations.
 
+**Note:** survival models are built on the `censored` extension of `parsnip`. It must be installed, but you don't need to load it — `pipeML` loads it automatically when a survival task runs.
+```{r, eval=FALSE}
+install.packages("censored")  # only needed once, if not already installed
+```
+
 Load example dataset for survival:
 ```{r, eval=FALSE}
 data = pipeML::data_example_survival
@@ -484,13 +489,13 @@ roc_data <- lapply(names(prediction), function(cohort) {
 }) %>% dplyr::bind_rows()
 
 auc_roc <- list(
-  mean  = sapply(prediction, function(x) x$AUC$AUROC$mean),
+  estimate = sapply(prediction, function(x) x$AUC$AUROC$estimate),
   lower = sapply(prediction, function(x) x$AUC$AUROC$lower),
   upper = sapply(prediction, function(x) x$AUC$AUROC$upper)
 )
 
 auc_prc <- list(
-  mean  = sapply(prediction, function(x) x$AUC$AUPRC$mean),
+  estimate = sapply(prediction, function(x) x$AUC$AUPRC$estimate),
   lower = sapply(prediction, function(x) x$AUC$AUPRC$lower),
   upper = sapply(prediction, function(x) x$AUC$AUPRC$upper)
 )

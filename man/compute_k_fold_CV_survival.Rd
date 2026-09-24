@@ -78,7 +78,7 @@ The function can:
 The function internally:
 \itemize{
 \item Merges predictors and outcomes.
-\item Creates stratified folds using \strong{rsample}, either by event or by cohort × event (LODO).
+\item Creates stratified folds using \strong{rsample}, either by event or by cohort x event (LODO).
 \item Evaluates predefined survival models: Cox PH, penalized Cox (glmnet), AFT (flexsurv),
 decision trees, bagged trees, and random forests.
 \item Aggregates the median and MAD of C-index across resamples.

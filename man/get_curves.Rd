@@ -16,7 +16,9 @@ get_curves(
   LODO = FALSE,
   file.name,
   width = 6,
-  height = 6
+  height = 6,
+  roc_band = NULL,
+  prc_band = NULL
 )
 }
 \arguments{
@@ -33,9 +35,13 @@ get_curves(
 \item{color}{The name of the column containing the cohort names. Each cohort will have a
 corresponding color in the plot. Multiple cohorts will result in different curves.}
 
-\item{auc_roc}{A numeric value representing the AUC for the ROC curve.}
+\item{auc_roc}{A list with elements \code{estimate}, \code{lower} and \code{upper}
+giving the AUROC and its confidence interval, as returned in
+\code{compute_prediction()$AUC$AUROC}. When \code{LODO = TRUE}, each element is a
+vector with one value per cohort, named to match the values of the \code{color} column.}
 
-\item{auc_prc}{A numeric value representing the AUC for the Precision-Recall curve.}
+\item{auc_prc}{Same structure as \code{auc_roc}, for the AUPRC
+(\code{compute_prediction()$AUC$AUPRC}).}
 
 \item{LODO}{Logical. If TRUE, the function assumes the data contains stacked predictions from
 multiple cohorts and assigns AUROC/AUPRC per cohort (default = FALSE).}
@@ -45,6 +51,14 @@ multiple cohorts and assigns AUROC/AUPRC per cohort (default = FALSE).}
 \item{width}{A numeric value for the width of plot}
 
 \item{height}{A numeric value for the height of plot}
+
+\item{roc_band}{Optional data frame with columns \code{fpr}, \code{lower}, \code{upper}
+(as in \code{compute_prediction()$Curve_bands$ROC}). If supplied and \code{LODO = FALSE},
+it is drawn as a shaded pointwise confidence band around the ROC curve.}
+
+\item{prc_band}{Optional data frame with columns \code{recall}, \code{lower}, \code{upper}
+(as in \code{compute_prediction()$Curve_bands$PRC}), drawn around the precision-recall
+curve in the same way.}
 }
 \value{
 Saves two PDF plots: one for the ROC curve and one for the Precision-Recall curve

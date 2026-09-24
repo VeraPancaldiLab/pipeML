@@ -27,14 +27,14 @@ event indicator, and predictors.}
 
 \item{model}{Character. The type of survival model to train. Options:
 \itemize{
-\item \code{"cox_ph_survival"} – Cox proportional hazards model
-\item \code{"proportional_hazards_glmnet"} – Penalized Cox (LASSO/Elastic Net)
-\item \code{"survreg_flexsurv"} – Parametric AFT model
-\item \code{"rand_forest_partykit"} – Random survival forest (ctree engine)
-\item \code{"rand_forest_aorsf"} – Oblique random survival forest
-\item \code{"decision_tree_partykit"} – Single survival tree
-\item \code{"bag_tree_rpart"} – Bagged survival trees
-\item \code{"boost_tree_mboost"} – Gradient boosting for survival data
+\item \code{"cox_ph_survival"} - Cox proportional hazards model
+\item \code{"proportional_hazards_glmnet"} - Penalized Cox (LASSO/Elastic Net)
+\item \code{"survreg_flexsurv"} - Parametric AFT model
+\item \code{"rand_forest_partykit"} - Random survival forest (ctree engine)
+\item \code{"rand_forest_aorsf"} - Oblique random survival forest
+\item \code{"decision_tree_partykit"} - Single survival tree
+\item \code{"bag_tree_rpart"} - Bagged survival trees
+\item \code{"boost_tree_mboost"} - Gradient boosting for survival data
 }}
 
 \item{models_hyperparameters}{Optional list of hyperparameter values to apply.
@@ -49,8 +49,8 @@ If \code{df_test} is provided:
 \item A tibble with columns \code{predictions} (predicted risk scores) and \code{c_index} (Concordance Index).
 \item If \code{return_model = TRUE}, a list with elements:
 \itemize{
-\item \code{Model} – fitted tidymodels workflow
-\item \code{Metrics} – tibble with \code{predictions} and \code{c_index}.
+\item \code{Model} - fitted tidymodels workflow
+\item \code{Metrics} - tibble with \code{predictions} and \code{c_index}.
 If \code{df_test} is \code{NULL}, the function returns only the fitted model object.
 }
 }

@@ -10,14 +10,14 @@ get_default_hyperparams(model_name, train_x = NULL, levels = 5, v = 5)
 \item{model_name}{Character string specifying the model name.
 Supported options include:
 \itemize{
-\item \code{"cox_ph_survival"} – Classic Cox proportional hazards model
-\item \code{"proportional_hazards_glmnet"} – Penalized Cox (LASSO / Elastic Net)
-\item \code{"survreg_flexsurv"} – Parametric accelerated failure time (AFT)
-\item \code{"decision_tree_partykit"} – Single survival tree
-\item \code{"bag_tree_rpart"} – Bagged CART survival trees
-\item \code{"rand_forest_partykit"} – Random survival forest (ctree-based)
-\item \code{"rand_forest_aorsf"} – Oblique random survival forest
-\item \code{"boost_tree_mboost"} – Gradient boosting for survival
+\item \code{"cox_ph_survival"} - Classic Cox proportional hazards model
+\item \code{"proportional_hazards_glmnet"} - Penalized Cox (LASSO / Elastic Net)
+\item \code{"survreg_flexsurv"} - Parametric accelerated failure time (AFT)
+\item \code{"decision_tree_partykit"} - Single survival tree
+\item \code{"bag_tree_rpart"} - Bagged CART survival trees
+\item \code{"rand_forest_partykit"} - Random survival forest (ctree-based)
+\item \code{"rand_forest_aorsf"} - Oblique random survival forest
+\item \code{"boost_tree_mboost"} - Gradient boosting for survival
 }}
 
 \item{train_x}{Optional data frame or matrix of training predictors.

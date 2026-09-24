@@ -38,9 +38,9 @@ predictions into a comparable numeric format.
 \details{
 The function attempts predictions using multiple types depending on model support:
 \itemize{
-\item \code{"linear_pred"} — Linear predictor/log hazard (higher = higher risk).
-\item \code{"time"} — Expected survival time (higher = longer survival, reversed internally).
-\item \code{"survival"} — Survival probability at a median evaluation time (higher = better survival, reversed internally).
+\item \code{"linear_pred"} - Linear predictor/log hazard (higher = higher risk).
+\item \code{"time"} - Expected survival time (higher = longer survival, reversed internally).
+\item \code{"survival"} - Survival probability at a median evaluation time (higher = better survival, reversed internally).
 }
 
 Standardizes output into a tibble with a single numeric \code{.pred} column.

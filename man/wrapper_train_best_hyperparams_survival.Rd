@@ -25,14 +25,14 @@ used for cross-validation.}
 \item{ml_method}{Character string specifying the survival model to train.
 Must be one of:
 \itemize{
-\item \code{"cox_ph_survival"} — Cox proportional hazards model.
-\item \code{"proportional_hazards_glmnet"} — Penalized Cox (elastic net).
-\item \code{"survreg_flexsurv"} — Parametric AFT model.
-\item \code{"rand_forest_partykit"} — Random survival forest via \code{partykit}.
-\item \code{"rand_forest_aorsf"} — Oblique random survival forest.
-\item \code{"decision_tree_partykit"} — Single survival tree.
-\item \code{"bag_tree_rpart"} — Bagged CART-based survival trees.
-\item \code{"boost_tree_mboost"} — Gradient boosting for censored data.
+\item \code{"cox_ph_survival"} - Cox proportional hazards model.
+\item \code{"proportional_hazards_glmnet"} - Penalized Cox (elastic net).
+\item \code{"survreg_flexsurv"} - Parametric AFT model.
+\item \code{"rand_forest_partykit"} - Random survival forest via \code{partykit}.
+\item \code{"rand_forest_aorsf"} - Oblique random survival forest.
+\item \code{"decision_tree_partykit"} - Single survival tree.
+\item \code{"bag_tree_rpart"} - Bagged CART-based survival trees.
+\item \code{"boost_tree_mboost"} - Gradient boosting for censored data.
 }}
 
 \item{fold_construction_fun}{A custom function used to construct folds and

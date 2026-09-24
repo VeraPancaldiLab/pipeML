@@ -20,7 +20,7 @@
 R/
   pipeML-package.R       # Package metadata & namespace declarations
   data.R                 # Documentation for bundled example datasets
-  machine_learning.R     # All implementation (~5,700 lines, core file)
+  machine_learning.R     # All implementation (~5,200 lines, core file)
 vignettes/
   pipeML.Rmd             # Main tutorial vignette
 data/                    # Bundled example datasets (.rda)
@@ -39,13 +39,12 @@ pipeML.Rproj             # RStudio project config
 
 ---
 
-## Exported Functions (8 total)
+## Exported Functions (7 total)
 
 All live in `R/machine_learning.R`.
 
 | Function | Purpose |
 |---|---|
-| `feature.selection.boruta()` | Repeated Boruta feature selection with parallel support |
 | `compute_features.training.ML()` | Train models on training data with repeated k-fold CV |
 | `compute_features.ML()` | Combined train + predict workflow (training + testing) |
 | `compute_prediction()` | Generate predictions on test data using trained model |
@@ -69,7 +68,7 @@ Cox PH, Elastic Net Cox, AFT parametric, Conditional Inference Trees, Bagged CAR
 ## Key Dependencies
 
 **Imports (must be installed):**
-`caret`, `Boruta`, `doParallel`, `foreach`, `dplyr`, `tidyr`, `tibble`, `purrr (>= 1.0.2)`, `ggplot2`, `reshape2`, `survival`, `survminer`, `fastshap`, `dials`, `parsnip`, `rsample`, `workflows`, `tune`, `yardstick`, `grDevices`, `parallel`, `stats`
+`caret`, `doParallel`, `foreach`, `dplyr`, `tidyr`, `tibble`, `purrr (>= 1.0.2)`, `ggplot2`, `reshape2`, `survival`, `survminer`, `fastshap`, `dials`, `parsnip`, `rsample`, `workflows`, `tune`, `yardstick`, `grDevices`, `parallel`, `stats`
 
 **Suggests (optional, needed for specific algorithms):**
 `testthat (>= 3.0.0)`, `knitr`, `rmarkdown`, `C50`, `randomForest`, `glmnet`, `xgboost`, `kernlab`, `recipes`, `tidymodels`, `censored`, `flexsurv`, `coin`, `aorsf`, `WGCNA`, `cowplot`, `matlib`
@@ -91,20 +90,15 @@ The key innovation: `compute_features.training.ML()` and `compute_features.ML()`
 ### Parallelization
 - `doParallel` + `foreach %dopar%` for cross-fold parallelization
 - XGBoost uses internal threading — external parallel is disabled to avoid contention
-- Boruta iterations support parallel runs
 
 ### Hyperparameter Tuning
 - Metric-based optimization: AUROC, AUPRC, Accuracy, C-index
 - Grid search within CV folds → best params applied to full training data
 
-### Model Stacking
-- Ensemble meta-learning support
-- Weighted feature importance from base models + meta-learner
-
 ### Feature Preprocessing (internal `preprocess_features()`)
 - Near-zero variance removal
 - Collinearity filtering (correlation threshold)
-- Boruta selection with tentative feature handling
+- Removal of features constant within any target class (classification only)
 
 ---
 
@@ -168,7 +162,8 @@ Edit `vignettes/pipeML.Rmd`. Run `devtools::build_vignettes()` to test locally. 
 
 ## Notes & Gotchas
 
-- The core implementation is a single large file (`machine_learning.R`, ~5,700 lines). Internal helpers are not exported — check NAMESPACE before assuming a function is public.
+- The core implementation is a single large file (`machine_learning.R`, ~5,200 lines). Internal helpers are not exported — check NAMESPACE before assuming a function is public.
+- Survival models need the `censored` package (in Suggests) to register parsnip's "censored regression" engines. Every survival entry point calls the internal `ensure_censored()`, which loads its namespace; users don't need `library(censored)`. Survival formulas must use `survival::Surv(...)`, not bare `Surv(...)` — the bare form only works when some other package happened to attach `survival`.
 - `multideconv` is a remote (GitHub) dependency — not on CRAN. Installation requires `remotes::install_github("VeraPancaldiLab/multideconv")`.
 - SHAP computation via `fastshap::explain()` can be memory-intensive on large datasets.
 - XGBoost parallel contention: when using `doParallel`, XGBoost nthread is set to 1 internally to prevent nested parallelism crashes.
@@ -196,7 +191,7 @@ Edit `vignettes/pipeML.Rmd`. Run `devtools::build_vignettes()` to test locally. 
   turn what's normally a ~30min job into a ~26-hour one, with zero warning beforehand.
   Concrete improvements worth making:
   - **Expose `nsim`** as a `compute_shap_values()` parameter instead of the hardcoded
-    100 (`machine_learning.R` line ~3603) — callers with a slow-predict method could
+    100 (`machine_learning.R` line ~2820) — callers with a slow-predict method could
     trade precision for speed deliberately, instead of being stuck with a fixed cost
     multiplier they can't control.
   - **Expose which/how many resamples to explain**, rather than always looping over

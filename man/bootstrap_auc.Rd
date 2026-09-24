@@ -4,7 +4,7 @@
 \alias{bootstrap_auc}
 \title{Bootstrap-based AUROC and AUPRC Estimation (Internal)}
 \usage{
-bootstrap_auc(predict, target, method, B = 1000, seed = 123)
+bootstrap_auc(predict, target, method, B = 1000, seed = 123, n_grid = 101)
 }
 \arguments{
 \item{predict}{Numeric vector or matrix of predicted values (scores).}
@@ -16,12 +16,19 @@ bootstrap_auc(predict, target, method, B = 1000, seed = 123)
 \item{B}{Integer. Number of bootstrap iterations (default = 1000).}
 
 \item{seed}{Integer. Random seed for reproducibility (default = 123).}
+
+\item{n_grid}{Integer. Number of evenly spaced points in [0, 1] at which the
+pointwise curve bands are evaluated (default = 101).}
 }
 \value{
-A list with two elements:
+A list with four elements:
 \describe{
 \item{AUROC}{List with \code{mean}, \code{lower}, \code{upper} 95\% CI, and all \code{values} from bootstrap.}
 \item{AUPRC}{List with \code{mean}, \code{lower}, \code{upper} 95\% CI, and all \code{values} from bootstrap.}
+\item{ROC_band}{Data frame with columns \code{fpr}, \code{lower}, \code{upper}: pointwise 95\% bootstrap
+band for sensitivity at each false positive rate.}
+\item{PRC_band}{Data frame with columns \code{recall}, \code{lower}, \code{upper}: pointwise 95\% bootstrap
+band for precision at each recall level.}
 }
 }
 \description{

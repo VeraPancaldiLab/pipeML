@@ -40,10 +40,10 @@ compute_features.training.ML(
 
 \item{metric}{Character. Performance metric for model selection and tuning. Supported values:
 \itemize{
-\item \code{"Accuracy"} — classification accuracy
-\item \code{"AUROC"} — area under the ROC curve
-\item \code{"AUPRC"} — area under the precision-recall curve
-\item \code{"C-index"} — concordance index (for survival tasks)
+\item \code{"Accuracy"} - classification accuracy
+\item \code{"AUROC"} - area under the ROC curve
+\item \code{"AUPRC"} - area under the precision-recall curve
+\item \code{"C-index"} - concordance index (for survival tasks)
 }}
 
 \item{k_folds}{Integer. Number of folds for cross-validation. Default: 10.}
@@ -62,15 +62,15 @@ compute_features.training.ML(
 
 \item{fold_construction_fun}{Function. Optional user-defined function for fold construction. Must accept a \code{bestune} argument:
 \itemize{
-\item \code{bestune = NULL} — explore parameter grid across folds (parallelized via \code{foreach}).
-\item \code{bestune provided} — rebuild features on the full dataset using optimized parameters.
+\item \code{bestune = NULL} - explore parameter grid across folds (parallelized via \code{foreach}).
+\item \code{bestune provided} - rebuild features on the full dataset using optimized parameters.
 }
 The function should save individual folds as \code{"Results/fold_*.rds"} with:
 \itemize{
-\item \code{train_data} — training data
-\item \code{test_data} — testing data
-\item \code{obs_test} — observed outcomes
-\item \code{params} — parameters used (if applicable)
+\item \code{train_data} - training data
+\item \code{test_data} - testing data
+\item \code{obs_test} - observed outcomes
+\item \code{params} - parameters used (if applicable)
 }}
 
 \item{fold_construction_args_fixed}{List of arguments passed to \code{fold_construction_fun} that remain fixed across CV and final training.}

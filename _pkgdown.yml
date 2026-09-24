@@ -36,7 +36,6 @@ reference:
   contents:
   - compute_shap_values
   - plot_shap_stability
-  - feature.selection.boruta
 - title: Visualization
   desc: >
     Model visualization

@@ -64,7 +64,7 @@ Ensures all performance metrics and interpretability analyses consistently treat
 \item{batch_id}{Column name indicating cohort or batch membership for each sample (required if \code{LODO = TRUE}).}
 
 \item{file_name}{Character. Base name used to save plots/results under \code{Results/}. For survival tasks,
-Kaplan–Meier plots are saved as \code{"Results/Survival_KM_<file_name>.pdf"}.}
+Kaplan-Meier plots are saved as \code{"Results/Survival_KM_<file_name>.pdf"}.}
 
 \item{ncores}{Integer. Number of CPU cores for parallelization. Default: \code{parallel::detectCores() - 1}.}
 
@@ -87,9 +87,10 @@ A named list containing:
 \item{Metrics}{Performance metrics computed on the test data.}
 \item{AUC}{For classification tasks, a list containing AUROC and AUPRC values.}
 \item{Prediction}{Predicted class probabilities (classification) or risk scores (survival).}
+\item{Curve_bands}{Pointwise 95\% bootstrap bands around the ROC and precision-recall curves (classification only; see \code{compute_prediction()}).}
 \item{CV_Results}{Cross-validation results, including median and MAD of C-index for survival tasks.}
 \item{Test_CINDEX}{Concordance index on test data (survival only).}
-\item{KM_Plot}{Kaplan–Meier plot object (if \code{return = TRUE}).}
+\item{KM_Plot}{Kaplan-Meier plot object (if \code{return = TRUE}).}
 }
 }
 \description{
@@ -97,14 +98,14 @@ This function trains and evaluates machine learning models using cross-validatio
 and then evaluates performance on independent test data. It supports both \strong{classification} and
 \strong{survival analysis} tasks, including hyperparameter tuning and cohort-based
 (Leave-One-Dataset-Out, LODO) validation. For survival models, it computes the \strong{C-index}
-and generates Kaplan–Meier plots stratified by predicted risk.
+and generates Kaplan-Meier plots stratified by predicted risk.
 }
 \details{
 For \strong{classification tasks}, the function performs repeated k-fold cross-validation
 with hyperparameter tuning, followed by evaluation on the test set. ROC and PR curves are generated.
 
 For \strong{survival tasks}, it performs model selection using the C-index, refits the best model
-on the full training data, evaluates test-set C-index, and plots Kaplan–Meier curves across
+on the full training data, evaluates test-set C-index, and plots Kaplan-Meier curves across
 quantile-based risk strata (Low/Medium/High). The C-index and log-rank test p-value are displayed.
 }
 \examples{

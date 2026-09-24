@@ -43,6 +43,9 @@ A list containing:
 Precision, Recall, F1 score, MCC) for each threshold (classification only).}
 \item{\code{AUC}}{List containing AUROC and AUPRC values with optional bootstrap confidence intervals (classification only).}
 \item{\code{Predictions}}{Data frame of predicted probabilities for each class (classification) or risk scores (survival).}
+\item{\code{Curve_bands}}{List with \code{ROC} (columns \code{fpr}, \code{lower}, \code{upper}) and
+\code{PRC} (columns \code{recall}, \code{lower}, \code{upper}): pointwise 95\% bootstrap bands
+around the ROC and precision-recall curves (classification only).}
 }
 }
 \description{
@@ -50,7 +53,7 @@ Computes prediction metrics for a trained machine learning model, including the 
 AUROC, AUPRC, Accuracy, Sensitivity, Specificity, Precision, Recall, F1 score, and MCC. For
 classification tasks, it also determines the optimal classification threshold and generates
 ROC, PRC, and confusion matrix plots. For survival analysis tasks, it predicts risk scores and
-optionally generates Kaplan–Meier plots.
+optionally generates Kaplan-Meier plots.
 }
 \details{
 For \strong{classification}, the function:
@@ -64,7 +67,7 @@ For \strong{classification}, the function:
 For \strong{survival analysis}, the function:
 \enumerate{
 \item Predicts risk scores using the trained survival model.
-\item Optionally generates Kaplan–Meier plots stratified by predicted risk groups.
+\item Optionally generates Kaplan-Meier plots stratified by predicted risk groups.
 }
 }
 \seealso{
