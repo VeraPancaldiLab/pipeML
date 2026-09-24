@@ -18,7 +18,8 @@ compute_shap_values(
   time_col = NULL,
   event_col = NULL,
   n_cores = 2,
-  file.name = NULL
+  file.name = NULL,
+  fold_models_dir = "Results/fold_models"
 )
 ```
 
@@ -64,6 +65,13 @@ compute_shap_values(
 
   Character. Optional filename prefix for saving SHAP stability plots.
   If `NULL`, plots are not saved.
+
+- fold_models_dir:
+
+  Character. Directory where per-fold models saved during training (by
+  `compute_custom_k_fold_CV` or `compute_k_fold_CV_survival`) are read
+  from, to avoid retraining each resample. Default:
+  `"Results/fold_models"`.
 
 ## Value
 

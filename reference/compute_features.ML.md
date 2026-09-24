@@ -3,10 +3,10 @@
 This function trains and evaluates machine learning models using
 cross-validation on training data and then evaluates performance on
 independent test data. It supports both **classification** and
-**survival analysis** tasks, including hyperparameter tuning, model
-stacking, and cohort-based (Leave-One-Dataset-Out, LODO) validation. For
-survival models, it computes the **C-index** and generates Kaplan–Meier
-plots stratified by predicted risk.
+**survival analysis** tasks, including hyperparameter tuning and
+cohort-based (Leave-One-Dataset-Out, LODO) validation. For survival
+models, it computes the **C-index** and generates Kaplan-Meier plots
+stratified by predicted risk.
 
 ## Usage
 
@@ -21,7 +21,6 @@ compute_features.ML(
   time_var = NULL,
   event_var = NULL,
   metric = "Accuracy",
-  stack = FALSE,
   k_folds = 10,
   n_rep = 5,
   LODO = FALSE,
@@ -31,7 +30,8 @@ compute_features.ML(
   return = FALSE,
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
-  fold_construction_args_tunable = NULL
+  fold_construction_args_tunable = NULL,
+  fold_models_dir = "Results/fold_models"
 )
 ```
 
@@ -84,11 +84,6 @@ compute_features.ML(
 
   - Survival: evaluated using concordance index (C-index).
 
-- stack:
-
-  Logical. Perform model stacking (ensemble meta-learning). Default:
-  `FALSE`.
-
 - k_folds:
 
   Integer. Number of folds for cross-validation. Default: 10.
@@ -110,7 +105,7 @@ compute_features.ML(
 - file_name:
 
   Character. Base name used to save plots/results under `Results/`. For
-  survival tasks, Kaplan–Meier plots are saved as
+  survival tasks, Kaplan-Meier plots are saved as
   `"Results/Survival_KM_<file_name>.pdf"`.
 
 - ncores:
@@ -138,6 +133,11 @@ compute_features.ML(
   List. Arguments passed to `fold_construction_fun` defining
   hyperparameters to explore during CV.
 
+- fold_models_dir:
+
+  Character. Directory where per-fold models are saved/read from when
+  `fold_construction_fun` is used. Default: `"Results/fold_models"`.
+
 ## Value
 
 A named list containing:
@@ -160,6 +160,12 @@ A named list containing:
   Predicted class probabilities (classification) or risk scores
   (survival).
 
+- Curve_bands:
+
+  Pointwise 95% bootstrap bands around the ROC and precision-recall
+  curves (classification only; see
+  [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md)).
+
 - CV_Results:
 
   Cross-validation results, including median and MAD of C-index for
@@ -171,7 +177,7 @@ A named list containing:
 
 - KM_Plot:
 
-  Kaplan–Meier plot object (if `return = TRUE`).
+  Kaplan-Meier plot object (if `return = TRUE`).
 
 ## Details
 
@@ -181,7 +187,7 @@ the test set. ROC and PR curves are generated.
 
 For **survival tasks**, it performs model selection using the C-index,
 refits the best model on the full training data, evaluates test-set
-C-index, and plots Kaplan–Meier curves across quantile-based risk strata
+C-index, and plots Kaplan-Meier curves across quantile-based risk strata
 (Low/Medium/High). The C-index and log-rank test p-value are displayed.
 
 ## Examples

@@ -1,9 +1,8 @@
 # pipeML
 
 ``` r
+
 library(pipeML)
-#> Warning: replacing previous import 'dplyr::explain' by 'fastshap::explain' when
-#> loading 'pipeML'
 library(caret)
 #> Loading required package: ggplot2
 #> Loading required package: lattice
@@ -57,6 +56,7 @@ If you already have a test set prepared, you can also use:
 Load example data:
 
 ``` r
+
 data = pipeML::data_example_classification
 X <- data %>% dplyr::select(-target)
 y <- data$target
@@ -65,6 +65,7 @@ y <- data$target
 For this example, make a train/test split:
 
 ``` r
+
 set.seed(123)
 
 train_idx <- caret::createDataPartition(y, p = 0.7, list = FALSE)
@@ -81,6 +82,7 @@ y_test  <- y[-train_idx]
 Train and tune models using repeated stratified k-fold cross-validation:
 
 ``` r
+
 res <- compute_features.training.ML(features_train = X_train, 
                                     target_var = y_train,
                                     task_type = "classification",
@@ -95,12 +97,14 @@ res <- compute_features.training.ML(features_train = X_train,
 Access the best-trained model:
 
 ``` r
+
 res$Model
 ```
 
 View all trained and tuned machine learning models:
 
 ``` r
+
 names(res$ML_Models)
 ```
 
@@ -119,6 +123,7 @@ optimal classification threshold. Supported values for maximize include:
 and “MCC”.
 
 ``` r
+
 pred = compute_prediction(model = res$Model, 
                           test_data = X_test, 
                           target_var = y_test, 
@@ -130,12 +135,14 @@ pred = compute_prediction(model = res$Model,
 Check predictions:
 
 ``` r
+
 head(pred$Predictions)
 ```
 
 Inspect threshold-based prediction metrics:
 
 ``` r
+
 head(pred$Metrics)
 ```
 
@@ -153,28 +160,89 @@ Figure 3. PR curve.
 
 #### Compute SHAP Values
 
-SHAP values help interpret machine learning predictions by quantifying
-feature contributions.
+##### What are SHAP values?
+
+SHAP (SHapley Additive exPlanations) values quantify how much each
+feature contributed to pushing a given prediction away from the average
+prediction. They are grounded in cooperative game theory: each feature
+is treated as a “player”, and its SHAP value represents its fair share
+of the prediction.
+
+For a single sample, SHAP values decompose the prediction as:
+
+    prediction(sample) = average prediction + SHAP(feature_1) + SHAP(feature_2) + ... + SHAP(feature_p)
+
+A positive SHAP value means the feature pushed the prediction above
+average (toward the positive class); a negative value means the
+opposite. Crucially, the SHAP values always sum exactly to the
+difference between the sample’s prediction and the dataset average — a
+property called **local accuracy**.
+
+##### How are SHAP values computed?
+
+`pipeML` uses the `fastshap` package, which estimates SHAP values via
+Monte Carlo sampling. For each sample and each feature, it asks: *on
+average, across all possible subsets of other features, how much does
+including this feature change the prediction?*
+
+When a feature is “absent” from a subset, it is replaced by a randomly
+drawn value from the training data. The `nsim` argument controls how
+many random subsets are sampled — higher values give more stable
+estimates but take longer. In practice, `nsim = 100` is often
+sufficient; the default of 1000 is conservative.
+
+##### Per-fold SHAP: why `pipeML` does it differently
+
+Most SHAP workflows fit one final model on all data and compute SHAP
+values on training samples. This has a bias: the model already memorized
+those samples, so features that overfit will appear more important than
+they really are.
+
+`pipeML` instead computes SHAP values **per cross-validation fold**:
+
+1.  For each fold, refit the model on the training split (with the
+    best-tuned hyperparameters).
+2.  Compute SHAP values only on the held-out test samples — samples the
+    model never saw.
+3.  After all folds, aggregate SHAP values per sample via the median
+    across resamples.
+
+This approach produces SHAP estimates that reflect true out-of-sample
+feature importance, which matters especially when:
+
+- The dataset is small (n \< 200) and overfitting is likely.
+- The feature space is high-dimensional relative to sample size.
+- SHAP is used as evidence of biological or scientific relevance.
+
+The cost is that the model is refitted once per resample. See the
+[Efficient SHAP with saved fold
+models](#efficient-shap-with-saved-fold-models) section for how `pipeML`
+avoids this overhead.
+
+##### Running `compute_shap_values`
 
 ``` r
+
 df = cbind(X_train, target = as.numeric(y_train)) ## compute_shap_values expects predictors and target in a single data.frame
 
 shap_classification <- compute_shap_values(
-  model_trained = res$Model, 
-  data_train = df, 
-  task_type = "classification", 
-  target_col = "target", 
+  model_trained  = res$Model,
+  data_train     = df,
+  task_type      = "classification",
+  target_col     = "target",
   trait.positive = "2", # Notice here that because of as.numeric() our target variable changed to 1 and 2 so we will consider 2 as our new 1.
-  n_cores = 2,  
-  file.name = "Example_classification"
+  n_cores        = 2,
+  file.name      = "Example_classification",
+  fold_models_dir = "Results/fold_models"  # directory where fold models were saved during CV
 )
 ```
 
 Visualize feature importance and interactions using shapviz:
 
 ``` r
+
 sv <- shapviz::shapviz(
-  shap = as.matrix(shap_classification$shap_values),
+  shap = as.matrix(shap_classification),
   X = df[, setdiff(colnames(df), "target")]
 )
 
@@ -187,7 +255,7 @@ shapviz::sv_importance(sv, kind = "beeswarm") +
   ggplot2::ggtitle("SHAP Beeswarm Summary")
 
 # Feature dependence plots for top 6 features
-top_features <- names(sort(colMeans(abs(shap_classification$shap_values)), decreasing = TRUE))[1:6]
+top_features <- names(sort(colMeans(abs(shap_classification)), decreasing = TRUE))[1:6]
 
 for (f in top_features) {
   print(
@@ -195,23 +263,6 @@ for (f in top_features) {
     ggplot2::ggtitle(paste0("Dependence: ", f))
   )
 }
-```
-
-#### Model Stacking
-
-To apply model stacking, set `stack = TRUE`:
-
-``` r
-res <- compute_features.training.ML(features_train = X_train, 
-                                    target_var = y_train,
-                                    task_type = "classification",
-                                    trait.positive = "1",
-                                    metric = "AUROC",
-                                    stack = T,
-                                    k_folds = 2,
-                                    n_rep = 1,
-                                    file_name = "Example_classification",
-                                    return = F)
 ```
 
 ### Survival Tasks
@@ -230,9 +281,19 @@ components:
 `pipeML` automates the training, evaluation, and interpretation of
 survival models using cross-validation and SHAP-based explanations.
 
+**Note:** survival models are built on the `censored` extension of
+`parsnip`. It must be installed, but you don’t need to load it —
+`pipeML` loads it automatically when a survival task runs.
+
+``` r
+
+install.packages("censored")  # only needed once, if not already installed
+```
+
 Load example dataset for survival:
 
 ``` r
+
 data = pipeML::data_example_survival
 X <- data %>% dplyr::select(-time, -status)
 time <- data$time
@@ -242,6 +303,7 @@ event <- data$status
 Similar to the previous example, split data into train/test:
 
 ``` r
+
 set.seed(123)
 train_idx <- caret::createDataPartition(event, p = 0.7, list = FALSE)
 
@@ -262,6 +324,7 @@ The function
 can also train survival models by setting `task_type = "survival"`.
 
 ``` r
+
 res_survival <- compute_features.training.ML(
   features_train = X_train, 
   task_type = "survival",
@@ -277,6 +340,7 @@ res_survival <- compute_features.training.ML(
 Access the best model:
 
 ``` r
+
 names(res_survival$ML_Models)
 res_survival$Model$Model_object
 ```
@@ -284,6 +348,7 @@ res_survival$Model$Model_object
 Check training metrics:
 
 ``` r
+
 head(res_survival$Model$Prediction_folds)
 ```
 
@@ -297,6 +362,7 @@ After training, predictions can be generated using
 [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md).
 
 ``` r
+
 pred <- compute_prediction(
   model = res_survival$Model,
   test_data = X_test,
@@ -345,14 +411,16 @@ We will use the same function `compute_shap_values` computed before but
 this time with the `task_type = "survival"`.
 
 ``` r
+
 shap_survival <- compute_shap_values(
-  model_trained = res_survival$Model,
-  data_train = df,
-  task_type = "survival",
-  time_col = "time",
-  event_col = "status",
-  n_cores = 2,
-  file.name = "Example_survival"
+  model_trained   = res_survival$Model,
+  data_train      = df,
+  task_type       = "survival",
+  time_col        = "time",
+  event_col       = "status",
+  n_cores         = 2,
+  file.name       = "Example_survival",
+  fold_models_dir = "Results/fold_models"
 )
 ```
 
@@ -368,6 +436,7 @@ to the test dataset.
 #### Classification Example
 
 ``` r
+
 data = pipeML::data_example_classification
 X <- data %>% dplyr::select(-target)
 y <- data$target
@@ -381,6 +450,7 @@ X_test  <- X[-train_idx, ]
 ```
 
 ``` r
+
 res <- compute_features.ML(features_train = X_train, 
                            features_test = X_test, 
                            coldata = data,
@@ -398,6 +468,7 @@ res <- compute_features.ML(features_train = X_train,
 #### Survival Example
 
 ``` r
+
 data = pipeML::data_example_survival
 X <- data %>% dplyr::select(-time, -status)
 time <- data$time
@@ -417,6 +488,7 @@ event_test  <- event[-train_idx]
 ```
 
 ``` r
+
 res <- compute_features.ML(features_train = X_train, 
                            features_test = X_test, 
                            coldata = data,
@@ -447,6 +519,7 @@ datasets:
 Simulate datasets from different batches (‘cohorts’)
 
 ``` r
+
 set.seed(123)
 
 # Simulate traitData with 3 cohorts
@@ -472,6 +545,7 @@ colnames(features_all) <- paste0("Feature", 1:15)
 Perform LODO analysis using base function `compute_features.training.ML`
 
 ``` r
+
 prediction = list()
 i = 1
 for (cohort in unique(traitData$Cohort)) {
@@ -527,6 +601,7 @@ to generate ROC and PR curves.
 Extract prediction metrics and join
 
 ``` r
+
 roc_data <- lapply(names(prediction), function(cohort) {
   df <- prediction[[cohort]]$Metrics
   df$cohort <- cohort
@@ -534,13 +609,13 @@ roc_data <- lapply(names(prediction), function(cohort) {
 }) %>% dplyr::bind_rows()
 
 auc_roc <- list(
-  mean  = sapply(prediction, function(x) x$AUC$AUROC$mean),
+  estimate = sapply(prediction, function(x) x$AUC$AUROC$estimate),
   lower = sapply(prediction, function(x) x$AUC$AUROC$lower),
   upper = sapply(prediction, function(x) x$AUC$AUROC$upper)
 )
 
 auc_prc <- list(
-  mean  = sapply(prediction, function(x) x$AUC$AUPRC$mean),
+  estimate = sapply(prediction, function(x) x$AUC$AUPRC$estimate),
   lower = sapply(prediction, function(x) x$AUC$AUPRC$lower),
   upper = sapply(prediction, function(x) x$AUC$AUPRC$upper)
 )
@@ -549,6 +624,7 @@ auc_prc <- list(
 Plot ROC and PR curves:
 
 ``` r
+
 get_curves(
   data = roc_data,
   color = "cohort",
@@ -647,6 +723,7 @@ Structure of base function
 - **…**: additional arguments specific to the algorithm used
 
 ``` r
+
 compute_features_modular <- function(data, structure = NULL, ...) {
   
 
@@ -676,6 +753,7 @@ an example: in practice, you can use any feature computation that
 depends on multiple samples, such as clustering, PCA, among others.
 
 ``` r
+
 library(WGCNA)
 compute_features_modular <- function(counts, power = NULL, modules = NULL) {
 
@@ -747,6 +825,7 @@ features. If not, make sure to extract them before adding the target
 column
 
 ``` r
+
 prepare_custom_folds <- function(data, folds = NULL, bestune = NULL, ...) {
   
   if (!is.null(bestune)) {
@@ -831,6 +910,7 @@ Notice that each time I call the function `compute_features_modular()` I
 am setting my additional argument `power`
 
 ``` r
+
 prepare_WGCNA_folds <- function(data, folds = NULL, bestune = NULL, power) {
   
   if (!is.null(bestune)) {
@@ -908,6 +988,7 @@ prepare_WGCNA_folds <- function(data, folds = NULL, bestune = NULL, power) {
 Load data example
 
 ``` r
+
 counts = pipeML::counts_example
 coldata = pipeML::coldata_example
 
@@ -936,6 +1017,7 @@ parameters, you can ignore this argument and it will be set up to
 `NULL`.
 
 ``` r
+
 res_custom   = compute_features.training.ML(features_train = t(counts_train),
                                             target_var     = coldata_train$Response,
                                             task_type      = "classification",
@@ -944,8 +1026,9 @@ res_custom   = compute_features.training.ML(features_train = t(counts_train),
                                             k_folds        = 2,
                                             n_rep          = 1,
                                             return         = FALSE,
-                                            fold_construction_fun = prepare_WGCNA_folds,
-                                            fold_construction_args_fixed = list(power=6))
+                                            fold_construction_fun        = prepare_WGCNA_folds,
+                                            fold_construction_args_fixed = list(power = 6),
+                                            fold_models_dir              = "Results/fold_models")
 ```
 
 Notice that `res_custom$Custom_output` contains the output features of
@@ -953,6 +1036,7 @@ your base function in case these are needed (e.g. for prediction - see
 next section)
 
 ``` r
+
 str(res_custom$Custom_output)
 head(res_custom$Custom_output$features)
 head(res_custom$Custom_output$structure)
@@ -987,6 +1071,7 @@ For the `compute_features_modular` we are only going to add the tunable
 parameters in our function call
 
 ``` r
+
 compute_features_modular <- function(
     counts, 
     power = NULL,                  
@@ -1190,6 +1275,7 @@ prepare_custom_folds_tuning <- function(data,
 In our case it would be:
 
 ``` r
+
 prepare_WGCNA_folds_modular <- function(
     data,
     folds = NULL,
@@ -1376,6 +1462,7 @@ Therefore, the total number of evaluated models becomes:
 and repetitions used in cross-validation.
 
 ``` r
+
 res_params <- compute_features.training.ML(features_train = t(counts_train), 
                                            target_var     = coldata_train$Response,
                                            task_type = "classification",
@@ -1403,6 +1490,7 @@ To apply the model to new data, compute the same type of features using
 the learned modules from the training set.
 
 ``` r
+
 test = compute_features_modular(counts_test, modules = res_custom$Custom_output$structure)
 test_features = test$features
 ```
@@ -1410,6 +1498,7 @@ test_features = test$features
 Prediction
 
 ``` r
+
 pred <- compute_prediction(model = res_custom$Model,
                            test_data = test_features,
                            target_var = coldata_test$Response,
@@ -1448,6 +1537,106 @@ In summary, the `bestune` argument acts as a control switch:
 This design allows a single custom fold-construction function to handle
 both hyperparameter tuning (exploration, parallelized) and final model
 preparation (exploitation, single optimized run).
+
+### Efficient SHAP with Saved Fold Models
+
+#### The problem: retraining cost
+
+[`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md)
+computes SHAP values per cross-validation fold to avoid bias from
+evaluating on training data. For a 5-fold × 10-repetition CV, this means
+refitting the model **50 times** from scratch inside
+[`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md),
+in addition to the 50 fits already done during
+[`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md).
+With high-dimensional data and slow models, this effectively doubles the
+total compute time.
+
+#### The solution: fold model caching
+
+When `fold_construction_fun` is provided (custom fold construction
+path), `pipeML` automatically saves the fitted model for each fold to
+disk during cross-validation. After the best ML method and
+hyperparameters are identified by aggregation, all other saved files
+(wrong method or wrong hyperparameter configuration) are deleted. Only
+the files needed for SHAP survive.
+
+When
+[`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md)
+is subsequently called, it first checks the `fold_models_dir` directory
+for these saved models. If found, it loads them directly and skips
+retraining. A diagnostic message is printed before the parallel SHAP
+computation begins:
+
+    Fold models found for 50 / 50 resamples — none will retrain
+
+If some files are missing (e.g., the directory was cleared), it falls
+back to the original retraining behavior for those resamples, so
+backward compatibility is fully preserved.
+
+#### File naming convention
+
+Saved fold model files follow this pattern:
+
+    fold_model_{fold_name}_{ml_method}_{grid_row}.rds
+
+For example: `fold_model_Fold1.Rep1_glmnet_11.rds` is the glmnet model
+trained on fold 1, repetition 1, using the 11th hyperparameter
+combination from the tuning grid.
+
+Each file contains:
+
+- `fit`: the fitted caret/parsnip model object
+- `hp`: the hyperparameter values used (single-row data frame)
+- `X_train`: training features after fold-level preprocessing (e.g.,
+  collinearity removal)
+- `X_test`: test features aligned to the training feature space
+- `test_idx`: row indices of the held-out samples
+
+#### Controlling the directory
+
+Both
+[`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
+and
+[`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md)
+accept a `fold_models_dir` argument (default: `"Results/fold_models"`).
+Set both to the same path to ensure the files written during CV are
+found during SHAP computation:
+
+``` r
+
+fold_dir <- "Results/fold_models"
+
+res <- compute_features.training.ML(
+  features_train        = X_train,
+  target_var            = y_train,
+  task_type             = "classification",
+  trait.positive        = "R",
+  metric                = "AUROC",
+  k_folds               = 5,
+  n_rep                 = 10,
+  fold_construction_fun = prepare_custom_folds,
+  fold_models_dir       = fold_dir
+)
+
+shap_res <- compute_shap_values(
+  model_trained   = res$Model,
+  data_train      = df_shap,
+  task_type       = "classification",
+  target_col      = "target",
+  trait.positive  = "yes",
+  n_cores         = 4,
+  fold_models_dir = fold_dir
+)
+```
+
+#### When fold model caching is active
+
+Fold model caching only applies when `fold_construction_fun` is not
+`NULL` (the custom fold construction path). On the standard k-fold path,
+no files are saved and
+[`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md)
+always retrains, exactly as before.
 
 ## **References**
 

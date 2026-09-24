@@ -5,7 +5,7 @@ including the confusion matrix, AUROC, AUPRC, Accuracy, Sensitivity,
 Specificity, Precision, Recall, F1 score, and MCC. For classification
 tasks, it also determines the optimal classification threshold and
 generates ROC, PRC, and confusion matrix plots. For survival analysis
-tasks, it predicts risk scores and optionally generates Kaplan–Meier
+tasks, it predicts risk scores and optionally generates Kaplan-Meier
 plots.
 
 ## Usage
@@ -19,7 +19,6 @@ compute_prediction(
   task_type = "classification",
   time_var = NULL,
   event_var = NULL,
-  stack = FALSE,
   file.name = NULL,
   return = FALSE
 )
@@ -61,11 +60,6 @@ compute_prediction(
   Column or vector of event indicators (1 = event, 0 = censored;
   required for survival tasks).
 
-- stack:
-
-  Logical. If TRUE, uses meta-learner predictions for stacked models
-  (classification only).
-
 - file.name:
 
   Character. Filename prefix for saving plots (optional). If NULL, plots
@@ -96,12 +90,17 @@ A list containing:
   Data frame of predicted probabilities for each class (classification)
   or risk scores (survival).
 
+- `Curve_bands`:
+
+  List with `ROC` (columns `fpr`, `lower`, `upper`) and `PRC` (columns
+  `recall`, `lower`, `upper`): pointwise 95% bootstrap bands around the
+  ROC and precision-recall curves (classification only).
+
 ## Details
 
 For **classification**, the function:
 
-1.  Uses the trained model (or meta-learner if `stack = TRUE`) to
-    predict probabilities for the test data.
+1.  Uses the trained model to predict probabilities for the test data.
 
 2.  Computes performance metrics across thresholds and selects the
     optimal threshold based on a chosen metric.
@@ -116,7 +115,7 @@ For **survival analysis**, the function:
 
 1.  Predicts risk scores using the trained survival model.
 
-2.  Optionally generates Kaplan–Meier plots stratified by predicted risk
+2.  Optionally generates Kaplan-Meier plots stratified by predicted risk
     groups.
 
 ## See also

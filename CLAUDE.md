@@ -24,7 +24,7 @@ preventing information leakage.
     R/
       pipeML-package.R       # Package metadata & namespace declarations
       data.R                 # Documentation for bundled example datasets
-      machine_learning.R     # All implementation (~5,700 lines, core file)
+      machine_learning.R     # All implementation (~5,200 lines, core file)
     vignettes/
       pipeML.Rmd             # Main tutorial vignette
     data/                    # Bundled example datasets (.rda)
@@ -42,20 +42,19 @@ preventing information leakage.
 
 ------------------------------------------------------------------------
 
-## Exported Functions (8 total)
+## Exported Functions (7 total)
 
 All live in `R/machine_learning.R`.
 
-| Function                                                                                                               | Purpose                                                   |
-|------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------|
-| [`feature.selection.boruta()`](https://verapancaldilab.github.io/pipeML/reference/feature.selection.boruta.md)         | Repeated Boruta feature selection with parallel support   |
-| [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md) | Train models on training data with repeated k-fold CV     |
-| [`compute_features.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.ML.md)                   | Combined train + predict workflow (training + testing)    |
-| [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md)                     | Generate predictions on test data using trained model     |
-| [`get_curves()`](https://verapancaldilab.github.io/pipeML/reference/get_curves.md)                                     | ROC and Precision-Recall curves with confidence intervals |
-| [`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md)                   | SHAP feature importance values across resamples           |
-| [`plot_shap_stability()`](https://verapancaldilab.github.io/pipeML/reference/plot_shap_stability.md)                   | Visualize SHAP importance stability across resamples      |
-| [`plot_survival_performance()`](https://verapancaldilab.github.io/pipeML/reference/plot_survival_performance.md)       | Kaplan-Meier curves stratified by predicted risk groups   |
+| Function | Purpose |
+|----|----|
+| [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md) | Train models on training data with repeated k-fold CV |
+| [`compute_features.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.ML.md) | Combined train + predict workflow (training + testing) |
+| [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md) | Generate predictions on test data using trained model |
+| [`get_curves()`](https://verapancaldilab.github.io/pipeML/reference/get_curves.md) | ROC and Precision-Recall curves with confidence intervals |
+| [`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md) | SHAP feature importance values across resamples |
+| [`plot_shap_stability()`](https://verapancaldilab.github.io/pipeML/reference/plot_shap_stability.md) | Visualize SHAP importance stability across resamples |
+| [`plot_survival_performance()`](https://verapancaldilab.github.io/pipeML/reference/plot_survival_performance.md) | Kaplan-Meier curves stratified by predicted risk groups |
 
 ------------------------------------------------------------------------
 
@@ -73,11 +72,10 @@ Survival Forests, Gradient Boosting (censored)
 
 ## Key Dependencies
 
-**Imports (must be installed):** `caret`, `Boruta`, `doParallel`,
-`foreach`, `dplyr`, `tidyr`, `tibble`, `purrr (>= 1.0.2)`, `ggplot2`,
-`reshape2`, `survival`, `survminer`, `fastshap`, `dials`, `parsnip`,
-`rsample`, `workflows`, `tune`, `yardstick`, `grDevices`, `parallel`,
-`stats`
+**Imports (must be installed):** `caret`, `doParallel`, `foreach`,
+`dplyr`, `tidyr`, `tibble`, `purrr (>= 1.0.2)`, `ggplot2`, `reshape2`,
+`survival`, `survminer`, `fastshap`, `dials`, `parsnip`, `rsample`,
+`workflows`, `tune`, `yardstick`, `grDevices`, `parallel`, `stats`
 
 **Suggests (optional, needed for specific algorithms):**
 `testthat (>= 3.0.0)`, `knitr`, `rmarkdown`, `C50`, `randomForest`,
@@ -113,7 +111,6 @@ with best hyperparameters.
 - `doParallel` + `foreach %dopar%` for cross-fold parallelization
 - XGBoost uses internal threading — external parallel is disabled to
   avoid contention
-- Boruta iterations support parallel runs
 
 ### Hyperparameter Tuning
 
@@ -121,27 +118,23 @@ with best hyperparameters.
 - Grid search within CV folds → best params applied to full training
   data
 
-### Model Stacking
-
-- Ensemble meta-learning support
-- Weighted feature importance from base models + meta-learner
-
 ### Feature Preprocessing (internal `preprocess_features()`)
 
 - Near-zero variance removal
 - Collinearity filtering (correlation threshold)
-- Boruta selection with tentative feature handling
+- Removal of features constant within any target class (classification
+  only)
 
 ------------------------------------------------------------------------
 
 ## Bundled Example Datasets
 
-| Dataset                       | Content                                                            |
-|-------------------------------|--------------------------------------------------------------------|
-| `data_example_classification` | Breast Cancer Wisconsin (from mlbench)                             |
-| `data_example_survival`       | Lung cancer survival (from survival package)                       |
-| `counts_example`              | Gene expression matrix — Gide et al. 2019 melanoma cohort (4.4 MB) |
-| `coldata_example`             | Metadata with anti-PD-1 therapy response labels for Gide cohort    |
+| Dataset | Content |
+|----|----|
+| `data_example_classification` | Breast Cancer Wisconsin (from mlbench) |
+| `data_example_survival` | Lung cancer survival (from survival package) |
+| `counts_example` | Gene expression matrix — Gide et al. 2019 melanoma cohort (4.4 MB) |
+| `coldata_example` | Metadata with anti-PD-1 therapy response labels for Gide cohort |
 
 Access via `data(dataset_name)` after
 [`library(pipeML)`](https://verapancaldilab.github.io/pipeML).
@@ -161,6 +154,7 @@ Access via `data(dataset_name)` after
 ### Building & Checking
 
 ``` r
+
 devtools::load_all()       # Load package in dev mode
 devtools::document()       # Regenerate docs & NAMESPACE
 devtools::check()          # Full R CMD check
@@ -194,7 +188,8 @@ pkgdown::build_site()      # Rebuild docs website
     /
     [`compute_custom_k_fold_CV()`](https://verapancaldilab.github.io/pipeML/reference/compute_custom_k_fold_CV.md)
     in `machine_learning.R`
-2.  Add a hyperparameter grid entry in `get_tune_grid()`
+2.  Add a hyperparameter grid entry in
+    [`get_tune_grid()`](https://verapancaldilab.github.io/pipeML/reference/get_tune_grid.md)
 3.  Handle retraining in
     [`wrapper_train_best_hyperparams_classification()`](https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_classification.md)
 4.  Document in vignette and function `@param method` Roxygen docs
@@ -219,8 +214,17 @@ locally. The pkgdown CI will publish on merge to main.
 ## Notes & Gotchas
 
 - The core implementation is a single large file (`machine_learning.R`,
-  ~5,700 lines). Internal helpers are not exported — check NAMESPACE
+  ~5,200 lines). Internal helpers are not exported — check NAMESPACE
   before assuming a function is public.
+- Survival models need the `censored` package (in Suggests) to register
+  parsnip’s “censored regression” engines. Every survival entry point
+  calls the internal
+  [`ensure_censored()`](https://verapancaldilab.github.io/pipeML/reference/ensure_censored.md),
+  which loads its namespace; users don’t need
+  [`library(censored)`](https://github.com/tidymodels/censored).
+  Survival formulas must use `survival::Surv(...)`, not bare `Surv(...)`
+  — the bare form only works when some other package happened to attach
+  `survival`.
 - `multideconv` is a remote (GitHub) dependency — not on CRAN.
   Installation requires
   `remotes::install_github("VeraPancaldiLab/multideconv")`.
@@ -231,3 +235,55 @@ locally. The pkgdown CI will publish on merge to main.
   is set to 1 internally to prevent nested parallelism crashes.
 - The `docs/` directory is gitignored — pkgdown output is built and
   deployed by CI only.
+- `compute_shap_values(model_trained, ...)` expects the *actual* caret
+  `train` object (needs `$pred`, `$bestTune`, `$method`) — a caller
+  passing a wrapper object one level up (e.g. a custom pipeline’s
+  `list(Model = train_obj, ...)` instead of `train_obj` itself) gets no
+  error, just a silent `NULL` return with a “trivial predictions”
+  warning, since `unique(model_trained$pred$Resample)` evaluates to
+  `NULL` and the `foreach` loop over resamples runs zero iterations.
+  Worth either validating the input class
+  (`stopifnot(inherits(model_trained, "train"))`) or documenting this
+  failure mode more visibly, since the warning message doesn’t hint at
+  “wrong object passed in.”
+
+## Known Issues / TODO
+
+- **[`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md)’s
+  cost is extremely method-dependent, and this is invisible to the
+  caller until it’s too late.** Measured empirically (melanoma LODO
+  dataset, ~250-300 x ~15 NMF-factor features, `nsim = 100`, one
+  [`fastshap::explain()`](https://bgreenwell.github.io/fastshap/reference/explain.html)
+  call per CV resample): `glmnet` ≈ 16s/resample, `KNN` ≈ 25s/resample,
+  but `svmRadial` ≈ **930s/resample** — a ~58x slowdown, because
+  SVM/KNN-family predict methods are computationally heavier per call
+  (KNN recomputes distances to the full training set; SVM’s kernel
+  evaluation is per-support-vector) and
+  [`fastshap::explain()`](https://bgreenwell.github.io/fastshap/reference/explain.html)
+  calls the prediction function repeatedly (proportional to `nsim`) for
+  every resample. With the default `k_folds x n_rep` producing up to 100
+  resamples, an SVM-selected model can turn what’s normally a ~30min job
+  into a ~26-hour one, with zero warning beforehand. Concrete
+  improvements worth making:
+  - **Expose `nsim`** as a
+    [`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md)
+    parameter instead of the hardcoded 100 (`machine_learning.R` line
+    ~2820) — callers with a slow-predict method could trade precision
+    for speed deliberately, instead of being stuck with a fixed cost
+    multiplier they can’t control.
+  - **Expose which/how many resamples to explain**, rather than always
+    looping over every one of `unique(model_trained$pred$Resample)` —
+    explaining a representative subset (e.g. 10-20 of 100) would give an
+    approximate-but-fast SHAP estimate on request.
+  - **Print a per-resample time estimate after the first resample
+    completes** (before committing to the rest of the loop) — currently
+    there’s no feedback at all until the whole thing finishes or the
+    caller gives up waiting; even a single
+    `cat(sprintf("First resample took %.1fs; estimated total: %.1fmin for %d resamples\n", ...))`
+    after resample 1 would let users abort early with an informed
+    decision instead of guessing.
+  - Consider flagging known-slow methods (`svmRadial`, `svmLinear`,
+    `knn`, and other instance-/kernel-based predictors) with a
+    [`message()`](https://rdrr.io/r/base/message.html) up front
+    suggesting a reduced `nsim` or resample subset for those
+    specifically.

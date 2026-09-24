@@ -2,19 +2,12 @@
 
 Internal function to summarize cross-validated AUROC and AUPRC values
 from a list of trained machine learning models. Computes median and MAD
-for each model, optionally generates barplots, and can select base
-models for stacking.
+for each model and optionally generates barplots.
 
 ## Usage
 
 ``` r
-compute_cv_AUC(
-  models,
-  file_name = NULL,
-  base_models = FALSE,
-  AUC_type = "AUROC",
-  return = TRUE
-)
+compute_cv_AUC(models, file_name = NULL, AUC_type = "AUROC", return = TRUE)
 ```
 
 ## Arguments
@@ -28,12 +21,6 @@ compute_cv_AUC(
 
   Optional character string. Prefix for saving AUROC/AUPRC plots in the
   `Results/` directory.
-
-- base_models:
-
-  Logical. If `TRUE`, selects a subset of models as base learners for
-  stacking using
-  [`choose_base_models()`](https://verapancaldilab.github.io/pipeML/reference/choose_base_models.md).
 
 - AUC_type:
 
@@ -61,8 +48,3 @@ A list containing:
 
   Character string: the model with the highest median value for the
   selected metric (`AUC_type`).
-
-- `Base_models`:
-
-  (Optional) Character vector of selected base models if
-  `base_models = TRUE`.

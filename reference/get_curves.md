@@ -19,7 +19,9 @@ get_curves(
   LODO = FALSE,
   file.name,
   width = 6,
-  height = 6
+  height = 6,
+  roc_band = NULL,
+  prc_band = NULL
 )
 ```
 
@@ -53,11 +55,16 @@ get_curves(
 
 - auc_roc:
 
-  A numeric value representing the AUC for the ROC curve.
+  A list with elements `estimate`, `lower` and `upper` giving the AUROC
+  and its confidence interval, as returned in
+  `compute_prediction()$AUC$AUROC`. When `LODO = TRUE`, each element is
+  a vector with one value per cohort, named to match the values of the
+  `color` column.
 
 - auc_prc:
 
-  A numeric value representing the AUC for the Precision-Recall curve.
+  Same structure as `auc_roc`, for the AUPRC
+  (`compute_prediction()$AUC$AUPRC`).
 
 - LODO:
 
@@ -76,6 +83,19 @@ get_curves(
 - height:
 
   A numeric value for the height of plot
+
+- roc_band:
+
+  Optional data frame with columns `fpr`, `lower`, `upper` (as in
+  `compute_prediction()$Curve_bands$ROC`). If supplied and
+  `LODO = FALSE`, it is drawn as a shaded pointwise confidence band
+  around the ROC curve.
+
+- prc_band:
+
+  Optional data frame with columns `recall`, `lower`, `upper` (as in
+  `compute_prediction()$Curve_bands$PRC`), drawn around the
+  precision-recall curve in the same way.
 
 ## Value
 

@@ -10,6 +10,7 @@ You can install the development version of `pipeML` from
 [GitHub](https://github.com/) with:
 
 ``` r
+
 # install.packages("pak")
 pak::pkg_install("VeraPancaldiLab/pipeML")
 ```
@@ -58,7 +59,6 @@ machine learning applications.
 
 ### Feature selection
 
-- Boruta-based feature selection
 - Optional correlation-based feature filtering
 
 ### Hyperparameter tuning
@@ -74,10 +74,6 @@ machine learning applications.
 - SHAP-based feature importance
 - Variable importance summaries
 - Performance visualization (ROC and PR curves)
-
-### Ensemble learning
-
-- Model stacking
 
 ### Parallel computing
 
@@ -131,12 +127,14 @@ For a detailed tutorial, see [Get
 started](https://VeraPancaldiLab.github.io/pipeML/articles/pipeML.html)
 
 ``` r
+
 library(pipeML)
 ```
 
 ### Training models
 
 ``` r
+
 res <- compute_features.training.ML(features_train = X_train, 
                                     target_var = y_train,
                                     task_type = "classification",
@@ -150,6 +148,7 @@ res <- compute_features.training.ML(features_train = X_train,
 ### Predicting on new data
 
 ``` r
+
 pred = compute_prediction(model = res$Model, 
                           test_data = X_test, 
                           target_var = y_test, 
@@ -161,6 +160,7 @@ pred = compute_prediction(model = res$Model,
 ### Training and Testing Workflow
 
 ``` r
+
 res <- compute_features.ML(features_train = X_train, 
                            features_test = X_test, 
                            coldata = data,

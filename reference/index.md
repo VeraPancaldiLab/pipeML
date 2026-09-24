@@ -5,8 +5,8 @@
 Machine learning
 
 - [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
-  : Train machine learning or survival models with optional stacking and
-  custom cross-validation
+  : Train machine learning or survival models with custom
+  cross-validation
 - [`compute_features.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.ML.md)
   : Train and evaluate machine learning models for classification or
   survival analysis
@@ -21,8 +21,6 @@ Model interpretability
   : Compute SHAP Values for Machine Learning Models
 - [`plot_shap_stability()`](https://verapancaldilab.github.io/pipeML/reference/plot_shap_stability.md)
   : Plot SHAP Feature Importance Stability Across Resamples
-- [`feature.selection.boruta()`](https://verapancaldilab.github.io/pipeML/reference/feature.selection.boruta.md)
-  : Compute Feature Selection Using Repeated Boruta Algorithm
 
 ## Visualization
 

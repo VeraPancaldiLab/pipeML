@@ -18,22 +18,22 @@ get_default_hyperparams(model_name, train_x = NULL, levels = 5, v = 5)
 
   Character string specifying the model name. Supported options include:
 
-  - `"cox_ph_survival"` – Classic Cox proportional hazards model
+  - `"cox_ph_survival"` - Classic Cox proportional hazards model
 
-  - `"proportional_hazards_glmnet"` – Penalized Cox (LASSO / Elastic
+  - `"proportional_hazards_glmnet"` - Penalized Cox (LASSO / Elastic
     Net)
 
-  - `"survreg_flexsurv"` – Parametric accelerated failure time (AFT)
+  - `"survreg_flexsurv"` - Parametric accelerated failure time (AFT)
 
-  - `"decision_tree_partykit"` – Single survival tree
+  - `"decision_tree_partykit"` - Single survival tree
 
-  - `"bag_tree_rpart"` – Bagged CART survival trees
+  - `"bag_tree_rpart"` - Bagged CART survival trees
 
-  - `"rand_forest_partykit"` – Random survival forest (ctree-based)
+  - `"rand_forest_partykit"` - Random survival forest (ctree-based)
 
-  - `"rand_forest_aorsf"` – Oblique random survival forest
+  - `"rand_forest_aorsf"` - Oblique random survival forest
 
-  - `"boost_tree_mboost"` – Gradient boosting for survival
+  - `"boost_tree_mboost"` - Gradient boosting for survival
 
 - train_x:
 

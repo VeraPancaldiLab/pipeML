@@ -2,8 +2,7 @@
 
 Internal function that performs repeated stratified k-fold
 cross-validation to train and tune hyperparameters across multiple
-machine learning models. Optionally, it can perform model stacking and
-Boruta-based feature selection. Model performance is evaluated using
+machine learning models. Model performance is evaluated using
 user-specified metrics such as Accuracy, AUROC, or AUPRC.
 
 ## Usage
@@ -13,7 +12,6 @@ compute_k_fold_CV(
   train_data,
   k_folds,
   n_rep,
-  stacking = FALSE,
   metric = "Accuracy",
   file_name = NULL,
   LODO = FALSE,
@@ -21,7 +19,8 @@ compute_k_fold_CV(
   return = FALSE,
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
-  fold_construction_args_tunable = NULL
+  fold_construction_args_tunable = NULL,
+  fold_models_dir = "Results/fold_models"
 )
 ```
 
@@ -41,10 +40,6 @@ compute_k_fold_CV(
 
   Integer. Number of repetitions of the k-fold cross-validation. Default
   is 100.
-
-- stacking:
-
-  Logical. Whether to perform model stacking. Default is `FALSE`.
 
 - metric:
 
@@ -100,12 +95,3 @@ A list containing:
 - The selected machine learning model
 
 - All trained machine learning models
-
-If `stacking = TRUE`, the list will also include:
-
-- Base models
-
-- Meta-learner
-
-- Matrix of weighted feature importance (see
-  [`calculate_feature_importance_stacking()`](https://verapancaldilab.github.io/pipeML/reference/calculate_feature_importance_stacking.md))

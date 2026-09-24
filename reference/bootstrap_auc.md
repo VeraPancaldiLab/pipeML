@@ -9,7 +9,7 @@ computes the metrics for each bootstrap iteration, returning the mean,
 ## Usage
 
 ``` r
-bootstrap_auc(predict, target, method, B = 1000, seed = 123)
+bootstrap_auc(predict, target, method, B = 1000, seed = 123, n_grid = 101)
 ```
 
 ## Arguments
@@ -34,9 +34,14 @@ bootstrap_auc(predict, target, method, B = 1000, seed = 123)
 
   Integer. Random seed for reproducibility (default = 123).
 
+- n_grid:
+
+  Integer. Number of evenly spaced points in \[0, 1\] at which the
+  pointwise curve bands are evaluated (default = 101).
+
 ## Value
 
-A list with two elements:
+A list with four elements:
 
 - AUROC:
 
@@ -47,3 +52,13 @@ A list with two elements:
 
   List with `mean`, `lower`, `upper` 95% CI, and all `values` from
   bootstrap.
+
+- ROC_band:
+
+  Data frame with columns `fpr`, `lower`, `upper`: pointwise 95%
+  bootstrap band for sensitivity at each false positive rate.
+
+- PRC_band:
+
+  Data frame with columns `recall`, `lower`, `upper`: pointwise 95%
+  bootstrap band for precision at each recall level.

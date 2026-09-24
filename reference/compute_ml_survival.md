@@ -14,7 +14,8 @@ compute_ml_survival(
   event_col,
   model,
   models_hyperparameters,
-  return_model = F
+  return_model = F,
+  fold_models_dir = "Results/fold_models"
 )
 ```
 
@@ -43,21 +44,21 @@ compute_ml_survival(
 
   Character. The type of survival model to train. Options:
 
-  - `"cox_ph_survival"` – Cox proportional hazards model
+  - `"cox_ph_survival"` - Cox proportional hazards model
 
-  - `"proportional_hazards_glmnet"` – Penalized Cox (LASSO/Elastic Net)
+  - `"proportional_hazards_glmnet"` - Penalized Cox (LASSO/Elastic Net)
 
-  - `"survreg_flexsurv"` – Parametric AFT model
+  - `"survreg_flexsurv"` - Parametric AFT model
 
-  - `"rand_forest_partykit"` – Random survival forest (ctree engine)
+  - `"rand_forest_partykit"` - Random survival forest (ctree engine)
 
-  - `"rand_forest_aorsf"` – Oblique random survival forest
+  - `"rand_forest_aorsf"` - Oblique random survival forest
 
-  - `"decision_tree_partykit"` – Single survival tree
+  - `"decision_tree_partykit"` - Single survival tree
 
-  - `"bag_tree_rpart"` – Bagged survival trees
+  - `"bag_tree_rpart"` - Bagged survival trees
 
-  - `"boost_tree_mboost"` – Gradient boosting for survival data
+  - `"boost_tree_mboost"` - Gradient boosting for survival data
 
 - models_hyperparameters:
 
@@ -79,9 +80,9 @@ If `df_test` is provided:
 
 - If `return_model = TRUE`, a list with elements:
 
-  - `Model` – fitted tidymodels workflow
+  - `Model` - fitted tidymodels workflow
 
-  - `Metrics` – tibble with `predictions` and `c_index`. If `df_test` is
+  - `Metrics` - tibble with `predictions` and `c_index`. If `df_test` is
     `NULL`, the function returns only the fitted model object.
 
 ## Details

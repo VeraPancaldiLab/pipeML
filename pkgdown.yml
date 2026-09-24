@@ -1,9 +1,9 @@
-pandoc: 3.1.11
-pkgdown: 2.2.0
+pandoc: 3.8.3
+pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
   pipeML: pipeML.html
-last_built: 2026-04-19T11:10Z
+last_built: 2026-09-24T16:30Z
 urls:
   reference: https://verapancaldilab.github.io/pipeML/reference
   article: https://verapancaldilab.github.io/pipeML/articles

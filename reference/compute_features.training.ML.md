@@ -1,9 +1,9 @@
-# Train machine learning or survival models with optional stacking and custom cross-validation
+# Train machine learning or survival models with custom cross-validation
 
 This function trains one or more machine learning models using repeated
-k-fold cross-validation, with optional model stacking, feature
-selection, and support for both classification and survival tasks. It
-allows flexible cross-validation schemes, including:
+k-fold cross-validation, with optional feature selection, and support
+for both classification and survival tasks. It allows flexible
+cross-validation schemes, including:
 
 - Standard stratified k-fold cross-validation
 
@@ -22,7 +22,6 @@ compute_features.training.ML(
   time_var = NULL,
   event_var = NULL,
   metric = NULL,
-  stack = FALSE,
   k_folds = 10,
   n_rep = 5,
   LODO = FALSE,
@@ -32,7 +31,8 @@ compute_features.training.ML(
   return = FALSE,
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
-  fold_construction_args_tunable = NULL
+  fold_construction_args_tunable = NULL,
+  fold_models_dir = "Results/fold_models"
 )
 ```
 
@@ -69,18 +69,13 @@ compute_features.training.ML(
   Character. Performance metric for model selection and tuning.
   Supported values:
 
-  - `"Accuracy"` — classification accuracy
+  - `"Accuracy"` - classification accuracy
 
-  - `"AUROC"` — area under the ROC curve
+  - `"AUROC"` - area under the ROC curve
 
-  - `"AUPRC"` — area under the precision-recall curve
+  - `"AUPRC"` - area under the precision-recall curve
 
-  - `"C-index"` — concordance index (for survival tasks)
-
-- stack:
-
-  Logical. Perform model stacking (ensemble meta-learning). Default:
-  `FALSE`.
+  - `"C-index"` - concordance index (for survival tasks)
 
 - k_folds:
 
@@ -120,22 +115,22 @@ compute_features.training.ML(
   Function. Optional user-defined function for fold construction. Must
   accept a `bestune` argument:
 
-  - `bestune = NULL` — explore parameter grid across folds (parallelized
+  - `bestune = NULL` - explore parameter grid across folds (parallelized
     via `foreach`).
 
-  - `bestune provided` — rebuild features on the full dataset using
+  - `bestune provided` - rebuild features on the full dataset using
     optimized parameters.
 
   The function should save individual folds as `"Results/fold_*.rds"`
   with:
 
-  - `train_data` — training data
+  - `train_data` - training data
 
-  - `test_data` — testing data
+  - `test_data` - testing data
 
-  - `obs_test` — observed outcomes
+  - `obs_test` - observed outcomes
 
-  - `params` — parameters used (if applicable)
+  - `params` - parameters used (if applicable)
 
 - fold_construction_args_fixed:
 
@@ -147,11 +142,16 @@ compute_features.training.ML(
   List of arguments passed to `fold_construction_fun` for hyperparameter
   tuning.
 
+- fold_models_dir:
+
+  Character. Directory where per-fold models are saved/read from when
+  `fold_construction_fun` is used. Default: `"Results/fold_models"`.
+
 ## Value
 
 A list containing:
 
-- Trained model(s) or meta-learner (if `stack = TRUE`)
+- Trained model(s)
 
 - Features used for training
 

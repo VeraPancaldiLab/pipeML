@@ -42,21 +42,21 @@ wrapper_train_best_hyperparams_survival(
   Character string specifying the survival model to train. Must be one
   of:
 
-  - `"cox_ph_survival"` — Cox proportional hazards model.
+  - `"cox_ph_survival"` - Cox proportional hazards model.
 
-  - `"proportional_hazards_glmnet"` — Penalized Cox (elastic net).
+  - `"proportional_hazards_glmnet"` - Penalized Cox (elastic net).
 
-  - `"survreg_flexsurv"` — Parametric AFT model.
+  - `"survreg_flexsurv"` - Parametric AFT model.
 
-  - `"rand_forest_partykit"` — Random survival forest via `partykit`.
+  - `"rand_forest_partykit"` - Random survival forest via `partykit`.
 
-  - `"rand_forest_aorsf"` — Oblique random survival forest.
+  - `"rand_forest_aorsf"` - Oblique random survival forest.
 
-  - `"decision_tree_partykit"` — Single survival tree.
+  - `"decision_tree_partykit"` - Single survival tree.
 
-  - `"bag_tree_rpart"` — Bagged CART-based survival trees.
+  - `"bag_tree_rpart"` - Bagged CART-based survival trees.
 
-  - `"boost_tree_mboost"` — Gradient boosting for censored data.
+  - `"boost_tree_mboost"` - Gradient boosting for censored data.
 
 - fold_construction_fun:
 

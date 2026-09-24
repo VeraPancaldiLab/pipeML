@@ -10,7 +10,12 @@ including performance metrics and predictions.
 ## Usage
 
 ``` r
-compute_custom_k_fold_CV(processed_folds, ml_method, tuneGrid)
+compute_custom_k_fold_CV(
+  processed_folds,
+  ml_method,
+  tuneGrid,
+  fold_models_dir = "Results/fold_models"
+)
 ```
 
 ## Arguments

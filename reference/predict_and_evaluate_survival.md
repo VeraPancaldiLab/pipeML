@@ -62,12 +62,12 @@ A list containing:
 The function attempts predictions using multiple types depending on
 model support:
 
-- `"linear_pred"` — Linear predictor/log hazard (higher = higher risk).
+- `"linear_pred"` - Linear predictor/log hazard (higher = higher risk).
 
-- `"time"` — Expected survival time (higher = longer survival, reversed
+- `"time"` - Expected survival time (higher = longer survival, reversed
   internally).
 
-- `"survival"` — Survival probability at a median evaluation time
+- `"survival"` - Survival probability at a median evaluation time
   (higher = better survival, reversed internally).
 
 Standardizes output into a tibble with a single numeric `.pred` column.

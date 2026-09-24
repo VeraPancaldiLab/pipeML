@@ -35,7 +35,7 @@ compute_cv_CINDEX(models, file_name = NULL, plot_results = TRUE)
 - plot_results:
 
   Logical (default = TRUE). If `TRUE`, generates a PDF bar plot showing
-  median C-index ± MAD per model.
+  median C-index +/- MAD per model.
 
 ## Value
 
@@ -60,7 +60,7 @@ A list with:
 
 - MAD provides robust variability estimation of C-index values.
 
-- The optional plot displays model performance with error bars ± MAD.
+- The optional plot displays model performance with error bars +/- MAD.
 
 ## See also
 

@@ -22,7 +22,8 @@ compute_k_fold_CV_survival(
   file_name = NULL,
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
-  fold_construction_args_tunable = NULL
+  fold_construction_args_tunable = NULL,
+  fold_models_dir = "Results/fold_models"
 )
 ```
 
@@ -126,7 +127,7 @@ The function internally:
 - Merges predictors and outcomes.
 
 - Creates stratified folds using **rsample**, either by event or by
-  cohort × event (LODO).
+  cohort x event (LODO).
 
 - Evaluates predefined survival models: Cox PH, penalized Cox (glmnet),
   AFT (flexsurv), decision trees, bagged trees, and random forests.
