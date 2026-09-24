@@ -33,8 +33,9 @@ Imports:
     workflows,
     tune,
     yardstick
-Remotes: 
+Remotes:
     VeraPancaldiLab/multideconv,
+    bgreenwell/fastshap@v0.3.0
 Suggests: 
     testthat (>= 3.0.0),
     knitr,
