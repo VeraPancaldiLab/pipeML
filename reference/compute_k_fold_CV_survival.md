@@ -23,7 +23,7 @@ compute_k_fold_CV_survival(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = "Results/fold_models"
+  fold_models_dir = "Results/fold_models/survival"
 )
 ```
 

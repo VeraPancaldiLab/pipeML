@@ -3,8 +3,9 @@
 This function calculates SHAP (SHapley Additive exPlanations) values to
 assess feature importance for a trained machine learning model. It
 supports both classification and survival tasks, and performs
-calculations on cross-validation resamples in parallel. The results can
-be summarized and optionally saved with a stability plot.
+calculations on cross-validation resamples in parallel. Each sample is
+explained only by the fold model(s) that held it out, and its SHAP
+values are summarized across repeats by the median.
 
 ## Usage
 
@@ -19,7 +20,7 @@ compute_shap_values(
   event_col = NULL,
   n_cores = 2,
   file.name = NULL,
-  fold_models_dir = "Results/fold_models"
+  fold_models_dir = NULL
 )
 ```
 
@@ -41,7 +42,8 @@ compute_shap_values(
 - target_col:
 
   Character. Name of the target column for classification tasks.
-  Required if `task_type = "classification"`.
+  Required if `task_type = "classification"`. The column is removed from
+  the predictors before any model is refitted or explained.
 
 - trait.positive:
 
@@ -63,21 +65,24 @@ compute_shap_values(
 
 - file.name:
 
-  Character. Optional filename prefix for saving SHAP stability plots.
-  If `NULL`, plots are not saved.
+  Character. Currently unused (the SHAP stability plot is disabled);
+  kept for backward compatibility.
 
 - fold_models_dir:
 
   Character. Directory where per-fold models saved during training (by
   `compute_custom_k_fold_CV` or `compute_k_fold_CV_survival`) are read
-  from, to avoid retraining each resample. Default:
-  `"Results/fold_models"`.
+  from, to avoid retraining each resample. If `NULL` (default), uses
+  `"Results/fold_models/<task_type>"`, the same default used by
+  `compute_features.training.ML`.
 
 ## Value
 
-A data frame containing SHAP values for all features, averaged across
-resamples, with rows corresponding to training samples and columns to
-features.
+A data frame containing SHAP values for all features, summarized
+(median) across resamples, with rows corresponding to training samples
+and columns to features. Values are in the units of the model output
+(probability of the positive class for classification, risk score for
+survival).
 
 ## Details
 
@@ -86,18 +91,19 @@ The function performs the following steps:
 1.  Sets up classification or survival prediction functions based on the
     task type.
 
-2.  Loops over all cross-validation resamples in parallel, refitting
-    models on training folds.
+2.  Loops over all cross-validation resamples in parallel, loading the
+    saved fold model (or refitting it on the training fold if no
+    matching file is found).
 
 3.  Computes SHAP values using
     [`fastshap::explain()`](https://bgreenwell.github.io/fastshap/reference/explain.html)
-    for each resample, skipping trivial predictions.
+    on the held-out samples of each resample, skipping resamples with
+    trivial predictions.
 
 4.  Combines SHAP values across resamples and summarizes them (median
     per sample).
 
-5.  Generates and optionally saves a SHAP stability plot if `file.name`
-    is provided.
-
-Trivial predictions (constant probability for all samples) are skipped,
-and a warning is issued if SHAP values cannot be computed.
+A summary of how many resamples were loaded, retrained or skipped is
+printed. Samples that could not be explained in any resample are
+reported with a warning. If no resample could be explained, `NULL` is
+returned.

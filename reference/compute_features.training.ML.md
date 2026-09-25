@@ -32,7 +32,7 @@ compute_features.training.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = "Results/fold_models"
+  fold_models_dir = NULL
 )
 ```
 
@@ -145,7 +145,11 @@ compute_features.training.ML(
 - fold_models_dir:
 
   Character. Directory where per-fold models are saved/read from when
-  `fold_construction_fun` is used. Default: `"Results/fold_models"`.
+  `fold_construction_fun` is used. If `NULL` (default), uses
+  `"Results/fold_models/<task_type>"` so classification and survival
+  runs never share (or prune) each other's files. Use a distinct
+  directory per analysis when running several analyses of the same task
+  type from one folder.
 
 ## Value
 

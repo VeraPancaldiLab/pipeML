@@ -79,7 +79,7 @@ It allows flexible cross-validation schemes, including:</p><ul><li><p>Standard s
 <span>  fold_construction_fun <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  fold_construction_args_fixed <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  fold_construction_args_tunable <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  fold_models_dir <span class="op">=</span> <span class="st">"Results/fold_models"</span></span>
+<span>  fold_models_dir <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -167,7 +167,9 @@ It allows flexible cross-validation schemes, including:</p><ul><li><p>Standard s
 
 <dt id="arg-fold-models-dir">fold_models_dir<a class="anchor" aria-label="anchor" href="#arg-fold-models-dir"></a></dt>
 <dd><p>Character. Directory where per-fold models are saved/read from when
-<code>fold_construction_fun</code> is used. Default: <code>"Results/fold_models"</code>.</p></dd>
+<code>fold_construction_fun</code> is used. If <code>NULL</code> (default), uses <code>"Results/fold_models/&lt;task_type&gt;"</code>
+so classification and survival runs never share (or prune) each other's files. Use a distinct
+directory per analysis when running several analyses of the same task type from one folder.</p></dd>
 
 </dl></div>
     <div class="section level2">
