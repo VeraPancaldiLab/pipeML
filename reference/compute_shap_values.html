@@ -54,10 +54,8 @@ the fold model(s) that held it out, and its SHAP values are summarized across re
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">compute_shap_values</span><span class="op">(</span></span>
 <span>  <span class="va">model_trained</span>,</span>
-<span>  <span class="va">data_train</span>,</span>
+<span>  data_train <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
-<span>  target_col <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  <span class="va">trait.positive</span>,</span>
 <span>  time_col <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  event_col <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  n_cores <span class="op">=</span> <span class="fl">2</span>,</span>
@@ -71,25 +69,20 @@ the fold model(s) that held it out, and its SHAP values are summarized across re
 
 
 <dl><dt id="arg-model-trained">model_trained<a class="anchor" aria-label="anchor" href="#arg-model-trained"></a></dt>
-<dd><p>A trained machine learning model object (e.g., output from caret or custom ML pipeline),
-which includes cross-validation resamples.</p></dd>
+<dd><p>A trained machine learning model object, which includes cross-validation resamples.
+For classification, this must be the caret <code>train</code> object returned as <code>$Model</code> by
+<code><a href="compute_features.training.ML.html">compute_features.training.ML()</a></code> (e.g. <code>res$Model</code>): the training data
+(<code>$trainingData</code>), the outcome (<code>.outcome</code>, coded <code>"no"</code>/<code>"yes"</code>) and the positive
+class (<code>"yes"</code>) are all taken from it.</p></dd>
 
 
 <dt id="arg-data-train">data_train<a class="anchor" aria-label="anchor" href="#arg-data-train"></a></dt>
-<dd><p>A data frame containing the training data used for the model.</p></dd>
+<dd><p>Survival only. A data frame containing the training data used for the model.
+Ignored for classification, where the training data is taken from <code>model_trained$trainingData</code>.</p></dd>
 
 
 <dt id="arg-task-type">task_type<a class="anchor" aria-label="anchor" href="#arg-task-type"></a></dt>
 <dd><p>Character. Either <code>"classification"</code> (default) or <code>"survival"</code>.</p></dd>
-
-
-<dt id="arg-target-col">target_col<a class="anchor" aria-label="anchor" href="#arg-target-col"></a></dt>
-<dd><p>Character. Name of the target column for classification tasks. Required if <code>task_type = "classification"</code>.
-The column is removed from the predictors before any model is refitted or explained.</p></dd>
-
-
-<dt id="arg-trait-positive">trait.positive<a class="anchor" aria-label="anchor" href="#arg-trait-positive"></a></dt>
-<dd><p>Value representing the positive class in classification tasks.</p></dd>
 
 
 <dt id="arg-time-col">time_col<a class="anchor" aria-label="anchor" href="#arg-time-col"></a></dt>

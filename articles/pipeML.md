@@ -222,18 +222,15 @@ avoids this overhead.
 ##### Running `compute_shap_values`
 
 ``` r
+For classification, the training data, the outcome and the positive class are all taken from the trained model (`res$Model`), so only the model needs to be passed:
+```
 
-df = cbind(X_train, target = as.numeric(y_train)) ## compute_shap_values expects predictors and target in a single data.frame
+``` r
 
 shap_classification <- compute_shap_values(
   model_trained  = res$Model,
-  data_train     = df,
   task_type      = "classification",
-  target_col     = "target",
-  trait.positive = "2", # Notice here that because of as.numeric() our target variable changed to 1 and 2 so we will consider 2 as our new 1.
-  n_cores        = 2,
-  file.name      = "Example_classification",
-  fold_models_dir = "Results/fold_models"  # directory where fold models were saved during CV
+  n_cores        = 2
 )
 ```
 
@@ -241,9 +238,11 @@ Visualize feature importance and interactions using shapviz:
 
 ``` r
 
+X_shap <- res$Model$trainingData[rownames(shap_classification), colnames(shap_classification)]
+
 sv <- shapviz::shapviz(
   shap = as.matrix(shap_classification),
-  X = df[, setdiff(colnames(df), "target")]
+  X = X_shap
 )
 
 # Global feature importance (bar plot)
@@ -1568,7 +1567,7 @@ for these saved models. If found, it loads them directly and skips
 retraining. A diagnostic message is printed before the parallel SHAP
 computation begins:
 
-    Fold models found for 50 / 50 resamples — none will retrain
+    Fold models found in 'Results/fold_models/classification' for 50 / 50 resamples — none will retrain
 
 If some files are missing (e.g., the directory was cleared), it falls
 back to the original retraining behavior for those resamples, so
@@ -1599,9 +1598,12 @@ Both
 [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
 and
 [`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md)
-accept a `fold_models_dir` argument (default: `"Results/fold_models"`).
-Set both to the same path to ensure the files written during CV are
-found during SHAP computation:
+accept a `fold_models_dir` argument. If it is left as `NULL` (default),
+both use `"Results/fold_models/<task_type>"` (`.../classification` or
+`.../survival`), so classification and survival runs never overwrite or
+prune each other’s files. When running several analyses of the same task
+type from one working directory, give each one its own directory and
+pass the same path to both functions:
 
 ``` r
 
@@ -1621,10 +1623,7 @@ res <- compute_features.training.ML(
 
 shap_res <- compute_shap_values(
   model_trained   = res$Model,
-  data_train      = df_shap,
   task_type       = "classification",
-  target_col      = "target",
-  trait.positive  = "yes",
   n_cores         = 4,
   fold_models_dir = fold_dir
 )

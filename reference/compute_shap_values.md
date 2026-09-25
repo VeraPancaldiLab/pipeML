@@ -12,10 +12,8 @@ values are summarized across repeats by the median.
 ``` r
 compute_shap_values(
   model_trained,
-  data_train,
+  data_train = NULL,
   task_type = "classification",
-  target_col = NULL,
-  trait.positive,
   time_col = NULL,
   event_col = NULL,
   n_cores = 2,
@@ -28,26 +26,23 @@ compute_shap_values(
 
 - model_trained:
 
-  A trained machine learning model object (e.g., output from caret or
-  custom ML pipeline), which includes cross-validation resamples.
+  A trained machine learning model object, which includes
+  cross-validation resamples. For classification, this must be the caret
+  `train` object returned as `$Model` by
+  [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
+  (e.g. `res$Model`): the training data (`$trainingData`), the outcome
+  (`.outcome`, coded `"no"`/`"yes"`) and the positive class (`"yes"`)
+  are all taken from it.
 
 - data_train:
 
-  A data frame containing the training data used for the model.
+  Survival only. A data frame containing the training data used for the
+  model. Ignored for classification, where the training data is taken
+  from `model_trained$trainingData`.
 
 - task_type:
 
   Character. Either `"classification"` (default) or `"survival"`.
-
-- target_col:
-
-  Character. Name of the target column for classification tasks.
-  Required if `task_type = "classification"`. The column is removed from
-  the predictors before any model is refitted or explained.
-
-- trait.positive:
-
-  Value representing the positive class in classification tasks.
 
 - time_col:
 
