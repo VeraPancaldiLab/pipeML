@@ -14,7 +14,7 @@ compute_shap_values(
   event_col = NULL,
   n_cores = 2,
   file.name = NULL,
-  fold_models_dir = "Results/fold_models"
+  fold_models_dir = NULL
 )
 }
 \arguments{
@@ -25,7 +25,8 @@ which includes cross-validation resamples.}
 
 \item{task_type}{Character. Either \code{"classification"} (default) or \code{"survival"}.}
 
-\item{target_col}{Character. Name of the target column for classification tasks. Required if \code{task_type = "classification"}.}
+\item{target_col}{Character. Name of the target column for classification tasks. Required if \code{task_type = "classification"}.
+The column is removed from the predictors before any model is refitted or explained.}
 
 \item{trait.positive}{Value representing the positive class in classification tasks.}
 
@@ -35,31 +36,34 @@ which includes cross-validation resamples.}
 
 \item{n_cores}{Integer. Number of cores for parallel computation. Default is 2.}
 
-\item{file.name}{Character. Optional filename prefix for saving SHAP stability plots. If \code{NULL}, plots are not saved.}
+\item{file.name}{Character. Currently unused (the SHAP stability plot is disabled); kept for backward compatibility.}
 
 \item{fold_models_dir}{Character. Directory where per-fold models saved during training
 (by \code{compute_custom_k_fold_CV} or \code{compute_k_fold_CV_survival}) are read from,
-to avoid retraining each resample. Default: \code{"Results/fold_models"}.}
+to avoid retraining each resample. If \code{NULL} (default), uses
+\code{"Results/fold_models/<task_type>"}, the same default used by \code{compute_features.training.ML}.}
 }
 \value{
-A data frame containing SHAP values for all features, averaged across resamples, with rows corresponding
-to training samples and columns to features.
+A data frame containing SHAP values for all features, summarized (median) across resamples, with rows
+corresponding to training samples and columns to features. Values are in the units of the model output
+(probability of the positive class for classification, risk score for survival).
 }
 \description{
 This function calculates SHAP (SHapley Additive exPlanations) values to assess feature importance
 for a trained machine learning model. It supports both classification and survival tasks, and
-performs calculations on cross-validation resamples in parallel. The results can be summarized
-and optionally saved with a stability plot.
+performs calculations on cross-validation resamples in parallel. Each sample is explained only by
+the fold model(s) that held it out, and its SHAP values are summarized across repeats by the median.
 }
 \details{
 The function performs the following steps:
 \enumerate{
 \item Sets up classification or survival prediction functions based on the task type.
-\item Loops over all cross-validation resamples in parallel, refitting models on training folds.
-\item Computes SHAP values using \code{fastshap::explain()} for each resample, skipping trivial predictions.
+\item Loops over all cross-validation resamples in parallel, loading the saved fold model
+(or refitting it on the training fold if no matching file is found).
+\item Computes SHAP values using \code{fastshap::explain()} on the held-out samples of each resample,
+skipping resamples with trivial predictions.
 \item Combines SHAP values across resamples and summarizes them (median per sample).
-\item Generates and optionally saves a SHAP stability plot if \code{file.name} is provided.
 }
-Trivial predictions (constant probability for all samples) are skipped, and a warning is issued if SHAP
-values cannot be computed.
+A summary of how many resamples were loaded, retrained or skipped is printed. Samples that could not be
+explained in any resample are reported with a warning. If no resample could be explained, \code{NULL} is returned.
 }

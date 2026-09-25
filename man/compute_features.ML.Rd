@@ -24,7 +24,7 @@ compute_features.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = "Results/fold_models"
+  fold_models_dir = NULL
 )
 }
 \arguments{
@@ -78,7 +78,9 @@ Must accept a \code{bestune} argument internally to inject optimized hyperparame
 \item{fold_construction_args_tunable}{List. Arguments passed to \code{fold_construction_fun} defining hyperparameters to explore during CV.}
 
 \item{fold_models_dir}{Character. Directory where per-fold models are saved/read from when
-\code{fold_construction_fun} is used. Default: \code{"Results/fold_models"}.}
+\code{fold_construction_fun} is used. If \code{NULL} (default), uses \code{"Results/fold_models/<task_type>"}
+so classification and survival runs never share (or prune) each other's files. Use a distinct
+directory per analysis when running several analyses of the same task type from one folder.}
 }
 \value{
 A named list containing:

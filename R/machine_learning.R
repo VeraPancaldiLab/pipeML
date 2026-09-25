@@ -79,7 +79,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "Accuracy", fi
                              ncores = NULL, return = FALSE, fold_construction_fun = NULL,
                              fold_construction_args_fixed = NULL,
                              fold_construction_args_tunable = NULL,
-                             fold_models_dir = "Results/fold_models"){
+                             fold_models_dir = "Results/fold_models/classification"){
 
   ml_methods_names <- c("treebag", "rf", "C5.0",
                         "glmnet", "knn", "rpart", "lasso", "ridge",
@@ -1026,7 +1026,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "Accuracy", fi
 #' }
 #'
 #' @keywords internal
-compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid, fold_models_dir = "Results/fold_models") {
+compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid, fold_models_dir = "Results/fold_models/classification") {
 
   train_data = processed_folds[["train_data"]]
   test_data = processed_folds[["test_data"]]
@@ -1141,7 +1141,9 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid, fold_
 #' @param fold_construction_args_fixed List of arguments passed to \code{fold_construction_fun} that remain fixed across CV and final training.
 #' @param fold_construction_args_tunable List of arguments passed to \code{fold_construction_fun} for hyperparameter tuning.
 #' @param fold_models_dir Character. Directory where per-fold models are saved/read from when
-#'   \code{fold_construction_fun} is used. Default: \code{"Results/fold_models"}.
+#'   \code{fold_construction_fun} is used. If \code{NULL} (default), uses \code{"Results/fold_models/<task_type>"}
+#'   so classification and survival runs never share (or prune) each other's files. Use a distinct
+#'   directory per analysis when running several analyses of the same task type from one folder.
 #'
 #' @details
 #' The function provides:
@@ -1169,7 +1171,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
                                         time_var = NULL, event_var = NULL, metric = NULL, k_folds = 10, n_rep = 5, LODO = FALSE,
                                         batch_var = NULL, file_name = NULL, ncores = NULL, return = FALSE,
                                         fold_construction_fun = NULL, fold_construction_args_fixed = NULL, fold_construction_args_tunable = NULL,
-                                        fold_models_dir = "Results/fold_models"){
+                                        fold_models_dir = NULL){
 
   # ---------------------------------------------------------------------------
   # Validate task_type and required arguments
@@ -1191,6 +1193,10 @@ compute_features.training.ML = function(features_train, task_type = c("classific
   } else {
     stop("Invalid task_type. Must be either 'classification' or 'survival'.\n")
   }
+
+  # Task-specific fold model directory: the pruning after model selection deletes every file in this
+  # directory that does not belong to the selected model, so tasks must not share it
+  if (is.null(fold_models_dir)) fold_models_dir <- file.path("Results", "fold_models", task_type)
 
   # ---------------------------------------------------------------------------
   # === CASE 1: CLASSIFICATION TASK ==========================================
@@ -1311,7 +1317,9 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #' @param fold_construction_args_tunable List. Arguments passed to \code{fold_construction_fun} defining hyperparameters to explore during CV.
 #' @param return Logical. Whether to return and save plots/results. Default: \code{FALSE}.
 #' @param fold_models_dir Character. Directory where per-fold models are saved/read from when
-#'   \code{fold_construction_fun} is used. Default: \code{"Results/fold_models"}.
+#'   \code{fold_construction_fun} is used. If \code{NULL} (default), uses \code{"Results/fold_models/<task_type>"}
+#'   so classification and survival runs never share (or prune) each other's files. Use a distinct
+#'   directory per analysis when running several analyses of the same task type from one folder.
 #'
 #' @details
 #' For **classification tasks**, the function performs repeated k-fold cross-validation
@@ -1376,7 +1384,10 @@ compute_features.ML <- function(features_train, features_test, coldata,
                                 fold_construction_fun = NULL,
                                 fold_construction_args_fixed = NULL,
                                 fold_construction_args_tunable = NULL,
-                                fold_models_dir = "Results/fold_models"){
+                                fold_models_dir = NULL){
+
+  # Task-specific fold model directory (see compute_features.training.ML)
+  if (is.null(fold_models_dir)) fold_models_dir <- file.path("Results", "fold_models", task_type)
 
   # ---------------------------------------------------------------------------
   # === CASE 1: CLASSIFICATION TASK ==========================================
@@ -2618,37 +2629,41 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 #'
 #' This function calculates SHAP (SHapley Additive exPlanations) values to assess feature importance
 #' for a trained machine learning model. It supports both classification and survival tasks, and
-#' performs calculations on cross-validation resamples in parallel. The results can be summarized
-#' and optionally saved with a stability plot.
+#' performs calculations on cross-validation resamples in parallel. Each sample is explained only by
+#' the fold model(s) that held it out, and its SHAP values are summarized across repeats by the median.
 #'
 #' @param model_trained A trained machine learning model object (e.g., output from caret or custom ML pipeline),
 #'   which includes cross-validation resamples.
 #' @param data_train A data frame containing the training data used for the model.
 #' @param task_type Character. Either `"classification"` (default) or `"survival"`.
 #' @param target_col Character. Name of the target column for classification tasks. Required if `task_type = "classification"`.
+#'   The column is removed from the predictors before any model is refitted or explained.
 #' @param trait.positive Value representing the positive class in classification tasks.
 #' @param time_col Character. Column name representing survival time. Required if `task_type = "survival"`.
 #' @param event_col Character. Column name representing survival event indicator. Required if `task_type = "survival"`.
 #' @param n_cores Integer. Number of cores for parallel computation. Default is 2.
-#' @param file.name Character. Optional filename prefix for saving SHAP stability plots. If `NULL`, plots are not saved.
+#' @param file.name Character. Currently unused (the SHAP stability plot is disabled); kept for backward compatibility.
 #' @param fold_models_dir Character. Directory where per-fold models saved during training
 #'   (by \code{compute_custom_k_fold_CV} or \code{compute_k_fold_CV_survival}) are read from,
-#'   to avoid retraining each resample. Default: \code{"Results/fold_models"}.
+#'   to avoid retraining each resample. If \code{NULL} (default), uses
+#'   \code{"Results/fold_models/<task_type>"}, the same default used by \code{compute_features.training.ML}.
 #'
-#' @return A data frame containing SHAP values for all features, averaged across resamples, with rows corresponding
-#'   to training samples and columns to features.
+#' @return A data frame containing SHAP values for all features, summarized (median) across resamples, with rows
+#'   corresponding to training samples and columns to features. Values are in the units of the model output
+#'   (probability of the positive class for classification, risk score for survival).
 #'
 #' @details
 #' The function performs the following steps:
 #' \enumerate{
 #'   \item Sets up classification or survival prediction functions based on the task type.
-#'   \item Loops over all cross-validation resamples in parallel, refitting models on training folds.
-#'   \item Computes SHAP values using `fastshap::explain()` for each resample, skipping trivial predictions.
+#'   \item Loops over all cross-validation resamples in parallel, loading the saved fold model
+#'     (or refitting it on the training fold if no matching file is found).
+#'   \item Computes SHAP values using `fastshap::explain()` on the held-out samples of each resample,
+#'     skipping resamples with trivial predictions.
 #'   \item Combines SHAP values across resamples and summarizes them (median per sample).
-#'   \item Generates and optionally saves a SHAP stability plot if `file.name` is provided.
 #' }
-#' Trivial predictions (constant probability for all samples) are skipped, and a warning is issued if SHAP
-#' values cannot be computed.
+#' A summary of how many resamples were loaded, retrained or skipped is printed. Samples that could not be
+#' explained in any resample are reported with a warning. If no resample could be explained, `NULL` is returned.
 #'
 #' @import dplyr
 #' @import caret
@@ -2658,8 +2673,10 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 #' @export
 compute_shap_values <- function(model_trained, data_train, task_type = "classification", target_col = NULL,
                                 trait.positive, time_col = NULL, event_col = NULL, n_cores = 2, file.name = NULL,
-                                fold_models_dir = "Results/fold_models") {
-                                  
+                                fold_models_dir = NULL) {
+
+  if (is.null(fold_models_dir)) fold_models_dir <- file.path("Results", "fold_models", task_type)
+
   sample_ids <- rownames(data_train)
 
   if(task_type == "classification"){
@@ -2673,8 +2690,8 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
         )
       )
 
-    X = data_train %>%
-      dplyr::select(-dplyr::all_of(target_col))
+    # Drop the original outcome column so it cannot leak into refitted models or SHAP inputs
+    if (target_col != "target") data_train[[target_col]] <- NULL
 
     pred_fun = function(object, newdata){
       predict(object, newdata, type = "prob")[,"yes"]
@@ -2688,8 +2705,6 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
 
   }else if(task_type == "survival"){
     if(is.null(time_col) || is.null(event_col)) stop("time_col and event_col must be provided for survival tasks")
-    X = data_train %>%
-      dplyr::select(-dplyr::all_of(c(time_col, event_col)))
 
     # Determine resamples from the model object
     resamples <- unique(model_trained$Resample_matrix$Resample)
@@ -2714,9 +2729,19 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
   # Get tuned hyperparameters
   filter_conditions <- model_trained$bestTune[1, , drop = FALSE]
 
-  # Register parallel backend
+  # Resample and method names are used inside a regex: escape metacharacters (e.g. "." in "Fold1.Rep1")
+  escape_regex <- function(x) gsub("([.|()\\^{}+$*?\\[\\]\\\\])", "\\\\\\1", x)
+  fold_file_pattern <- function(r) {
+    sprintf("^fold_model_%s_%s_\\d+\\.rds$", escape_regex(r), escape_regex(method))
+  }
+
+  # Register parallel backend (always released, also on error)
   cl <- parallel::makeCluster(n_cores)
   doParallel::registerDoParallel(cl)
+  on.exit({
+    parallel::stopCluster(cl)
+    unregister_dopar() # Stop Dopar from running in the background
+  }, add = TRUE)
 
   base_pkgs <- c("dplyr", "caret", "pipeML")
   if (task_type == "survival") {
@@ -2726,126 +2751,95 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
 
   # Pre-scan saved fold models and report before entering the parallel block
   saved_resamples <- sapply(resamples, function(r) {
-    length(list.files(fold_models_dir,
-                      pattern = sprintf("^fold_model_%s_%s_\\d+\\.rds$", r, method),
-                      full.names = FALSE)) > 0
+    length(list.files(fold_models_dir, pattern = fold_file_pattern(r), full.names = FALSE)) > 0
   })
-  cat(sprintf("Fold models found for %d / %d resamples \u2014 %s will retrain\n",
-              sum(saved_resamples), length(resamples),
+  cat(sprintf("Fold models found in '%s' for %d / %d resamples — %s will retrain\n",
+              fold_models_dir, sum(saved_resamples), length(resamples),
               if (all(saved_resamples)) "none" else paste(names(saved_resamples)[!saved_resamples], collapse = ", ")))
 
+  # Each worker returns list(resample, status, shap); status is reported from the main process,
+  # since messages emitted inside PSOCK workers do not reach the console
   importance_list <- foreach::foreach(resample = resamples, .packages = base_pkgs) %dopar% {
 
-      if(task_type == "classification"){
-
-        # Try to load a saved fold model from compute_custom_k_fold_CV
-        saved_files <- list.files(fold_models_dir,
-                                  pattern = sprintf("^fold_model_%s_%s_\\d+\\.rds$", resample, method),
-                                  full.names = TRUE)
-        loaded_fold <- NULL
-        if (length(saved_files) > 0) {
-          for (sf in saved_files) {
-            candidate <- readRDS(sf)
-            hp_match <- all(mapply(function(col) {
-              col %in% names(candidate$hp) &&
-                isTRUE(all.equal(candidate$hp[[col]], filter_conditions[[col]], check.attributes = FALSE))
-            }, names(filter_conditions)))
-            if (hp_match) { loaded_fold <- candidate; break }
-          }
+      # Try to load a saved fold model (from compute_custom_k_fold_CV / compute_k_fold_CV_survival)
+      saved_files <- list.files(fold_models_dir, pattern = fold_file_pattern(resample), full.names = TRUE)
+      loaded_fold <- NULL
+      for (sf in saved_files) {
+        candidate <- readRDS(sf)
+        if (task_type == "survival" && (is.null(filter_conditions) || nrow(candidate$hp) == 0)) {
+          loaded_fold <- candidate; break
         }
-
-        if (!is.null(loaded_fold)) {
-          fit     <- loaded_fold$fit
-          X_train <- loaded_fold$X_train
-          X_test  <- loaded_fold$X_test
-          pred_probs <- pred_fun(fit, X_test)
-        } else {
-          test_index <- model_trained$pred %>%
-            dplyr::filter(Resample == resample) %>%
-            dplyr::distinct(rowIndex) %>%
-            dplyr::pull(rowIndex)
-
-          train_data_fold <- data_train[-test_index, ]
-          test_data_fold  <- data_train[test_index, ]
-
-          fit <- if (any(filter_conditions != "none")) {
-            caret::train(
-              target ~ .,
-              data = train_data_fold,
-              method = method,
-              trControl = caret::trainControl(method = "none", classProbs = TRUE),
-              tuneGrid = filter_conditions,
-              metric = "Accuracy"
-            )
-          } else {
-            caret::train(
-              target ~ .,
-              data = train_data_fold,
-              method = method,
-              trControl = caret::trainControl(method = "none", classProbs = TRUE),
-              metric = "Accuracy"
-            )
-          }
-
-          X_train    <- train_data_fold[, setdiff(names(train_data_fold), "target")]
-          X_test     <- test_data_fold[, setdiff(names(test_data_fold), "target")]
-          pred_probs <- pred_fun(fit, X_test)
-        }
-
-      }else if(task_type == "survival"){
-
-        # Try to load a saved fold model from compute_k_fold_CV_survival
-        saved_files <- list.files(fold_models_dir,
-                                  pattern = sprintf("^fold_model_%s_%s_\\d+\\.rds$", resample, method),
-                                  full.names = TRUE)
-        loaded_fold <- NULL
-        if (length(saved_files) > 0) {
-          for (sf in saved_files) {
-            candidate <- readRDS(sf)
-            if (is.null(filter_conditions) || nrow(candidate$hp) == 0) {
-              loaded_fold <- candidate; break
-            }
-            hp_match <- all(mapply(function(col) {
-              col %in% names(candidate$hp) &&
-                isTRUE(all.equal(candidate$hp[[col]], filter_conditions[[col]], check.attributes = FALSE))
-            }, names(filter_conditions)))
-            if (hp_match) { loaded_fold <- candidate; break }
-          }
-        }
-
-        if (!is.null(loaded_fold)) {
-          cat("Resample", resample, "\u2014 loaded saved fold model (skipping retrain)\n")
-          fit        <- loaded_fold$fit
-          X_train    <- loaded_fold$X_train
-          X_test     <- loaded_fold$X_test
-          pred_probs <- pred_fun(fit, X_test)
-        } else {
-          test_index <- model_trained$Resample_matrix %>%
-            dplyr::filter(Resample == resample) %>%
-            dplyr::pull(rowIndex)
-
-          train_data_fold <- data_train[-test_index, ]
-          test_data_fold  <- data_train[test_index, ]
-
-          res = compute_ml_survival(train_data_fold, test_data_fold, outcome_col = time_col,
-                                    event_col = event_col, model = method,
-                                    models_hyperparameters = if (is.null(filter_conditions)) NULL else
-                                      list(filter_conditions),
-                                    return_model = T,
-                                    fold_models_dir = fold_models_dir)
-
-          fit        <- res$Model
-          X_train    <- train_data_fold %>% dplyr::select(-dplyr::all_of(c(time_col, event_col)))
-          X_test     <- test_data_fold %>% dplyr::select(-dplyr::all_of(c(time_col, event_col)))
-          pred_probs <- res$Metrics$predictions
-        }
+        hp_match <- all(mapply(function(col) {
+          col %in% names(candidate$hp) &&
+            isTRUE(all.equal(candidate$hp[[col]], filter_conditions[[col]], check.attributes = FALSE))
+        }, names(filter_conditions)))
+        if (hp_match) { loaded_fold <- candidate; break }
       }
 
+      if (!is.null(loaded_fold)) {
+        status  <- "loaded"
+        fit     <- loaded_fold$fit
+        X_train <- loaded_fold$X_train
+        X_test  <- loaded_fold$X_test
+        pred_probs <- pred_fun(fit, X_test)
 
+      } else if (task_type == "classification") {
+        status <- "retrained"
+        test_index <- model_trained$pred %>%
+          dplyr::filter(Resample == resample) %>%
+          dplyr::distinct(rowIndex) %>%
+          dplyr::pull(rowIndex)
 
-      # Check for trivial predictions (same for all "yes"/"no")
-      if (length(unique(round(pred_probs, 5))) > 1) { ## equal prob in all the samples
-        # If predictions are not trivial, compute SHAP values
+        train_data_fold <- data_train[-test_index, ]
+        test_data_fold  <- data_train[test_index, ]
+
+        fit <- if (any(filter_conditions != "none")) {
+          caret::train(
+            target ~ .,
+            data = train_data_fold,
+            method = method,
+            trControl = caret::trainControl(method = "none", classProbs = TRUE),
+            tuneGrid = filter_conditions,
+            metric = "Accuracy"
+          )
+        } else {
+          caret::train(
+            target ~ .,
+            data = train_data_fold,
+            method = method,
+            trControl = caret::trainControl(method = "none", classProbs = TRUE),
+            metric = "Accuracy"
+          )
+        }
+
+        X_train    <- train_data_fold[, setdiff(names(train_data_fold), "target")]
+        X_test     <- test_data_fold[, setdiff(names(test_data_fold), "target")]
+        pred_probs <- pred_fun(fit, X_test)
+
+      } else {
+        status <- "retrained"
+        test_index <- model_trained$Resample_matrix %>%
+          dplyr::filter(Resample == resample) %>%
+          dplyr::pull(rowIndex)
+
+        train_data_fold <- data_train[-test_index, ]
+        test_data_fold  <- data_train[test_index, ]
+
+        res = compute_ml_survival(train_data_fold, test_data_fold, outcome_col = time_col,
+                                  event_col = event_col, model = method,
+                                  models_hyperparameters = if (is.null(filter_conditions)) NULL else
+                                    list(filter_conditions),
+                                  return_model = T,
+                                  fold_models_dir = fold_models_dir)
+
+        fit        <- res$Model
+        X_train    <- train_data_fold %>% dplyr::select(-dplyr::all_of(c(time_col, event_col)))
+        X_test     <- test_data_fold %>% dplyr::select(-dplyr::all_of(c(time_col, event_col)))
+        pred_probs <- res$Metrics$predictions
+      }
+
+      # Check for trivial predictions (same value for all held-out samples)
+      if (length(unique(round(pred_probs, 5))) > 1) {
         shap_values <- fastshap::explain(
           object = fit,
           X = X_train,
@@ -2858,33 +2852,35 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
         shap_values <- as.data.frame(shap_values)
         shap_values$Samples <- rownames(X_test)
 
-        shap_values
+        list(resample = resample, status = status, shap = shap_values)
 
       } else {
-        message("Skipping resample ", resample, " (constant predictions)")
-        NULL
+        list(resample = resample, status = paste0(status, ", skipped (constant predictions)"), shap = NULL)
       }
 
   }
 
-  # Stop the cluster after parallel execution
-  parallel::stopCluster(cl)
-  unregister_dopar() # Stop Dopar from running in the background
-
   gc()
 
-  importance_list = importance_list[!sapply(importance_list, is.null)]
+  # Report per-resample status
+  status_tab <- table(vapply(importance_list, `[[`, character(1), "status"))
+  cat("Resample status:", paste(sprintf("%s = %d", names(status_tab), as.integer(status_tab)), collapse = "; "), "\n")
+  skipped <- vapply(importance_list, function(x) is.null(x$shap), logical(1))
+  if (any(skipped)) {
+    message("Skipped resamples (constant predictions): ",
+            paste(vapply(importance_list[skipped], `[[`, character(1), "resample"), collapse = ", "))
+  }
+
+  importance_list <- lapply(importance_list[!skipped], `[[`, "shap")
 
   # Check if trivial predictions were found
   if (length(importance_list)==0) {
-    warning("Trivial predictions were found in some resamples. SHAP values cannot be calculated")
+    warning("Trivial predictions were found in all resamples. SHAP values cannot be calculated")
     return(NULL)
   }
 
   # Combine and summarize importance results
   shap_df <- dplyr::bind_rows(importance_list)
-
-  #plot_shap_stability(shap_df, file.name = file.name)
 
   shap_df <- shap_df %>%
     dplyr::group_by(Samples) %>%
@@ -2895,10 +2891,17 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
     dplyr::arrange(match(Samples, sample_ids)) %>%
     as.data.frame()
 
+  missing_samples <- setdiff(sample_ids, shap_df$Samples)
+  if (length(missing_samples) > 0) {
+    warning(length(missing_samples), " sample(s) were not explained in any resample and are absent from the output: ",
+            paste(utils::head(missing_samples, 10), collapse = ", "),
+            if (length(missing_samples) > 10) " ...")
+  }
+
   rownames(shap_df) <- shap_df$Samples
   shap_df$Samples <- NULL
 
-  cat("SHAP analisis finished! \n\n")
+  cat("SHAP analysis finished! \n\n")
 
   return(shap_df)
 }
@@ -3910,7 +3913,7 @@ get_default_hyperparams <- function(model_name, train_x = NULL, levels = 5, v = 
 compute_ml_survival <- function(df_train, df_test = NULL,
                                 outcome_col, event_col,
                                 model, models_hyperparameters, return_model = F,
-                                fold_models_dir = "Results/fold_models"){
+                                fold_models_dir = "Results/fold_models/survival"){
   ensure_censored()
 
   # ---------------------------------------------------------------------------
@@ -4120,7 +4123,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
                                        LODO = FALSE, batch_id = NULL, file_name = NULL, fold_construction_fun = NULL,
                                        fold_construction_args_fixed = NULL,
                                        fold_construction_args_tunable = NULL,
-                                       fold_models_dir = "Results/fold_models"){
+                                       fold_models_dir = "Results/fold_models/survival"){
   ensure_censored()
 
 
@@ -4174,12 +4177,18 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
   ### -------------------------------------------------------------------------
   # Convert the rsample object into a list of training indices, enabling reuse
   # of legacy caret-compatible aggregation utilities.
+  # Folds are named "Fold1.Rep1", ..., "FoldK.RepN" (same convention as classification), so that
+  # Resample labels, custom fold files and saved fold models (used by compute_shap_values) all match.
+  # rsample only sets id2 when repeats > 1 (id = "RepeatR", id2 = "FoldK"); otherwise id = "FoldK".
   #
+  fold_num <- as.integer(gsub("\\D", "", if ("id2" %in% names(folds)) folds$id2 else folds$id))
+  rep_num  <- if ("id2" %in% names(folds)) as.integer(gsub("\\D", "", folds$id)) else rep(1L, nrow(folds))
+
   multifolds <- purrr::map(
     seq_len(nrow(folds)),
     ~ folds$splits[[.x]]$in_id
   ) %>%
-    purrr::set_names(folds$id)
+    purrr::set_names(paste0("Fold", fold_num, ".Rep", rep_num))
 
   # ---------------------------------------------------------------------------
   # Step 5: Define candidate survival models
@@ -4269,7 +4278,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
                 data.frame() %>%
                 dplyr::mutate(
                   model = method,
-                  Resample = paste0("Fold", fold_i),
+                  Resample = names(multifolds)[fold_i],
                   rowIndex = test_idx,
                 ) %>%
                 dplyr::bind_cols(current_params %>% dplyr::select(-.config_id))%>%
@@ -4324,6 +4333,10 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
 
       result = readRDS(result_files[[fold_i]]) ## per resample
 
+      # Fold name from the file written by fold_construction_fun ("Results/fold_<name>.rds").
+      # list.files() sorts alphabetically, so fold_i is not the position in multifolds.
+      fold_name <- sub("^fold_(.*)\\.rds$", "\\1", basename(result_files[[fold_i]]))
+
       # Each fold contains multiple parameter sets (list of lists) --> fold_construction_args_tunable != NULL
       if (!is.null(fold_construction_args_tunable)) {
         models_all_params <- vector("list", length(result))
@@ -4331,8 +4344,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
         cl <- parallel::makeCluster(ncores)
         doParallel::registerDoParallel(cl)
 
-        foreach_pkgs <- c("dplyr", "caret", "pipeML")
-        if (task_type == "survival") foreach_pkgs <- c(foreach_pkgs, "censored")
+        foreach_pkgs <- c("dplyr", "caret", "pipeML", "censored")
         models_all_params <- foreach::foreach(parameter_i = seq_along(result),
                                               .packages = foreach_pkgs) %dopar% {
 
@@ -4396,14 +4408,14 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
                                                           test_idx = result[[parameter_i]][["rowIndex"]]
                                                         ),
                                                         file = file.path(fold_models_dir, sprintf("fold_model_%s_%s_%d.rds",
-                                                                                                  paste0("Fold", fold_i), method, g))
+                                                                                                  fold_name, method, g))
                                                       )
 
                                                       trained_df <- trained$Metrics %>%
                                                         data.frame() %>%
                                                         dplyr::mutate(
                                                           model = method,
-                                                          Resample = paste0("Fold", fold_i)
+                                                          Resample = fold_name
                                                         ) %>%
                                                         dplyr::bind_cols(current_params %>% dplyr::select(-.config_id))%>%
                                                         dplyr::bind_cols(result[[parameter_i]][["params"]]) %>%
@@ -4477,14 +4489,14 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
                   test_idx = result[["rowIndex"]]
                 ),
                 file = file.path(fold_models_dir, sprintf("fold_model_%s_%s_%d.rds",
-                                                          paste0("Fold", fold_i), method, g))
+                                                          fold_name, method, g))
               )
 
               trained_df <- trained$Metrics %>%
                 data.frame() %>%
                 dplyr::mutate(
                   model = method,
-                  Resample = paste0("Fold", fold_i)
+                  Resample = fold_name
                 ) %>%
                 dplyr::bind_cols(current_params %>% dplyr::select(-.config_id))%>%
                 dplyr::relocate(c_index, .after = dplyr::last_col())

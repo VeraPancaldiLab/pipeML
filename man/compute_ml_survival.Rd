@@ -12,7 +12,7 @@ compute_ml_survival(
   model,
   models_hyperparameters,
   return_model = F,
-  fold_models_dir = "Results/fold_models"
+  fold_models_dir = "Results/fold_models/survival"
 )
 }
 \arguments{
