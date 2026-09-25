@@ -6,10 +6,8 @@
 \usage{
 compute_shap_values(
   model_trained,
-  data_train,
+  data_train = NULL,
   task_type = "classification",
-  target_col = NULL,
-  trait.positive,
   time_col = NULL,
   event_col = NULL,
   n_cores = 2,
@@ -18,17 +16,16 @@ compute_shap_values(
 )
 }
 \arguments{
-\item{model_trained}{A trained machine learning model object (e.g., output from caret or custom ML pipeline),
-which includes cross-validation resamples.}
+\item{model_trained}{A trained machine learning model object, which includes cross-validation resamples.
+For classification, this must be the caret \code{train} object returned as \code{$Model} by
+\code{compute_features.training.ML()} (e.g. \code{res$Model}): the training data
+(\code{$trainingData}), the outcome (\code{.outcome}, coded \code{"no"}/\code{"yes"}) and the positive
+class (\code{"yes"}) are all taken from it.}
 
-\item{data_train}{A data frame containing the training data used for the model.}
+\item{data_train}{Survival only. A data frame containing the training data used for the model.
+Ignored for classification, where the training data is taken from \code{model_trained$trainingData}.}
 
 \item{task_type}{Character. Either \code{"classification"} (default) or \code{"survival"}.}
-
-\item{target_col}{Character. Name of the target column for classification tasks. Required if \code{task_type = "classification"}.
-The column is removed from the predictors before any model is refitted or explained.}
-
-\item{trait.positive}{Value representing the positive class in classification tasks.}
 
 \item{time_col}{Character. Column name representing survival time. Required if \code{task_type = "survival"}.}
 

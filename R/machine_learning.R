@@ -2632,13 +2632,14 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 #' performs calculations on cross-validation resamples in parallel. Each sample is explained only by
 #' the fold model(s) that held it out, and its SHAP values are summarized across repeats by the median.
 #'
-#' @param model_trained A trained machine learning model object (e.g., output from caret or custom ML pipeline),
-#'   which includes cross-validation resamples.
-#' @param data_train A data frame containing the training data used for the model.
+#' @param model_trained A trained machine learning model object, which includes cross-validation resamples.
+#'   For classification, this must be the caret \code{train} object returned as \code{$Model} by
+#'   \code{compute_features.training.ML()} (e.g. \code{res$Model}): the training data
+#'   (\code{$trainingData}), the outcome (\code{.outcome}, coded \code{"no"}/\code{"yes"}) and the positive
+#'   class (\code{"yes"}) are all taken from it.
+#' @param data_train Survival only. A data frame containing the training data used for the model.
+#'   Ignored for classification, where the training data is taken from \code{model_trained$trainingData}.
 #' @param task_type Character. Either `"classification"` (default) or `"survival"`.
-#' @param target_col Character. Name of the target column for classification tasks. Required if `task_type = "classification"`.
-#'   The column is removed from the predictors before any model is refitted or explained.
-#' @param trait.positive Value representing the positive class in classification tasks.
 #' @param time_col Character. Column name representing survival time. Required if `task_type = "survival"`.
 #' @param event_col Character. Column name representing survival event indicator. Required if `task_type = "survival"`.
 #' @param n_cores Integer. Number of cores for parallel computation. Default is 2.
@@ -2671,27 +2672,36 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 #' @import doParallel
 #' @import grDevices
 #' @export
-compute_shap_values <- function(model_trained, data_train, task_type = "classification", target_col = NULL,
-                                trait.positive, time_col = NULL, event_col = NULL, n_cores = 2, file.name = NULL,
+compute_shap_values <- function(model_trained, data_train = NULL, task_type = "classification",
+                                time_col = NULL, event_col = NULL, n_cores = 2, file.name = NULL,
                                 fold_models_dir = NULL) {
 
   if (is.null(fold_models_dir)) fold_models_dir <- file.path("Results", "fold_models", task_type)
 
-  sample_ids <- rownames(data_train)
-
   if(task_type == "classification"){
-    if(is.null(target_col)) stop("target_col must be provided for classification tasks")
 
-    data_train <- data_train %>%
-      dplyr::mutate(
-        target = factor(
-          ifelse(data_train[[target_col]] == trait.positive, "yes", "no"),
-          levels = c("no", "yes")
-        )
-      )
+    # Everything is inferred from the caret train object: pipeML always trains on a "no"/"yes" target,
+    # and caret stores the training data (outcome renamed to ".outcome") in $trainingData
+    if (!inherits(model_trained, "train") || is.null(model_trained$trainingData) || is.null(model_trained$pred)) {
+      stop("For classification, model_trained must be the caret train object returned as $Model by ",
+           "compute_features.training.ML() (e.g. res$Model), with $trainingData and $pred.")
+    }
+    if (!is.null(data_train)) {
+      message("data_train is ignored for classification: using model_trained$trainingData")
+    }
 
-    # Drop the original outcome column so it cannot leak into refitted models or SHAP inputs
-    if (target_col != "target") data_train[[target_col]] <- NULL
+    data_train <- as.data.frame(model_trained$trainingData)
+    outcome <- as.character(data_train$.outcome)
+    if (!all(outcome %in% c("no", "yes"))) {
+      stop("model_trained$trainingData$.outcome must be coded 'no'/'yes' (as done by compute_features.training.ML())")
+    }
+    if (max(model_trained$pred$rowIndex) > nrow(data_train)) {
+      stop("model_trained$pred refers to rows beyond model_trained$trainingData: the model object is inconsistent")
+    }
+
+    # Outcome column becomes "target"; ".outcome" is dropped so it cannot leak into refits or SHAP inputs
+    data_train$target <- factor(outcome, levels = c("no", "yes"))
+    data_train$.outcome <- NULL
 
     pred_fun = function(object, newdata){
       predict(object, newdata, type = "prob")[,"yes"]
@@ -2705,6 +2715,7 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
 
   }else if(task_type == "survival"){
     if(is.null(time_col) || is.null(event_col)) stop("time_col and event_col must be provided for survival tasks")
+    if(is.null(data_train)) stop("data_train must be provided for survival tasks")
 
     # Determine resamples from the model object
     resamples <- unique(model_trained$Resample_matrix$Resample)
@@ -2721,6 +2732,8 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
     }
 
   }
+
+  sample_ids <- rownames(data_train)
 
   gc() #clean memory before start
 
@@ -2753,7 +2766,7 @@ compute_shap_values <- function(model_trained, data_train, task_type = "classifi
   saved_resamples <- sapply(resamples, function(r) {
     length(list.files(fold_models_dir, pattern = fold_file_pattern(r), full.names = FALSE)) > 0
   })
-  cat(sprintf("Fold models found in '%s' for %d / %d resamples — %s will retrain\n",
+  cat(sprintf("Fold models found in '%s' for %d / %d resamples \u2014 %s will retrain\n",
               fold_models_dir, sum(saved_resamples), length(resamples),
               if (all(saved_resamples)) "none" else paste(names(saved_resamples)[!saved_resamples], collapse = ", ")))
 
@@ -3752,7 +3765,7 @@ get_tune_grid = function(method, train_data){
 #'
 #' This function generates default hyperparameter grids for various survival models
 #' compatible with the tidymodels framework. It uses the default parameter ranges
-#' from the {dials} package and produces a sequence of evenly spaced values
+#' from the \pkg{dials} package and produces a sequence of evenly spaced values
 #' within those ranges for each tunable hyperparameter.
 #'
 #' The function supports models such as Cox proportional hazards (regular and penalized),

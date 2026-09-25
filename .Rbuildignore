@@ -8,3 +8,7 @@
 ^\.github$
 ^\.claude$
 ^\.vscode$
+^CLAUDE\.md$
+^README\.html$
+^pypath_log$
+^Results$

@@ -38,7 +38,7 @@ Returns \code{NULL} for models without tunable hyperparameters.
 \description{
 This function generates default hyperparameter grids for various survival models
 compatible with the tidymodels framework. It uses the default parameter ranges
-from the {dials} package and produces a sequence of evenly spaced values
+from the \pkg{dials} package and produces a sequence of evenly spaced values
 within those ranges for each tunable hyperparameter.
 }
 \details{
