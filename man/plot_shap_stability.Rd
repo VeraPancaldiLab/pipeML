@@ -4,25 +4,26 @@
 \alias{plot_shap_stability}
 \title{Plot SHAP Feature Importance Stability Across Resamples}
 \usage{
-plot_shap_stability(shap_df, file.name)
+plot_shap_stability(shap_resamples, file.name = NULL, top_n = 20)
 }
 \arguments{
-\item{shap_df}{A data frame of SHAP values with samples in rows and features in columns.}
+\item{shap_resamples}{A long data frame of per-resample SHAP values, with one row per sample and resample,
+a \code{Resample} column, a \code{Samples} column and one numeric column per feature. This is the
+\code{$shap_resamples} element returned by \code{compute_shap_values(..., return_resamples = TRUE)}.}
 
-\item{file.name}{Character string specifying the filename prefix for the saved PDF plot.}
+\item{file.name}{Character. Optional filename suffix. If provided, the plot is saved as
+\code{"Results/SHAP_stability_resample_<file.name>.pdf"}. If \code{NULL} (default), nothing is saved.}
+
+\item{top_n}{Integer. Number of most important features to show (by mean importance across resamples).
+Default 20. Use \code{NULL} to show all features.}
 }
 \value{
-A horizontal bar plot saved as a PDF in the \verb{Results/} directory. The plot shows
-the mean absolute SHAP value per feature and error bars indicating the standard deviation
-across resamples.
+A ggplot object (horizontal bar plot of the mean per-resample importance, with error bars showing
+the standard deviation across resamples, truncated at 0).
 }
 \description{
-This function visualizes the stability of SHAP feature importance values across cross-validation
-resamples. It computes the mean absolute SHAP value and standard deviation per feature, then
-generates a horizontal bar plot with error bars representing variability.
-}
-\details{
-The function reshapes the SHAP values into long format, calculates the mean absolute value
-and standard deviation per feature, and then creates a ggplot2 horizontal bar chart. The
-plot is saved as a PDF with filename: \code{"Results/SHAP_stability_resample_<file.name>.pdf"}.
+This function visualizes how stable SHAP feature importance is across cross-validation resamples.
+For each resample it computes the global importance of each feature (mean absolute SHAP value over the
+samples held out in that resample), then summarizes these per-resample importances across resamples
+as mean +/- standard deviation.
 }

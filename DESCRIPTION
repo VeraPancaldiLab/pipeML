@@ -54,7 +54,8 @@ Suggests:
     flexsurv,
     coin,
     aorsf,
-    WGCNA
+    WGCNA,
+    shapviz
 LazyData: true
 LazyDataCompression: bzip2
 VignetteBuilder: knitr

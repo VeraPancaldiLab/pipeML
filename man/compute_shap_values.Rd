@@ -6,44 +6,50 @@
 \usage{
 compute_shap_values(
   model_trained,
-  data_train = NULL,
   task_type = "classification",
-  time_col = NULL,
-  event_col = NULL,
   n_cores = 2,
   file.name = NULL,
-  fold_models_dir = NULL
+  fold_models_dir = NULL,
+  return_resamples = FALSE
 )
 }
 \arguments{
-\item{model_trained}{A trained machine learning model object, which includes cross-validation resamples.
-For classification, this must be the caret \code{train} object returned as \code{$Model} by
-\code{compute_features.training.ML()} (e.g. \code{res$Model}): the training data
-(\code{$trainingData}), the outcome (\code{.outcome}, coded \code{"no"}/\code{"yes"}) and the positive
-class (\code{"yes"}) are all taken from it.}
-
-\item{data_train}{Survival only. A data frame containing the training data used for the model.
-Ignored for classification, where the training data is taken from \code{model_trained$trainingData}.}
+\item{model_trained}{The trained model returned as \code{$Model} by \code{compute_features.training.ML()}
+(e.g. \code{res$Model}). Everything else is taken from it:
+\itemize{
+\item Classification: the caret \code{train} object; training data from \code{$trainingData}, outcome
+\code{.outcome} (coded \code{"no"}/\code{"yes"}), positive class \code{"yes"}.
+\item Survival: training data from \code{$trainingData} (features plus \code{time} and \code{event}
+columns, as standardized by \code{compute_features.training.ML()}).
+}}
 
 \item{task_type}{Character. Either \code{"classification"} (default) or \code{"survival"}.}
 
-\item{time_col}{Character. Column name representing survival time. Required if \code{task_type = "survival"}.}
-
-\item{event_col}{Character. Column name representing survival event indicator. Required if \code{task_type = "survival"}.}
-
 \item{n_cores}{Integer. Number of cores for parallel computation. Default is 2.}
 
-\item{file.name}{Character. Currently unused (the SHAP stability plot is disabled); kept for backward compatibility.}
+\item{file.name}{Character. Optional filename suffix. If provided, a SHAP stability plot
+(see \code{plot_shap_stability()}) is saved as \code{"Results/SHAP_stability_resample_<file.name>.pdf"}.
+If \code{NULL} (default), no plot is saved.}
 
 \item{fold_models_dir}{Character. Directory where per-fold models saved during training
 (by \code{compute_custom_k_fold_CV} or \code{compute_k_fold_CV_survival}) are read from,
 to avoid retraining each resample. If \code{NULL} (default), uses
 \code{"Results/fold_models/<task_type>"}, the same default used by \code{compute_features.training.ML}.}
+
+\item{return_resamples}{Logical. If \code{TRUE}, also return the per-resample SHAP values. Default \code{FALSE}.}
 }
 \value{
-A data frame containing SHAP values for all features, summarized (median) across resamples, with rows
-corresponding to training samples and columns to features. Values are in the units of the model output
-(probability of the positive class for classification, risk score for survival).
+If \code{return_resamples = FALSE} (default), a data frame containing SHAP values for all features,
+summarized (median) across resamples, with rows corresponding to training samples (sample IDs as rownames)
+and columns to features. Values are in the units of the model output (probability of the positive class
+for classification, risk score for survival).
+
+If \code{return_resamples = TRUE}, a list with:
+\itemize{
+\item \code{shap}: the summarized data frame described above.
+\item \code{shap_resamples}: a long data frame with one row per held-out sample and resample, with columns
+\code{Resample}, \code{Samples} and one column per feature. Can be passed to \code{plot_shap_stability()}.
+}
 }
 \description{
 This function calculates SHAP (SHapley Additive exPlanations) values to assess feature importance
@@ -55,8 +61,11 @@ the fold model(s) that held it out, and its SHAP values are summarized across re
 The function performs the following steps:
 \enumerate{
 \item Sets up classification or survival prediction functions based on the task type.
-\item Loops over all cross-validation resamples in parallel, loading the saved fold model
-(or refitting it on the training fold if no matching file is found).
+\item Loops over all cross-validation resamples in parallel, loading the saved fold model.
+For models trained with \code{fold_construction_fun} (custom folds), every fold model must be found
+in \code{fold_models_dir}, otherwise the function stops: their fold features were built per fold, so a
+fold cannot be rebuilt from the final training data. For models trained on the standard CV path (no saved
+fold models), each fold is refitted on its training samples.
 \item Computes SHAP values using \code{fastshap::explain()} on the held-out samples of each resample,
 skipping resamples with trivial predictions.
 \item Combines SHAP values across resamples and summarizes them (median per sample).
