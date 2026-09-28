@@ -54,13 +54,11 @@ the fold model(s) that held it out, and its SHAP values are summarized across re
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">compute_shap_values</span><span class="op">(</span></span>
 <span>  <span class="va">model_trained</span>,</span>
-<span>  data_train <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
-<span>  time_col <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  event_col <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  n_cores <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>  file.name <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  fold_models_dir <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  fold_models_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  return_resamples <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -69,28 +67,16 @@ the fold model(s) that held it out, and its SHAP values are summarized across re
 
 
 <dl><dt id="arg-model-trained">model_trained<a class="anchor" aria-label="anchor" href="#arg-model-trained"></a></dt>
-<dd><p>A trained machine learning model object, which includes cross-validation resamples.
-For classification, this must be the caret <code>train</code> object returned as <code>$Model</code> by
-<code><a href="compute_features.training.ML.html">compute_features.training.ML()</a></code> (e.g. <code>res$Model</code>): the training data
-(<code>$trainingData</code>), the outcome (<code>.outcome</code>, coded <code>"no"</code>/<code>"yes"</code>) and the positive
-class (<code>"yes"</code>) are all taken from it.</p></dd>
-
-
-<dt id="arg-data-train">data_train<a class="anchor" aria-label="anchor" href="#arg-data-train"></a></dt>
-<dd><p>Survival only. A data frame containing the training data used for the model.
-Ignored for classification, where the training data is taken from <code>model_trained$trainingData</code>.</p></dd>
+<dd><p>The trained model returned as <code>$Model</code> by <code><a href="compute_features.training.ML.html">compute_features.training.ML()</a></code>
+(e.g. <code>res$Model</code>). Everything else is taken from it:</p><ul><li><p>Classification: the caret <code>train</code> object; training data from <code>$trainingData</code>, outcome
+<code>.outcome</code> (coded <code>"no"</code>/<code>"yes"</code>), positive class <code>"yes"</code>.</p></li>
+<li><p>Survival: training data from <code>$trainingData</code> (features plus <code>time</code> and <code>event</code>
+columns, as standardized by <code><a href="compute_features.training.ML.html">compute_features.training.ML()</a></code>).</p></li>
+</ul></dd>
 
 
 <dt id="arg-task-type">task_type<a class="anchor" aria-label="anchor" href="#arg-task-type"></a></dt>
 <dd><p>Character. Either <code>"classification"</code> (default) or <code>"survival"</code>.</p></dd>
-
-
-<dt id="arg-time-col">time_col<a class="anchor" aria-label="anchor" href="#arg-time-col"></a></dt>
-<dd><p>Character. Column name representing survival time. Required if <code>task_type = "survival"</code>.</p></dd>
-
-
-<dt id="arg-event-col">event_col<a class="anchor" aria-label="anchor" href="#arg-event-col"></a></dt>
-<dd><p>Character. Column name representing survival event indicator. Required if <code>task_type = "survival"</code>.</p></dd>
 
 
 <dt id="arg-n-cores">n_cores<a class="anchor" aria-label="anchor" href="#arg-n-cores"></a></dt>
@@ -98,7 +84,9 @@ Ignored for classification, where the training data is taken from <code>model_tr
 
 
 <dt id="arg-file-name">file.name<a class="anchor" aria-label="anchor" href="#arg-file-name"></a></dt>
-<dd><p>Character. Currently unused (the SHAP stability plot is disabled); kept for backward compatibility.</p></dd>
+<dd><p>Character. Optional filename suffix. If provided, a SHAP stability plot
+(see <code><a href="plot_shap_stability.html">plot_shap_stability()</a></code>) is saved as <code>"Results/SHAP_stability_resample_&lt;file.name&gt;.pdf"</code>.
+If <code>NULL</code> (default), no plot is saved.</p></dd>
 
 
 <dt id="arg-fold-models-dir">fold_models_dir<a class="anchor" aria-label="anchor" href="#arg-fold-models-dir"></a></dt>
@@ -107,18 +95,29 @@ Ignored for classification, where the training data is taken from <code>model_tr
 to avoid retraining each resample. If <code>NULL</code> (default), uses
 <code>"Results/fold_models/&lt;task_type&gt;"</code>, the same default used by <code>compute_features.training.ML</code>.</p></dd>
 
+
+<dt id="arg-return-resamples">return_resamples<a class="anchor" aria-label="anchor" href="#arg-return-resamples"></a></dt>
+<dd><p>Logical. If <code>TRUE</code>, also return the per-resample SHAP values. Default <code>FALSE</code>.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A data frame containing SHAP values for all features, summarized (median) across resamples, with rows
-corresponding to training samples and columns to features. Values are in the units of the model output
-(probability of the positive class for classification, risk score for survival).</p>
-    </div>
+    <p>If <code>return_resamples = FALSE</code> (default), a data frame containing SHAP values for all features,
+summarized (median) across resamples, with rows corresponding to training samples (sample IDs as rownames)
+and columns to features. Values are in the units of the model output (probability of the positive class
+for classification, risk score for survival).</p>
+<p>If <code>return_resamples = TRUE</code>, a list with:</p><ul><li><p><code>shap</code>: the summarized data frame described above.</p></li>
+<li><p><code>shap_resamples</code>: a long data frame with one row per held-out sample and resample, with columns
+<code>Resample</code>, <code>Samples</code> and one column per feature. Can be passed to <code><a href="plot_shap_stability.html">plot_shap_stability()</a></code>.</p></li>
+</ul></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>The function performs the following steps:</p><ol><li><p>Sets up classification or survival prediction functions based on the task type.</p></li>
-<li><p>Loops over all cross-validation resamples in parallel, loading the saved fold model
-(or refitting it on the training fold if no matching file is found).</p></li>
+<li><p>Loops over all cross-validation resamples in parallel, loading the saved fold model.
+For models trained with <code>fold_construction_fun</code> (custom folds), every fold model must be found
+in <code>fold_models_dir</code>, otherwise the function stops: their fold features were built per fold, so a
+fold cannot be rebuilt from the final training data. For models trained on the standard CV path (no saved
+fold models), each fold is refitted on its training samples.</p></li>
 <li><p>Computes SHAP values using <code><a href="https://bgreenwell.github.io/fastshap/reference/explain.html" class="external-link">fastshap::explain()</a></code> on the held-out samples of each resample,
 skipping resamples with trivial predictions.</p></li>
 <li><p>Combines SHAP values across resamples and summarizes them (median per sample).</p></li>

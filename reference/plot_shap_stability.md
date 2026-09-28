@@ -1,37 +1,39 @@
 # Plot SHAP Feature Importance Stability Across Resamples
 
-This function visualizes the stability of SHAP feature importance values
-across cross-validation resamples. It computes the mean absolute SHAP
-value and standard deviation per feature, then generates a horizontal
-bar plot with error bars representing variability.
+This function visualizes how stable SHAP feature importance is across
+cross-validation resamples. For each resample it computes the global
+importance of each feature (mean absolute SHAP value over the samples
+held out in that resample), then summarizes these per-resample
+importances across resamples as mean +/- standard deviation.
 
 ## Usage
 
 ``` r
-plot_shap_stability(shap_df, file.name)
+plot_shap_stability(shap_resamples, file.name = NULL, top_n = 20)
 ```
 
 ## Arguments
 
-- shap_df:
+- shap_resamples:
 
-  A data frame of SHAP values with samples in rows and features in
-  columns.
+  A long data frame of per-resample SHAP values, with one row per sample
+  and resample, a `Resample` column, a `Samples` column and one numeric
+  column per feature. This is the `$shap_resamples` element returned by
+  `compute_shap_values(..., return_resamples = TRUE)`.
 
 - file.name:
 
-  Character string specifying the filename prefix for the saved PDF
-  plot.
+  Character. Optional filename suffix. If provided, the plot is saved as
+  `"Results/SHAP_stability_resample_<file.name>.pdf"`. If `NULL`
+  (default), nothing is saved.
+
+- top_n:
+
+  Integer. Number of most important features to show (by mean importance
+  across resamples). Default 20. Use `NULL` to show all features.
 
 ## Value
 
-A horizontal bar plot saved as a PDF in the `Results/` directory. The
-plot shows the mean absolute SHAP value per feature and error bars
-indicating the standard deviation across resamples.
-
-## Details
-
-The function reshapes the SHAP values into long format, calculates the
-mean absolute value and standard deviation per feature, and then creates
-a ggplot2 horizontal bar chart. The plot is saved as a PDF with
-filename: `"Results/SHAP_stability_resample_<file.name>.pdf"`.
+A ggplot object (horizontal bar plot of the mean per-resample
+importance, with error bars showing the standard deviation across
+resamples, truncated at 0).

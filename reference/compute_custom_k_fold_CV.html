@@ -62,7 +62,8 @@ and predictions.</p>
 <span>  <span class="va">processed_folds</span>,</span>
 <span>  <span class="va">ml_method</span>,</span>
 <span>  <span class="va">tuneGrid</span>,</span>
-<span>  fold_models_dir <span class="op">=</span> <span class="st">"Results/fold_models/classification"</span></span>
+<span>  fold_models_dir <span class="op">=</span> <span class="st">"Results/fold_models/classification"</span>,</span>
+<span>  file_id_offset <span class="op">=</span> <span class="fl">0</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -85,6 +86,17 @@ as supported by the <code>caret</code> package (e.g., <code>"rf"</code>, <code>"
 <dd><p>Optional. A data frame specifying the grid of hyperparameters
 to evaluate. If <code>NULL</code>, a default grid of length 3 is generated using
 <code><a href="https://rdrr.io/pkg/caret/man/modelLookup.html" class="external-link">caret::getModelInfo()</a></code>.</p></dd>
+
+
+<dt id="arg-fold-models-dir">fold_models_dir<a class="anchor" aria-label="anchor" href="#arg-fold-models-dir"></a></dt>
+<dd><p>Character. Directory where the fitted model of each fold is saved, for reuse by
+<code><a href="compute_shap_values.html">compute_shap_values()</a></code>.</p></dd>
+
+
+<dt id="arg-file-id-offset">file_id_offset<a class="anchor" aria-label="anchor" href="#arg-file-id-offset"></a></dt>
+<dd><p>Integer added to the hyperparameter row number in the saved file names, so that models
+sharing a caret method (glmnet, lasso, ridge) or fitted with different fold construction parameters get
+different files. Default 0.</p></dd>
 
 </dl></div>
     <div class="section level2">
