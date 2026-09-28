@@ -10,7 +10,8 @@ compute_shap_values(
   n_cores = 2,
   file.name = NULL,
   fold_models_dir = NULL,
-  return_resamples = FALSE
+  return_resamples = FALSE,
+  seed = 123
 )
 }
 \arguments{
@@ -37,6 +38,11 @@ to avoid retraining each resample. If \code{NULL} (default), uses
 \code{"Results/fold_models/<task_type>"}, the same default used by \code{compute_features.training.ML}.}
 
 \item{return_resamples}{Logical. If \code{TRUE}, also return the per-resample SHAP values. Default \code{FALSE}.}
+
+\item{seed}{Integer. Random seed for reproducible SHAP values. SHAP values are Monte Carlo estimates, and
+refitted folds (standard CV path) can involve randomness too; each resample is seeded from \code{seed} and
+its position in the resample list, so results are identical across runs and independent of \code{n_cores}.
+Default: \code{123}. Use \code{NULL} to leave the random number generator untouched.}
 }
 \value{
 If \code{return_resamples = FALSE} (default), a data frame containing SHAP values for all features,

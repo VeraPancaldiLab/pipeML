@@ -24,7 +24,8 @@ compute_features.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = NULL
+  fold_models_dir = NULL,
+  seed = 123
 )
 }
 \arguments{
@@ -81,6 +82,10 @@ Must accept a \code{bestune} argument internally to inject optimized hyperparame
 \code{fold_construction_fun} is used. If \code{NULL} (default), uses \code{"Results/fold_models/<task_type>"}
 so classification and survival runs never share (or prune) each other's files. Use a distinct
 directory per analysis when running several analyses of the same task type from one folder.}
+
+\item{seed}{Integer. Random seed for reproducible cross-validation (fold assignment and model fitting,
+including parallel runs). Default: \code{123}. Use \code{NULL} to leave the random number generator
+untouched. See \code{compute_features.training.ML()} for details.}
 }
 \value{
 A named list containing:

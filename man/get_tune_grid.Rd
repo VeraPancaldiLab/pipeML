@@ -40,8 +40,7 @@ classification method during custom-fold cross-validation
 the full grid can be evaluated in every fold.
 }
 \details{
-Calls \code{set.seed(123)}, which resets the global random number
-generator as a side effect. An error is raised for unsupported methods.
+The grids are deterministic. An error is raised for unsupported methods.
 }
 \seealso{
 \code{\link{compute_custom_k_fold_CV}}, \code{\link{get_default_hyperparams}}

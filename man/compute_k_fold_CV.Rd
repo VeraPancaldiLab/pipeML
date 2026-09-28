@@ -16,7 +16,8 @@ compute_k_fold_CV(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = "Results/fold_models/classification"
+  fold_models_dir = "Results/fold_models/classification",
+  seed = 123
 )
 }
 \arguments{
@@ -58,6 +59,9 @@ and final training.}
 \item{fold_construction_args_tunable}{List of arguments passed to
 \code{fold_construction_fun} that define hyperparameters to be tuned during
 cross-validation. Each element should contain candidate values.}
+
+\item{seed}{Integer. Random seed set before the folds are drawn, so fold assignment and model
+fitting are reproducible. \code{NULL} leaves the random number generator untouched.}
 }
 \value{
 A list containing:

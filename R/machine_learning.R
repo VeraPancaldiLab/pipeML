@@ -66,6 +66,8 @@ utils::globalVariables(c(
 #' @param fold_construction_args_tunable List of arguments passed to
 #'   \code{fold_construction_fun} that define hyperparameters to be tuned during
 #'   cross-validation. Each element should contain candidate values.
+#' @param seed Integer. Random seed set before the folds are drawn, so fold assignment and model
+#'   fitting are reproducible. \code{NULL} leaves the random number generator untouched.
 #'
 #' @return A list containing:
 #' \itemize{
@@ -79,9 +81,14 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "Accuracy", fi
                              ncores = NULL, return = FALSE, fold_construction_fun = NULL,
                              fold_construction_args_fixed = NULL,
                              fold_construction_args_tunable = NULL,
-                             fold_models_dir = "Results/fold_models/classification"){
+                             fold_models_dir = "Results/fold_models/classification",
+                             seed = 123){
 
   ensure_caret() # the "knn" model needs caret attached (see ensure_caret())
+
+  # caret draws the per-resample seeds of parallel workers from this generator, so seeding here
+  # also makes parallel runs reproducible
+  if (!is.null(seed)) set.seed(seed)
 
   ml_methods_names <- c("treebag", "rf", "C5.0",
                         "glmnet", "knn", "rpart", "lasso", "ridge",
@@ -1165,6 +1172,11 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid, fold_
 #'   \code{fold_construction_fun} is used. If \code{NULL} (default), uses \code{"Results/fold_models/<task_type>"}
 #'   so classification and survival runs never share (or prune) each other's files. Use a distinct
 #'   directory per analysis when running several analyses of the same task type from one folder.
+#' @param seed Integer. Random seed for reproducible cross-validation: it fixes the fold assignment and
+#'   the randomness in model fitting (e.g. random forest, bagging, boosting), including when running in
+#'   parallel with \code{ncores}. Default: \code{123}. Use \code{NULL} to leave the random number generator
+#'   untouched. Randomness inside a user-supplied \code{fold_construction_fun} that runs its own parallel
+#'   workers is not covered: seed those workers inside that function.
 #'
 #' @details
 #' The function provides:
@@ -1192,7 +1204,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
                                         time_var = NULL, event_var = NULL, metric = NULL, k_folds = 10, n_rep = 5, LODO = FALSE,
                                         batch_var = NULL, file_name = NULL, ncores = NULL, return = FALSE,
                                         fold_construction_fun = NULL, fold_construction_args_fixed = NULL, fold_construction_args_tunable = NULL,
-                                        fold_models_dir = NULL){
+                                        fold_models_dir = NULL, seed = 123){
 
   # ---------------------------------------------------------------------------
   # Validate task_type and required arguments
@@ -1244,7 +1256,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
                                  file_name = file_name, LODO = LODO, ncores = ncores, return= return,
                                  fold_construction_fun = fold_construction_fun, fold_construction_args_fixed = fold_construction_args_fixed,
                                  fold_construction_args_tunable = fold_construction_args_tunable,
-                                 fold_models_dir = fold_models_dir)
+                                 fold_models_dir = fold_models_dir, seed = seed)
 
   }
 
@@ -1284,7 +1296,8 @@ compute_features.training.ML = function(features_train, task_type = c("classific
       fold_construction_fun = fold_construction_fun,
       fold_construction_args_fixed = fold_construction_args_fixed,
       fold_construction_args_tunable = fold_construction_args_tunable,
-      fold_models_dir = fold_models_dir
+      fold_models_dir = fold_models_dir,
+      seed = seed
     )
 
   }
@@ -1341,6 +1354,9 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #'   \code{fold_construction_fun} is used. If \code{NULL} (default), uses \code{"Results/fold_models/<task_type>"}
 #'   so classification and survival runs never share (or prune) each other's files. Use a distinct
 #'   directory per analysis when running several analyses of the same task type from one folder.
+#' @param seed Integer. Random seed for reproducible cross-validation (fold assignment and model fitting,
+#'   including parallel runs). Default: \code{123}. Use \code{NULL} to leave the random number generator
+#'   untouched. See \code{compute_features.training.ML()} for details.
 #'
 #' @details
 #' For **classification tasks**, the function performs repeated k-fold cross-validation
@@ -1405,7 +1421,7 @@ compute_features.ML <- function(features_train, features_test, coldata,
                                 fold_construction_fun = NULL,
                                 fold_construction_args_fixed = NULL,
                                 fold_construction_args_tunable = NULL,
-                                fold_models_dir = NULL){
+                                fold_models_dir = NULL, seed = 123){
 
   # Task-specific fold model directory (see compute_features.training.ML)
   if (is.null(fold_models_dir)) fold_models_dir <- file.path("Results", "fold_models", task_type)
@@ -1447,7 +1463,7 @@ compute_features.ML <- function(features_train, features_test, coldata,
                                  file_name = file_name, LODO = LODO, ncores = ncores, return= return,
                                  fold_construction_fun = fold_construction_fun, fold_construction_args_fixed = fold_construction_args_fixed,
                                  fold_construction_args_tunable = fold_construction_args_tunable,
-                                 fold_models_dir = fold_models_dir)
+                                 fold_models_dir = fold_models_dir, seed = seed)
 
     ####################################################Predicting
     if(length(training)!=0){
@@ -1510,7 +1526,8 @@ compute_features.ML <- function(features_train, features_test, coldata,
       n_rep = n_rep,
       ncores = ncores,
       return= return,
-      file_name   = file_name
+      file_name   = file_name,
+      seed = seed
     )
 
     # ---------------------------- Refit best model ---------------------------
@@ -2673,6 +2690,10 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 #'   \code{"Results/fold_models/<task_type>"}, the same default used by \code{compute_features.training.ML}.
 #'
 #' @param return_resamples Logical. If \code{TRUE}, also return the per-resample SHAP values. Default \code{FALSE}.
+#' @param seed Integer. Random seed for reproducible SHAP values. SHAP values are Monte Carlo estimates, and
+#'   refitted folds (standard CV path) can involve randomness too; each resample is seeded from \code{seed} and
+#'   its position in the resample list, so results are identical across runs and independent of \code{n_cores}.
+#'   Default: \code{123}. Use \code{NULL} to leave the random number generator untouched.
 #'
 #' @return If \code{return_resamples = FALSE} (default), a data frame containing SHAP values for all features,
 #'   summarized (median) across resamples, with rows corresponding to training samples (sample IDs as rownames)
@@ -2709,7 +2730,7 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 #' @import grDevices
 #' @export
 compute_shap_values <- function(model_trained, task_type = "classification", n_cores = 2, file.name = NULL,
-                                fold_models_dir = NULL, return_resamples = FALSE) {
+                                fold_models_dir = NULL, return_resamples = FALSE, seed = 123) {
 
   if (is.null(fold_models_dir)) fold_models_dir <- file.path("Results", "fold_models", task_type)
 
@@ -2845,6 +2866,9 @@ compute_shap_values <- function(model_trained, task_type = "classification", n_c
   # Each worker returns list(resample, status, shap); status is reported from the main process,
   # since messages emitted inside PSOCK workers do not reach the console
   importance_list <- foreach::foreach(resample = resamples, .packages = base_pkgs) %dopar% {
+
+      # Workers do not share the main session's RNG: seed each resample from its position
+      if (!is.null(seed)) set.seed(seed + match(resample, resamples))
 
       # Try to load a saved fold model (from compute_custom_k_fold_CV / compute_k_fold_CV_survival)
       saved_files <- list.files(fold_models_dir, pattern = fold_file_pattern(resample), full.names = TRUE)
@@ -3820,15 +3844,13 @@ aggregate_results <- function(all_loaded, task = c("classification", "survival")
 #'     \code{min_child_weight = 1} and \code{subsample = 0.8} fixed (27 rows).}
 #' }
 #'
-#' @details Calls \code{set.seed(123)}, which resets the global random number
-#'   generator as a side effect. An error is raised for unsupported methods.
+#' @details The grids are deterministic. An error is raised for unsupported methods.
 #'
 #' @seealso \code{\link{compute_custom_k_fold_CV}}, \code{\link{get_default_hyperparams}}
 #'   for the survival-model equivalent.
 #' @keywords internal
 get_tune_grid = function(method, train_data){
   # TODO: revisit how many values are evaluated per hyperparameter
-  set.seed(123)
 
   if(method == "glmnet"){
     return(expand.grid(alpha = c(0,1), lambda = seq(0.001, 1, length = 20)))
@@ -4236,6 +4258,10 @@ compute_ml_survival <- function(df_train, df_test = NULL,
 #' @param fold_construction_fun Optional custom function to construct data folds.
 #' @param fold_construction_args_fixed Optional list of fixed arguments passed to `fold_construction_fun`.
 #' @param fold_construction_args_tunable Optional list of tunable arguments passed to `fold_construction_fun` during hyperparameter tuning.
+#' @param seed Integer. Random seed set before the folds are drawn, so fold assignment and model fitting are
+#'   reproducible. In the parallel custom-fold branch, each worker iteration is seeded from `seed`, the fold
+#'   and the parameter configuration, so results do not depend on worker scheduling. `NULL` leaves the random
+#'   number generator untouched.
 #'
 #' @return A named list containing:
 #' \describe{
@@ -4265,8 +4291,11 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
                                        LODO = FALSE, batch_id = NULL, file_name = NULL, fold_construction_fun = NULL,
                                        fold_construction_args_fixed = NULL,
                                        fold_construction_args_tunable = NULL,
-                                       fold_models_dir = "Results/fold_models/survival"){
+                                       fold_models_dir = "Results/fold_models/survival",
+                                       seed = 123){
   ensure_censored()
+
+  if (!is.null(seed)) set.seed(seed)
 
 
   # ---------------------------------------------------------------------------
@@ -4481,6 +4510,9 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
         foreach_pkgs <- c("dplyr", "caret", "pipeML", "censored")
         models_all_params <- foreach::foreach(parameter_i = seq_along(result),
                                               .packages = foreach_pkgs) %dopar% {
+
+                                                # Workers do not share the main session's RNG: seed each iteration
+                                                if (!is.null(seed)) set.seed(seed + 1000L * fold_i + parameter_i)
 
                                                 train_data_i <- result[[parameter_i]][["train_data"]]
                                                 test_data_i  <- result[[parameter_i]][["test_data"]]

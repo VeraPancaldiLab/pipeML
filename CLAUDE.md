@@ -20,7 +20,7 @@
 R/
   pipeML-package.R       # Package metadata & namespace declarations
   data.R                 # Documentation for bundled example datasets
-  machine_learning.R     # All implementation (~5,200 lines, core file)
+  machine_learning.R     # All implementation (~5,500 lines, core file)
 vignettes/
   pipeML.Rmd             # Main tutorial vignette
 data/                    # Bundled example datasets (.rda)
@@ -47,10 +47,10 @@ All live in `R/machine_learning.R`.
 |---|---|
 | `compute_features.training.ML()` | Train models on training data with repeated k-fold CV |
 | `compute_features.ML()` | Combined train + predict workflow (training + testing) |
-| `compute_prediction()` | Generate predictions on test data using trained model |
-| `get_curves()` | ROC and Precision-Recall curves with confidence intervals |
-| `compute_shap_values()` | SHAP feature importance values across resamples |
-| `plot_shap_stability()` | Visualize SHAP importance stability across resamples |
+| `compute_prediction()` | Generate predictions on test data using trained model (returns AUROC/AUPRC with bootstrap CIs and `Curve_bands`) |
+| `get_curves()` | ROC and Precision-Recall curves with pointwise bootstrap confidence bands |
+| `compute_shap_values()` | Per-fold SHAP values (each sample explained only by the fold models that held it out); takes only the trained model |
+| `plot_shap_stability()` | Visualize SHAP importance stability across resamples (input: `compute_shap_values(..., return_resamples = TRUE)$shap_resamples`) |
 | `plot_survival_performance()` | Kaplan-Meier curves stratified by predicted risk groups |
 
 ---
@@ -58,10 +58,10 @@ All live in `R/machine_learning.R`.
 ## Supported ML Algorithms
 
 **Classification (11, via caret):**
-`treebag`, `rf`, `C5.0`, `glmnet` (elastic/lasso/ridge), `knn`, `rpart`, `svmRadial`, `svmLinear`, `xgbTree`
+`treebag`, `rf`, `C5.0`, `glmnet`, `lasso` and `ridge` (both `glmnet` with fixed `alpha`), `knn`, `rpart`, `svmRadial`, `svmLinear`, `xgbTree`
 
-**Survival (7, via tidymodels/parsnip/censored):**
-Cox PH, Elastic Net Cox, AFT parametric, Conditional Inference Trees, Bagged CART, Random Survival Forests, Gradient Boosting (censored)
+**Survival (6 active, via tidymodels/parsnip/censored; `model_list` in `compute_k_fold_CV_survival()`):**
+`cox_ph_survival` (Cox PH), `proportional_hazards_glmnet` (elastic-net Cox), `survreg_flexsurv` (parametric AFT), `decision_tree_partykit` (conditional inference tree), `bag_tree_rpart` (bagged CART), `rand_forest_aorsf` (oblique random survival forest). `rand_forest_partykit` and `boost_tree_mboost` are implemented but commented out of `model_list`.
 
 ---
 
@@ -71,10 +71,11 @@ Cox PH, Elastic Net Cox, AFT parametric, Conditional Inference Trees, Bagged CAR
 `caret`, `doParallel`, `foreach`, `dplyr`, `tidyr`, `tibble`, `purrr (>= 1.0.2)`, `ggplot2`, `reshape2`, `survival`, `survminer`, `fastshap`, `dials`, `parsnip`, `rsample`, `workflows`, `tune`, `yardstick`, `grDevices`, `parallel`, `stats`
 
 **Suggests (optional, needed for specific algorithms):**
-`testthat (>= 3.0.0)`, `knitr`, `rmarkdown`, `C50`, `randomForest`, `glmnet`, `xgboost`, `kernlab`, `recipes`, `tidymodels`, `censored`, `flexsurv`, `coin`, `aorsf`, `WGCNA`, `cowplot`, `matlib`
+`testthat (>= 3.0.0)`, `knitr`, `rmarkdown`, `C50`, `randomForest`, `glmnet`, `xgboost`, `kernlab`, `recipes`, `tidyverse`, `tidymodels`, `censored`, `flexsurv`, `coin`, `aorsf`, `WGCNA`, `cowplot`, `matlib`, `shapviz`
 
 **Remotes (GitHub):**
-`VeraPancaldiLab/multideconv` — custom deconvolution package (optional)
+- `VeraPancaldiLab/multideconv` — custom deconvolution package (optional)
+- `bgreenwell/fastshap@v0.3.0` — `fastshap` was archived from CRAN on 2026-05-27, so CI (pak) can only install it from GitHub. Pinned to the v0.3.0 release tag; its `explain(object, X, pred_wrapper, newdata, nsim, adjust)` API and default estimator are unchanged from CRAN 0.1.1.
 
 ---
 
@@ -99,6 +100,24 @@ The key innovation: `compute_features.training.ML()` and `compute_features.ML()`
 - Near-zero variance removal
 - Collinearity filtering (correlation threshold)
 - Removal of features constant within any target class (classification only)
+
+### Reproducibility (`seed` argument, default `123`)
+- `compute_features.training.ML()`, `compute_features.ML()` and `compute_shap_values()` take `seed`; `NULL` leaves the RNG untouched.
+- The training functions pass it to `compute_k_fold_CV()` / `compute_k_fold_CV_survival()`, which call `set.seed(seed)` right before drawing folds. caret draws per-resample seeds for its parallel workers from the main session's RNG, so this also covers `ncores > 1`.
+- `%dopar%` loops don't share the main RNG, so each iteration seeds itself: `seed + match(resample, resamples)` in `compute_shap_values()`, and `seed + 1000L * fold_i + parameter_i` in the survival custom-fold branch. Results are therefore independent of worker scheduling and `n_cores`.
+- Randomness inside a user-supplied `fold_construction_fun` that runs its own parallel workers is not covered.
+
+### Fold Models & SHAP
+- During CV the model of each fold is saved to `fold_models_dir` (default `Results/fold_models/<task_type>`), and only the files of the selected model and `bestTune` are kept.
+- `compute_shap_values(model_trained, task_type, ...)` takes everything (training data, outcome, folds, tuned hyperparameters) from the model: caret's `$trainingData` / `$pred` for classification, `$trainingData` / `$Resample_matrix` for survival. Each sample is explained only by the fold models that held it out, then summarized across repeats by the median.
+- Standard-CV folds are refitted if their saved model is missing; custom-fold models (`fold_construction_fun`) cannot be rebuilt, so a missing fold model is an error.
+
+### Performance Curves (`compute_prediction()` → `get_curves()`)
+- AUROC/AUPRC are stored as `list(estimate, lower, upper)`: `estimate` is the value on the full test set, and the CI comes from 1000 bootstrap resamples (`bootstrap_auc()`, seed 123).
+- The shaded bands are pointwise 95% bootstrap bands. `bootstrap_auc()` evaluates each resample's curve on a 101-point grid (`roc_at_grid()`: best sensitivity at FPR ≤ x; `prc_at_grid()`: precision at the first threshold reaching recall x), returned as `Curve_bands`. `get_curves(roc_band, prc_band)` draws them under the curve; the LODO branch draws no band.
+
+### Outcome Alignment (`compute_features.ML()`)
+- Labels are taken from `coldata` by row name (`coldata[rownames(features_train), , drop = FALSE]`), so they follow the feature rows' order; missing samples are an error. Never subset with `%in%` and then attach columns by position — that silently scrambled labels whenever feature rows weren't in `coldata` order.
 
 ---
 
@@ -162,23 +181,29 @@ Edit `vignettes/pipeML.Rmd`. Run `devtools::build_vignettes()` to test locally. 
 
 ## Notes & Gotchas
 
-- The core implementation is a single large file (`machine_learning.R`, ~5,200 lines). Internal helpers are not exported — check NAMESPACE before assuming a function is public.
+- The core implementation is a single large file (`machine_learning.R`, ~5,500 lines). Internal helpers are not exported — check NAMESPACE before assuming a function is public.
+- caret must be *attached*, not just loaded: its `"knn"` model code calls `knn3()` without a namespace prefix, so a knn fit with `trainControl(method = "none")` fails with `could not find function "knn3"` otherwise. Classification entry points call the internal `ensure_caret()`.
+- Don't add `set.seed()` calls inside helpers: they override the user's `seed` mid-run (`get_tune_grid()` used to do this). Seed only at the entry points described under Reproducibility.
+- Roxygen markdown is enabled (`Roxygen: list(markdown = TRUE)`): write `95%`, not `95\%` (it becomes `\\%` in the Rd, which comments out the rest of the line), and avoid `[a, b]`-style ranges in plain text (parsed as links). Run `devtools::check_man()` after doc edits.
+- CRAN doesn't allow non-CRAN required dependencies: `multideconv` and `fastshap` (both in `Remotes`) block a CRAN submission.
 - Survival models need the `censored` package (in Suggests) to register parsnip's "censored regression" engines. Every survival entry point calls the internal `ensure_censored()`, which loads its namespace; users don't need `library(censored)`. Survival formulas must use `survival::Surv(...)`, not bare `Surv(...)` — the bare form only works when some other package happened to attach `survival`.
 - `multideconv` is a remote (GitHub) dependency — not on CRAN. Installation requires `remotes::install_github("VeraPancaldiLab/multideconv")`.
 - SHAP computation via `fastshap::explain()` can be memory-intensive on large datasets.
 - XGBoost parallel contention: when using `doParallel`, XGBoost nthread is set to 1 internally to prevent nested parallelism crashes.
 - The `docs/` directory is gitignored — pkgdown output is built and deployed by CI only.
-- `compute_shap_values(model_trained, ...)` expects the *actual* caret `train` object
-  (needs `$pred`, `$bestTune`, `$method`) — a caller passing a wrapper object one level
-  up (e.g. a custom pipeline's `list(Model = train_obj, ...)` instead of `train_obj`
-  itself) gets no error, just a silent `NULL` return with a "trivial predictions" warning,
-  since `unique(model_trained$pred$Resample)` evaluates to `NULL` and the `foreach` loop
-  over resamples runs zero iterations. Worth either validating the input class
-  (`stopifnot(inherits(model_trained, "train"))`) or documenting this failure mode more
-  visibly, since the warning message doesn't hint at "wrong object passed in."
+- `compute_shap_values(model_trained, ...)` expects `res$Model` from `compute_features.training.ML()` (for classification, the caret `train` object). It validates this and stops with a clear error if given the wrong object (e.g. `res` instead of `res$Model`).
 
 ## Known Issues / TODO
 
+### Open bugs
+- **LODO is ignored for survival and leaks the cohort label.** `compute_features.training.ML()` and `compute_features.ML()` add a `dataset` column when `LODO = TRUE`, but never pass `LODO`/`batch_id` to `compute_k_fold_CV_survival()`. No cohort-stratified folds are built, and `dataset` is fit as an ordinary predictor (`Surv(time, event) ~ .`) — silently.
+- **`ncores` is ignored in standard survival CV.** `compute_k_fold_CV_survival()` only creates a cluster in the custom-fold branch; the standard branch loops sequentially over folds and hyperparameter grids (up to 125 combinations per model), so a 2-fold run can take 10+ minutes.
+- **`compute_ml_survival()` swallows fitting errors**: it converts them into a warning and returns `NULL`, so failures go unnoticed (this is how the bare-`Surv()` bug stayed hidden). It also accepts a `fold_models_dir` argument it never uses.
+- **`data_example_survival` codes events as 1/2** (from `survival::lung`), while the docs say 0/1. It works because `Surv()` accepts both.
+- **No test suite.** `tests/testthat/` doesn't exist; verification is manual.
+- Cosmetic: on precision-recall plots, the curve's final vertical drop at recall = 1 (to precision = prevalence) falls below the confidence band, which ends at the first threshold reaching full recall.
+
+### Performance
 - **`compute_shap_values()`'s cost is extremely method-dependent, and this is invisible
   to the caller until it's too late.** Measured empirically (melanoma LODO dataset,
   ~250-300 x ~15 NMF-factor features, `nsim = 100`, one `fastshap::explain()` call per
@@ -191,7 +216,7 @@ Edit `vignettes/pipeML.Rmd`. Run `devtools::build_vignettes()` to test locally. 
   turn what's normally a ~30min job into a ~26-hour one, with zero warning beforehand.
   Concrete improvements worth making:
   - **Expose `nsim`** as a `compute_shap_values()` parameter instead of the hardcoded
-    100 (`machine_learning.R` line ~2820) — callers with a slow-predict method could
+    100 (`machine_learning.R` line ~2964) — callers with a slow-predict method could
     trade precision for speed deliberately, instead of being stuck with a fixed cost
     multiplier they can't control.
   - **Expose which/how many resamples to explain**, rather than always looping over

@@ -22,7 +22,8 @@ compute_features.training.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = NULL
+  fold_models_dir = NULL,
+  seed = 123
 )
 }
 \arguments{
@@ -81,6 +82,12 @@ The function should save individual folds as \code{"Results/fold_*.rds"} with:
 \code{fold_construction_fun} is used. If \code{NULL} (default), uses \code{"Results/fold_models/<task_type>"}
 so classification and survival runs never share (or prune) each other's files. Use a distinct
 directory per analysis when running several analyses of the same task type from one folder.}
+
+\item{seed}{Integer. Random seed for reproducible cross-validation: it fixes the fold assignment and
+the randomness in model fitting (e.g. random forest, bagging, boosting), including when running in
+parallel with \code{ncores}. Default: \code{123}. Use \code{NULL} to leave the random number generator
+untouched. Randomness inside a user-supplied \code{fold_construction_fun} that runs its own parallel
+workers is not covered: seed those workers inside that function.}
 }
 \value{
 A list containing:
