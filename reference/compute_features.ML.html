@@ -75,7 +75,8 @@ and generates Kaplan-Meier plots stratified by predicted risk.</p>
 <span>  fold_construction_fun <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  fold_construction_args_fixed <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  fold_construction_args_tunable <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  fold_models_dir <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  fold_models_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">123</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -173,6 +174,12 @@ Must accept a <code>bestune</code> argument internally to inject optimized hyper
 <code>fold_construction_fun</code> is used. If <code>NULL</code> (default), uses <code>"Results/fold_models/&lt;task_type&gt;"</code>
 so classification and survival runs never share (or prune) each other's files. Use a distinct
 directory per analysis when running several analyses of the same task type from one folder.</p></dd>
+
+
+<dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
+<dd><p>Integer. Random seed for reproducible cross-validation (fold assignment and model fitting,
+including parallel runs). Default: <code>123</code>. Use <code>NULL</code> to leave the random number generator
+untouched. See <code><a href="compute_features.training.ML.html">compute_features.training.ML()</a></code> for details.</p></dd>
 
 </dl></div>
     <div class="section level2">

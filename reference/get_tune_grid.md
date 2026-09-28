@@ -82,8 +82,7 @@ the `tuneGrid` argument of
 
 ## Details
 
-Calls `set.seed(123)`, which resets the global random number generator
-as a side effect. An error is raised for unsupported methods.
+The grids are deterministic. An error is raised for unsupported methods.
 
 ## See also
 

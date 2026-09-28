@@ -23,7 +23,8 @@ compute_k_fold_CV_survival(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = "Results/fold_models/survival"
+  fold_models_dir = "Results/fold_models/survival",
+  seed = 123
 )
 ```
 
@@ -88,6 +89,15 @@ compute_k_fold_CV_survival(
 
   Optional list of tunable arguments passed to `fold_construction_fun`
   during hyperparameter tuning.
+
+- seed:
+
+  Integer. Random seed set before the folds are drawn, so fold
+  assignment and model fitting are reproducible. In the parallel
+  custom-fold branch, each worker iteration is seeded from `seed`, the
+  fold and the parameter configuration, so results do not depend on
+  worker scheduling. `NULL` leaves the random number generator
+  untouched.
 
 ## Value
 

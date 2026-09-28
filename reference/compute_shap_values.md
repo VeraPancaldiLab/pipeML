@@ -16,7 +16,8 @@ compute_shap_values(
   n_cores = 2,
   file.name = NULL,
   fold_models_dir = NULL,
-  return_resamples = FALSE
+  return_resamples = FALSE,
+  seed = 123
 )
 ```
 
@@ -64,6 +65,15 @@ compute_shap_values(
 
   Logical. If `TRUE`, also return the per-resample SHAP values. Default
   `FALSE`.
+
+- seed:
+
+  Integer. Random seed for reproducible SHAP values. SHAP values are
+  Monte Carlo estimates, and refitted folds (standard CV path) can
+  involve randomness too; each resample is seeded from `seed` and its
+  position in the resample list, so results are identical across runs
+  and independent of `n_cores`. Default: `123`. Use `NULL` to leave the
+  random number generator untouched.
 
 ## Value
 

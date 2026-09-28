@@ -64,7 +64,8 @@ AUROC, or AUPRC.</p>
 <span>  fold_construction_fun <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  fold_construction_args_fixed <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  fold_construction_args_tunable <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  fold_models_dir <span class="op">=</span> <span class="st">"Results/fold_models/classification"</span></span>
+<span>  fold_models_dir <span class="op">=</span> <span class="st">"Results/fold_models/classification"</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">123</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -131,6 +132,11 @@ and final training.</p></dd>
 <dd><p>List of arguments passed to
 <code>fold_construction_fun</code> that define hyperparameters to be tuned during
 cross-validation. Each element should contain candidate values.</p></dd>
+
+
+<dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
+<dd><p>Integer. Random seed set before the folds are drawn, so fold assignment and model
+fitting are reproducible. <code>NULL</code> leaves the random number generator untouched.</p></dd>
 
 </dl></div>
     <div class="section level2">

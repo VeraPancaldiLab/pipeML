@@ -99,6 +99,7 @@ res <- compute_features.training.ML(features_train = X_train,
                                     k_folds = 2,
                                     n_rep = 1,
                                     ncores = 2,
+                                    seed = 123,
                                     file_name = "Example_classification",
                                     return = FALSE)
 ```
@@ -196,7 +197,8 @@ needs to be passed:
 
 shap_classification <- compute_shap_values(model_trained = res$Model,
                                            task_type = "classification",
-                                           n_cores = 2)
+                                           n_cores = 2,
+                                           seed = 123)
 head(shap_classification)
 ```
 

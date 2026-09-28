@@ -58,7 +58,8 @@ the fold model(s) that held it out, and its SHAP values are summarized across re
 <span>  n_cores <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>  file.name <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  fold_models_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  return_resamples <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  return_resamples <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  seed <span class="op">=</span> <span class="fl">123</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -98,6 +99,13 @@ to avoid retraining each resample. If <code>NULL</code> (default), uses
 
 <dt id="arg-return-resamples">return_resamples<a class="anchor" aria-label="anchor" href="#arg-return-resamples"></a></dt>
 <dd><p>Logical. If <code>TRUE</code>, also return the per-resample SHAP values. Default <code>FALSE</code>.</p></dd>
+
+
+<dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
+<dd><p>Integer. Random seed for reproducible SHAP values. SHAP values are Monte Carlo estimates, and
+refitted folds (standard CV path) can involve randomness too; each resample is seeded from <code>seed</code> and
+its position in the resample list, so results are identical across runs and independent of <code>n_cores</code>.
+Default: <code>123</code>. Use <code>NULL</code> to leave the random number generator untouched.</p></dd>
 
 </dl></div>
     <div class="section level2">

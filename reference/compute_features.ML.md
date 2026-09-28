@@ -31,7 +31,8 @@ compute_features.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = NULL
+  fold_models_dir = NULL,
+  seed = 123
 )
 ```
 
@@ -141,6 +142,14 @@ compute_features.ML(
   runs never share (or prune) each other's files. Use a distinct
   directory per analysis when running several analyses of the same task
   type from one folder.
+
+- seed:
+
+  Integer. Random seed for reproducible cross-validation (fold
+  assignment and model fitting, including parallel runs). Default:
+  `123`. Use `NULL` to leave the random number generator untouched. See
+  [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
+  for details.
 
 ## Value
 

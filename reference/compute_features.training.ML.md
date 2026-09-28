@@ -32,7 +32,8 @@ compute_features.training.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = NULL
+  fold_models_dir = NULL,
+  seed = 123
 )
 ```
 
@@ -150,6 +151,16 @@ compute_features.training.ML(
   runs never share (or prune) each other's files. Use a distinct
   directory per analysis when running several analyses of the same task
   type from one folder.
+
+- seed:
+
+  Integer. Random seed for reproducible cross-validation: it fixes the
+  fold assignment and the randomness in model fitting (e.g. random
+  forest, bagging, boosting), including when running in parallel with
+  `ncores`. Default: `123`. Use `NULL` to leave the random number
+  generator untouched. Randomness inside a user-supplied
+  `fold_construction_fun` that runs its own parallel workers is not
+  covered: seed those workers inside that function.
 
 ## Value
 

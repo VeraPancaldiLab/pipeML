@@ -63,7 +63,7 @@
 <pre><code>R/
   pipeML-package.R       # Package metadata &amp; namespace declarations
   data.R                 # Documentation for bundled example datasets
-  machine_learning.R     # All implementation (~5,200 lines, core file)
+  machine_learning.R     # All implementation (~5,500 lines, core file)
 vignettes/
   pipeML.Rmd             # Main tutorial vignette
 data/                    # Bundled example datasets (.rda)
@@ -89,26 +89,26 @@ pipeML.Rproj             # RStudio project config</code></pre>
 </tr><tr><td><code><a href="reference/compute_features.ML.html">compute_features.ML()</a></code></td>
 <td>Combined train + predict workflow (training + testing)</td>
 </tr><tr><td><code><a href="reference/compute_prediction.html">compute_prediction()</a></code></td>
-<td>Generate predictions on test data using trained model</td>
+<td>Generate predictions on test data using trained model (returns AUROC/AUPRC with bootstrap CIs and <code>Curve_bands</code>)</td>
 </tr><tr><td><code><a href="reference/get_curves.html">get_curves()</a></code></td>
-<td>ROC and Precision-Recall curves with confidence intervals</td>
+<td>ROC and Precision-Recall curves with pointwise bootstrap confidence bands</td>
 </tr><tr><td><code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code></td>
-<td>SHAP feature importance values across resamples</td>
+<td>Per-fold SHAP values (each sample explained only by the fold models that held it out); takes only the trained model</td>
 </tr><tr><td><code><a href="reference/plot_shap_stability.html">plot_shap_stability()</a></code></td>
-<td>Visualize SHAP importance stability across resamples</td>
+<td>Visualize SHAP importance stability across resamples (input: <code>compute_shap_values(..., return_resamples = TRUE)$shap_resamples</code>)</td>
 </tr><tr><td><code><a href="reference/plot_survival_performance.html">plot_survival_performance()</a></code></td>
 <td>Kaplan-Meier curves stratified by predicted risk groups</td>
 </tr></tbody></table><hr></div>
 <div class="section level2">
 <h2 id="supported-ml-algorithms">Supported ML Algorithms<a class="anchor" aria-label="anchor" href="#supported-ml-algorithms"></a></h2>
-<p><strong>Classification (11, via caret):</strong> <code>treebag</code>, <code>rf</code>, <code>C5.0</code>, <code>glmnet</code> (elastic/lasso/ridge), <code>knn</code>, <code>rpart</code>, <code>svmRadial</code>, <code>svmLinear</code>, <code>xgbTree</code></p>
-<p><strong>Survival (7, via tidymodels/parsnip/censored):</strong> Cox PH, Elastic Net Cox, AFT parametric, Conditional Inference Trees, Bagged CART, Random Survival Forests, Gradient Boosting (censored)</p>
+<p><strong>Classification (11, via caret):</strong> <code>treebag</code>, <code>rf</code>, <code>C5.0</code>, <code>glmnet</code>, <code>lasso</code> and <code>ridge</code> (both <code>glmnet</code> with fixed <code>alpha</code>), <code>knn</code>, <code>rpart</code>, <code>svmRadial</code>, <code>svmLinear</code>, <code>xgbTree</code></p>
+<p><strong>Survival (6 active, via tidymodels/parsnip/censored; <code>model_list</code> in <code><a href="reference/compute_k_fold_CV_survival.html">compute_k_fold_CV_survival()</a></code>):</strong> <code>cox_ph_survival</code> (Cox PH), <code>proportional_hazards_glmnet</code> (elastic-net Cox), <code>survreg_flexsurv</code> (parametric AFT), <code>decision_tree_partykit</code> (conditional inference tree), <code>bag_tree_rpart</code> (bagged CART), <code>rand_forest_aorsf</code> (oblique random survival forest). <code>rand_forest_partykit</code> and <code>boost_tree_mboost</code> are implemented but commented out of <code>model_list</code>.</p>
 <hr></div>
 <div class="section level2">
 <h2 id="key-dependencies">Key Dependencies<a class="anchor" aria-label="anchor" href="#key-dependencies"></a></h2>
 <p><strong>Imports (must be installed):</strong> <code>caret</code>, <code>doParallel</code>, <code>foreach</code>, <code>dplyr</code>, <code>tidyr</code>, <code>tibble</code>, <code>purrr (&gt;= 1.0.2)</code>, <code>ggplot2</code>, <code>reshape2</code>, <code>survival</code>, <code>survminer</code>, <code>fastshap</code>, <code>dials</code>, <code>parsnip</code>, <code>rsample</code>, <code>workflows</code>, <code>tune</code>, <code>yardstick</code>, <code>grDevices</code>, <code>parallel</code>, <code>stats</code></p>
-<p><strong>Suggests (optional, needed for specific algorithms):</strong> <code>testthat (&gt;= 3.0.0)</code>, <code>knitr</code>, <code>rmarkdown</code>, <code>C50</code>, <code>randomForest</code>, <code>glmnet</code>, <code>xgboost</code>, <code>kernlab</code>, <code>recipes</code>, <code>tidymodels</code>, <code>censored</code>, <code>flexsurv</code>, <code>coin</code>, <code>aorsf</code>, <code>WGCNA</code>, <code>cowplot</code>, <code>matlib</code></p>
-<p><strong>Remotes (GitHub):</strong> <code>VeraPancaldiLab/multideconv</code> — custom deconvolution package (optional)</p>
+<p><strong>Suggests (optional, needed for specific algorithms):</strong> <code>testthat (&gt;= 3.0.0)</code>, <code>knitr</code>, <code>rmarkdown</code>, <code>C50</code>, <code>randomForest</code>, <code>glmnet</code>, <code>xgboost</code>, <code>kernlab</code>, <code>recipes</code>, <code>tidyverse</code>, <code>tidymodels</code>, <code>censored</code>, <code>flexsurv</code>, <code>coin</code>, <code>aorsf</code>, <code>WGCNA</code>, <code>cowplot</code>, <code>matlib</code>, <code>shapviz</code></p>
+<p><strong>Remotes (GitHub):</strong> - <code>VeraPancaldiLab/multideconv</code> — custom deconvolution package (optional) - <code>bgreenwell/fastshap@v0.3.0</code> — <code>fastshap</code> was archived from CRAN on 2026-05-27, so CI (pak) can only install it from GitHub. Pinned to the v0.3.0 release tag; its <code>explain(object, X, pred_wrapper, newdata, nsim, adjust)</code> API and default estimator are unchanged from CRAN 0.1.1.</p>
 <hr></div>
 <div class="section level2">
 <h2 id="architecture--key-design-patterns">Architecture &amp; Key Design Patterns<a class="anchor" aria-label="anchor" href="#architecture--key-design-patterns"></a></h2>
@@ -138,6 +138,31 @@ pipeML.Rproj             # RStudio project config</code></pre>
 <ul><li>Near-zero variance removal</li>
 <li>Collinearity filtering (correlation threshold)</li>
 <li>Removal of features constant within any target class (classification only)</li>
+</ul></div>
+<div class="section level3">
+<h3 id="reproducibility-seed-argument-default-123">Reproducibility (<code>seed</code> argument, default <code>123</code>)<a class="anchor" aria-label="anchor" href="#reproducibility-seed-argument-default-123"></a></h3>
+<ul><li>
+<code><a href="reference/compute_features.training.ML.html">compute_features.training.ML()</a></code>, <code><a href="reference/compute_features.ML.html">compute_features.ML()</a></code> and <code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code> take <code>seed</code>; <code>NULL</code> leaves the RNG untouched.</li>
+<li>The training functions pass it to <code><a href="reference/compute_k_fold_CV.html">compute_k_fold_CV()</a></code> / <code><a href="reference/compute_k_fold_CV_survival.html">compute_k_fold_CV_survival()</a></code>, which call <code>set.seed(seed)</code> right before drawing folds. caret draws per-resample seeds for its parallel workers from the main session’s RNG, so this also covers <code>ncores &gt; 1</code>.</li>
+<li>
+<code>%dopar%</code> loops don’t share the main RNG, so each iteration seeds itself: <code>seed + match(resample, resamples)</code> in <code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code>, and <code>seed + 1000L * fold_i + parameter_i</code> in the survival custom-fold branch. Results are therefore independent of worker scheduling and <code>n_cores</code>.</li>
+<li>Randomness inside a user-supplied <code>fold_construction_fun</code> that runs its own parallel workers is not covered.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="fold-models--shap">Fold Models &amp; SHAP<a class="anchor" aria-label="anchor" href="#fold-models--shap"></a></h3>
+<ul><li>During CV the model of each fold is saved to <code>fold_models_dir</code> (default <code>Results/fold_models/&lt;task_type&gt;</code>), and only the files of the selected model and <code>bestTune</code> are kept.</li>
+<li>
+<code>compute_shap_values(model_trained, task_type, ...)</code> takes everything (training data, outcome, folds, tuned hyperparameters) from the model: caret’s <code>$trainingData</code> / <code>$pred</code> for classification, <code>$trainingData</code> / <code>$Resample_matrix</code> for survival. Each sample is explained only by the fold models that held it out, then summarized across repeats by the median.</li>
+<li>Standard-CV folds are refitted if their saved model is missing; custom-fold models (<code>fold_construction_fun</code>) cannot be rebuilt, so a missing fold model is an error.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="performance-curves-compute_prediction--get_curves">Performance Curves (<code>compute_prediction()</code> → <code>get_curves()</code>)<a class="anchor" aria-label="anchor" href="#performance-curves-compute_prediction--get_curves"></a></h3>
+<ul><li>AUROC/AUPRC are stored as <code>list(estimate, lower, upper)</code>: <code>estimate</code> is the value on the full test set, and the CI comes from 1000 bootstrap resamples (<code><a href="reference/bootstrap_auc.html">bootstrap_auc()</a></code>, seed 123).</li>
+<li>The shaded bands are pointwise 95% bootstrap bands. <code><a href="reference/bootstrap_auc.html">bootstrap_auc()</a></code> evaluates each resample’s curve on a 101-point grid (<code><a href="reference/roc_at_grid.html">roc_at_grid()</a></code>: best sensitivity at FPR ≤ x; <code><a href="reference/prc_at_grid.html">prc_at_grid()</a></code>: precision at the first threshold reaching recall x), returned as <code>Curve_bands</code>. <code>get_curves(roc_band, prc_band)</code> draws them under the curve; the LODO branch draws no band.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="outcome-alignment-compute_featuresml">Outcome Alignment (<code>compute_features.ML()</code>)<a class="anchor" aria-label="anchor" href="#outcome-alignment-compute_featuresml"></a></h3>
+<ul><li>Labels are taken from <code>coldata</code> by row name (<code>coldata[rownames(features_train), , drop = FALSE]</code>), so they follow the feature rows’ order; missing samples are an error. Never subset with <code>%in%</code> and then attach columns by position — that silently scrambled labels whenever feature rows weren’t in <code>coldata</code> order.</li>
 </ul><hr></div>
 </div>
 <div class="section level2">
@@ -214,7 +239,11 @@ pipeML.Rproj             # RStudio project config</code></pre>
 </div>
 <div class="section level2">
 <h2 id="notes--gotchas">Notes &amp; Gotchas<a class="anchor" aria-label="anchor" href="#notes--gotchas"></a></h2>
-<ul><li>The core implementation is a single large file (<code>machine_learning.R</code>, ~5,200 lines). Internal helpers are not exported — check NAMESPACE before assuming a function is public.</li>
+<ul><li>The core implementation is a single large file (<code>machine_learning.R</code>, ~5,500 lines). Internal helpers are not exported — check NAMESPACE before assuming a function is public.</li>
+<li>caret must be <em>attached</em>, not just loaded: its <code>"knn"</code> model code calls <code>knn3()</code> without a namespace prefix, so a knn fit with <code>trainControl(method = "none")</code> fails with <code>could not find function "knn3"</code> otherwise. Classification entry points call the internal <code><a href="reference/ensure_caret.html">ensure_caret()</a></code>.</li>
+<li>Don’t add <code><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed()</a></code> calls inside helpers: they override the user’s <code>seed</code> mid-run (<code><a href="reference/get_tune_grid.html">get_tune_grid()</a></code> used to do this). Seed only at the entry points described under Reproducibility.</li>
+<li>Roxygen markdown is enabled (<code>Roxygen: list(markdown = TRUE)</code>): write <code>95%</code>, not <code>95\%</code> (it becomes <code>\\%</code> in the Rd, which comments out the rest of the line), and avoid <code>[a, b]</code>-style ranges in plain text (parsed as links). Run <code>devtools::check_man()</code> after doc edits.</li>
+<li>CRAN doesn’t allow non-CRAN required dependencies: <code>multideconv</code> and <code>fastshap</code> (both in <code>Remotes</code>) block a CRAN submission.</li>
 <li>Survival models need the <code>censored</code> package (in Suggests) to register parsnip’s “censored regression” engines. Every survival entry point calls the internal <code><a href="reference/ensure_censored.html">ensure_censored()</a></code>, which loads its namespace; users don’t need <code><a href="https://github.com/tidymodels/censored" class="external-link">library(censored)</a></code>. Survival formulas must use <code>survival::Surv(...)</code>, not bare <code>Surv(...)</code> — the bare form only works when some other package happened to attach <code>survival</code>.</li>
 <li>
 <code>multideconv</code> is a remote (GitHub) dependency — not on CRAN. Installation requires <code>remotes::install_github("VeraPancaldiLab/multideconv")</code>.</li>
@@ -222,14 +251,30 @@ pipeML.Rproj             # RStudio project config</code></pre>
 <li>XGBoost parallel contention: when using <code>doParallel</code>, XGBoost nthread is set to 1 internally to prevent nested parallelism crashes.</li>
 <li>The <code>docs/</code> directory is gitignored — pkgdown output is built and deployed by CI only.</li>
 <li>
-<code>compute_shap_values(model_trained, ...)</code> expects the <em>actual</em> caret <code>train</code> object (needs <code>$pred</code>, <code>$bestTune</code>, <code>$method</code>) — a caller passing a wrapper object one level up (e.g. a custom pipeline’s <code>list(Model = train_obj, ...)</code> instead of <code>train_obj</code> itself) gets no error, just a silent <code>NULL</code> return with a “trivial predictions” warning, since <code>unique(model_trained$pred$Resample)</code> evaluates to <code>NULL</code> and the <code>foreach</code> loop over resamples runs zero iterations. Worth either validating the input class (<code>stopifnot(inherits(model_trained, "train"))</code>) or documenting this failure mode more visibly, since the warning message doesn’t hint at “wrong object passed in.”</li>
+<code>compute_shap_values(model_trained, ...)</code> expects <code>res$Model</code> from <code><a href="reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> (for classification, the caret <code>train</code> object). It validates this and stops with a clear error if given the wrong object (e.g. <code>res</code> instead of <code>res$Model</code>).</li>
 </ul></div>
 <div class="section level2">
 <h2 id="known-issues--todo">Known Issues / TODO<a class="anchor" aria-label="anchor" href="#known-issues--todo"></a></h2>
+<div class="section level3">
+<h3 id="open-bugs">Open bugs<a class="anchor" aria-label="anchor" href="#open-bugs"></a></h3>
+<ul><li>
+<strong>LODO is ignored for survival and leaks the cohort label.</strong> <code><a href="reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> and <code><a href="reference/compute_features.ML.html">compute_features.ML()</a></code> add a <code>dataset</code> column when <code>LODO = TRUE</code>, but never pass <code>LODO</code>/<code>batch_id</code> to <code><a href="reference/compute_k_fold_CV_survival.html">compute_k_fold_CV_survival()</a></code>. No cohort-stratified folds are built, and <code>dataset</code> is fit as an ordinary predictor (<code>Surv(time, event) ~ .</code>) — silently.</li>
+<li>
+<strong><code>ncores</code> is ignored in standard survival CV.</strong> <code><a href="reference/compute_k_fold_CV_survival.html">compute_k_fold_CV_survival()</a></code> only creates a cluster in the custom-fold branch; the standard branch loops sequentially over folds and hyperparameter grids (up to 125 combinations per model), so a 2-fold run can take 10+ minutes.</li>
+<li>
+<strong><code><a href="reference/compute_ml_survival.html">compute_ml_survival()</a></code> swallows fitting errors</strong>: it converts them into a warning and returns <code>NULL</code>, so failures go unnoticed (this is how the bare-<code>Surv()</code> bug stayed hidden). It also accepts a <code>fold_models_dir</code> argument it never uses.</li>
+<li>
+<strong><code>data_example_survival</code> codes events as 1/2</strong> (from <code><a href="https://rdrr.io/pkg/survival/man/lung.html" class="external-link">survival::lung</a></code>), while the docs say 0/1. It works because <code>Surv()</code> accepts both.</li>
+<li>
+<strong>No test suite.</strong> <code>tests/testthat/</code> doesn’t exist; verification is manual.</li>
+<li>Cosmetic: on precision-recall plots, the curve’s final vertical drop at recall = 1 (to precision = prevalence) falls below the confidence band, which ends at the first threshold reaching full recall.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="performance">Performance<a class="anchor" aria-label="anchor" href="#performance"></a></h3>
 <ul><li>
 <strong><code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code>’s cost is extremely method-dependent, and this is invisible to the caller until it’s too late.</strong> Measured empirically (melanoma LODO dataset, ~250-300 x ~15 NMF-factor features, <code>nsim = 100</code>, one <code><a href="https://bgreenwell.github.io/fastshap/reference/explain.html" class="external-link">fastshap::explain()</a></code> call per CV resample): <code>glmnet</code> ≈ 16s/resample, <code>KNN</code> ≈ 25s/resample, but <code>svmRadial</code> ≈ <strong>930s/resample</strong> — a ~58x slowdown, because SVM/KNN-family predict methods are computationally heavier per call (KNN recomputes distances to the full training set; SVM’s kernel evaluation is per-support-vector) and <code><a href="https://bgreenwell.github.io/fastshap/reference/explain.html" class="external-link">fastshap::explain()</a></code> calls the prediction function repeatedly (proportional to <code>nsim</code>) for every resample. With the default <code>k_folds x n_rep</code> producing up to 100 resamples, an SVM-selected model can turn what’s normally a ~30min job into a ~26-hour one, with zero warning beforehand. Concrete improvements worth making:
 <ul><li>
-<strong>Expose <code>nsim</code></strong> as a <code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code> parameter instead of the hardcoded 100 (<code>machine_learning.R</code> line ~2820) — callers with a slow-predict method could trade precision for speed deliberately, instead of being stuck with a fixed cost multiplier they can’t control.</li>
+<strong>Expose <code>nsim</code></strong> as a <code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code> parameter instead of the hardcoded 100 (<code>machine_learning.R</code> line ~2964) — callers with a slow-predict method could trade precision for speed deliberately, instead of being stuck with a fixed cost multiplier they can’t control.</li>
 <li>
 <strong>Expose which/how many resamples to explain</strong>, rather than always looping over every one of <code>unique(model_trained$pred$Resample)</code> — explaining a representative subset (e.g. 10-20 of 100) would give an approximate-but-fast SHAP estimate on request.</li>
 <li>
@@ -237,6 +282,7 @@ pipeML.Rproj             # RStudio project config</code></pre>
 <li>Consider flagging known-slow methods (<code>svmRadial</code>, <code>svmLinear</code>, <code>knn</code>, and other instance-/kernel-based predictors) with a <code><a href="https://rdrr.io/r/base/message.html" class="external-link">message()</a></code> up front suggesting a reduced <code>nsim</code> or resample subset for those specifically.</li>
 </ul></li>
 </ul></div>
+</div>
 </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

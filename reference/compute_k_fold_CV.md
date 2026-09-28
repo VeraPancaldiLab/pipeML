@@ -20,7 +20,8 @@ compute_k_fold_CV(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = "Results/fold_models/classification"
+  fold_models_dir = "Results/fold_models/classification",
+  seed = 123
 )
 ```
 
@@ -85,6 +86,12 @@ compute_k_fold_CV(
   List of arguments passed to `fold_construction_fun` that define
   hyperparameters to be tuned during cross-validation. Each element
   should contain candidate values.
+
+- seed:
+
+  Integer. Random seed set before the folds are drawn, so fold
+  assignment and model fitting are reproducible. `NULL` leaves the
+  random number generator untouched.
 
 ## Value
 
