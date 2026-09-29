@@ -2,14 +2,17 @@
 % Please edit documentation in R/machine_learning.R
 \name{plot_survival_performance}
 \alias{plot_survival_performance}
-\title{Plot and Save Survival Performance of a Model (Internal)}
+\title{Plot Kaplan-Meier Curves by Predicted Risk Group}
 \usage{
 plot_survival_performance(df_test, prediction, n_groups = 3, file_name = NULL)
 }
 \arguments{
-\item{df_test}{Data frame containing observed survival, event indicator and predicted risk score.}
+\item{df_test}{Data frame with the observed outcome of the test samples, in columns \code{time} and
+\code{event} (1 = event, 0 = censored), in the order of the predictions.}
 
-\item{prediction}{List containing prediction results}
+\item{prediction}{The output of \code{compute_prediction()} with \code{task_type = "survival"} (risk scores
+in \code{$preds}, C-index and its confidence interval in \code{$c_index}, \code{$c_index_lower} and
+\code{$c_index_upper}).}
 
 \item{n_groups}{Integer. Number of risk groups for stratification (default = 3).}
 
@@ -30,4 +33,20 @@ Risk groups are defined by quantiles of the predicted risk scores. Kaplan-Meier
 curves visualize survival per risk group, and a log-rank test assesses
 differences. The C-index and its 95\% confidence interval are displayed in the
 plot subtitle.
+}
+\examples{
+\dontrun{
+# res_survival: output of compute_features.training.ML(task_type = "survival")
+pred <- compute_prediction(model = res_survival$Model,
+                           test_data = X_test,
+                           task_type = "survival",
+                           time_var = time_test,
+                           event_var = event_test)
+
+plot_survival_performance(df_test = data.frame(time = time_test, event = event_test),
+                          prediction = pred,
+                          n_groups = 3,
+                          file_name = "Example")
+}
+
 }

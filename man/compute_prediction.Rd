@@ -17,8 +17,8 @@ compute_prediction(
 )
 }
 \arguments{
-\item{model}{The trained machine learning model returned from \code{compute_features.ML()} or
-\code{compute_features.training.ML()}.}
+\item{model}{The trained model returned as \code{$Model} by \code{compute_features.training.ML()}
+(e.g. \code{res$Model}).}
 
 \item{test_data}{A data frame or matrix of predictor variables for the test set.}
 
@@ -32,44 +32,65 @@ compute_prediction(
 
 \item{event_var}{Column or vector of event indicators (1 = event, 0 = censored; required for survival tasks).}
 
-\item{file.name}{Character. Filename prefix for saving plots (optional). If NULL, plots are not saved.}
+\item{file.name}{Character. File name prefix of the plots saved in \code{Results/}.}
 
-\item{return}{Logical. Whether to return metrics, predictions, and plots. Default = FALSE.}
+\item{return}{Logical. Whether to save the plots in \code{Results/} (ROC and precision-recall curves for
+classification, Kaplan-Meier curves by predicted risk group for survival). Default = FALSE.}
 }
 \value{
-A list containing:
+For classification, a list containing:
 \describe{
 \item{\code{Metrics}}{Data frame of performance metrics (Accuracy, Sensitivity, Specificity,
-Precision, Recall, F1 score, MCC) for each threshold (classification only).}
-\item{\code{AUC}}{List containing AUROC and AUPRC values with optional bootstrap confidence intervals (classification only).}
-\item{\code{Predictions}}{Data frame of predicted probabilities for each class (classification) or risk scores (survival).}
+Precision, Recall, F1 score, MCC) for each threshold.}
+\item{\code{AUC}}{List with \code{AUROC} and \code{AUPRC}, each a list with the \code{estimate} on the
+test set and the \code{lower} and \code{upper} bounds of its 95\% bootstrap confidence interval.}
+\item{\code{Predictions}}{Data frame of predicted probabilities for each class.}
 \item{\code{Curve_bands}}{List with \code{ROC} (columns \code{fpr}, \code{lower}, \code{upper}) and
 \code{PRC} (columns \code{recall}, \code{lower}, \code{upper}): pointwise 95\% bootstrap bands
-around the ROC and precision-recall curves (classification only).}
+around the ROC and precision-recall curves.}
+}
+For survival, a list containing:
+\describe{
+\item{\code{preds}}{Predicted risk scores (higher values mean higher risk).}
+\item{\code{c_index}, \code{c_index_lower}, \code{c_index_upper}}{C-index on the test set and its 95\%
+confidence interval.}
 }
 }
 \description{
-Computes prediction metrics for a trained machine learning model, including the confusion matrix,
-AUROC, AUPRC, Accuracy, Sensitivity, Specificity, Precision, Recall, F1 score, and MCC. For
-classification tasks, it also determines the optimal classification threshold and generates
-ROC, PRC, and confusion matrix plots. For survival analysis tasks, it predicts risk scores and
-optionally generates Kaplan-Meier plots.
+Applies a trained model to a test set and evaluates it. For classification, it computes AUROC and AUPRC
+with bootstrap confidence intervals, and Accuracy, Sensitivity, Specificity, Precision, Recall, F1 score and
+MCC at each probability threshold. For survival, it predicts risk scores and computes the C-index.
 }
 \details{
-For \strong{classification}, the function:
-\enumerate{
-\item Uses the trained model to predict probabilities for the test data.
-\item Computes performance metrics across thresholds and selects the optimal threshold based on a chosen metric.
-\item Calculates AUROC and AUPRC and optionally bootstrapped confidence intervals.
-\item Generates ROC, PRC, and confusion matrix plots if \code{return = TRUE} and \code{file.name} is provided.
+Confidence intervals of AUROC and AUPRC come from 1000 bootstrap resamples of the test samples.
+
+Survival models can predict a risk score, a survival time or a survival probability. The last two are
+reversed, so that higher predictions always mean higher risk.
+}
+\examples{
+\dontrun{
+data(data_example_classification)
+X <- data_example_classification[, setdiff(colnames(data_example_classification), "target")]
+y <- data_example_classification$target
+set.seed(123)
+train_idx <- caret::createDataPartition(y, p = 0.7, list = FALSE)
+
+res <- compute_features.training.ML(features_train = X[train_idx, ],
+                                    target_var = y[train_idx],
+                                    task_type = "classification",
+                                    trait.positive = "1",
+                                    k_folds = 5,
+                                    n_rep = 2)
+
+pred <- compute_prediction(model = res$Model,
+                           test_data = X[-train_idx, ],
+                           target_var = y[-train_idx],
+                           task_type = "classification",
+                           trait.positive = "1")
+pred$AUC
 }
 
-For \strong{survival analysis}, the function:
-\enumerate{
-\item Predicts risk scores using the trained survival model.
-\item Optionally generates Kaplan-Meier plots stratified by predicted risk groups.
-}
 }
 \seealso{
-\code{\link[caret]{confusionMatrix}}, \code{\link[caret]{varImp}}, \code{\link[ggplot2]{ggplot}}
+\code{\link{get_curves}}, \code{\link{plot_survival_performance}}
 }

@@ -47,3 +47,22 @@ feature on its training data. With flexible models and small datasets, a model t
 importance to features that help fit the training samples but do not generalize: compare the training
 performance with the cross-validation performance before interpreting them.
 }
+\examples{
+\dontrun{
+data(data_example_classification)
+X <- data_example_classification[, setdiff(colnames(data_example_classification), "target")]
+res <- compute_features.training.ML(features_train = X,
+                                    target_var = data_example_classification$target,
+                                    task_type = "classification",
+                                    trait.positive = "1",
+                                    k_folds = 5,
+                                    n_rep = 2)
+
+shap <- compute_shap_values(res$Model, task_type = "classification")
+head(shap)
+
+# Global importance: mean absolute SHAP value of each feature
+sort(colMeans(abs(shap)), decreasing = TRUE)
+}
+
+}

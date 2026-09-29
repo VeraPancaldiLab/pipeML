@@ -69,3 +69,15 @@ This function generates and saves the Receiver Operating Characteristic (ROC) cu
 and Precision-Recall curve based on the provided metrics. It also includes the AUC values
 for both curves in the plot legends.
 }
+\examples{
+\dontrun{
+# pred: output of compute_prediction() (classification)
+get_curves(data = pred$Metrics,
+           color = "model",
+           auc_roc = pred$AUC$AUROC,
+           auc_prc = pred$AUC$AUPRC,
+           roc_band = pred$Curve_bands$ROC,
+           prc_band = pred$Curve_bands$PRC,
+           file.name = "Example")
+}
+}

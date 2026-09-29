@@ -4,23 +4,37 @@ template:
   bslib:
     pkgdown-nav-height: 100px
 
+home:
+  sidebar:
+    structure: [links, license, community, citation, authors, dev, toc]
+
 navbar:
   structure:
-    left: [get-started, reference, articles, news]
+    left:  [intro, articles, reference, news]
     right: [search, github]
   components:
-    get-started:
-      text: Get started
-      href: index.html
     articles:
       text: Articles
       menu:
-      - text: pipeML vignette
-        href: articles/pipeML.html
-      - text: Classification and survival
-        href: articles/pipeML.html#classification-and-survival
-      - text: Advanced
-        href: articles/pipeML.html#advanced
+      - text: "Classification"
+        href: articles/a1_classification.html
+      - text: "Survival analysis"
+        href: articles/a2_survival.html
+      - text: "Interpreting models with SHAP values"
+        href: articles/a3_shap.html
+      - text: "Multi-cohort validation (LODO)"
+        href: articles/a4_lodo.html
+      - text: "Leakage-aware custom cross-validation"
+        href: articles/a5_custom_folds.html
+
+articles:
+- title: "Tutorial"
+  contents:
+  - a1_classification
+  - a2_survival
+  - a3_shap
+  - a4_lodo
+  - a5_custom_folds
 
 reference:
 - title: Main
@@ -35,7 +49,6 @@ reference:
     Model interpretability
   contents:
   - compute_shap_values
-  - plot_shap_stability
 - title: Visualization
   desc: >
     Model visualization

@@ -22,7 +22,13 @@ R/
   data.R                 # Documentation for bundled example datasets
   machine_learning.R     # All implementation (~5,500 lines, core file)
 vignettes/
-  pipeML.Rmd             # Main tutorial vignette
+  pipeML.Rmd             # "Get started" landing page (intro, install, workflow chooser, citation)
+  a1_classification.Rmd  # Articles, one per topic (same layout as multideconv)
+  a2_survival.Rmd
+  a3_shap.Rmd
+  a4_lodo.Rmd
+  a5_custom_folds.Rmd
+  figures/               # Static figures shown by the articles (code chunks are eval = FALSE)
 data/                    # Bundled example datasets (.rda)
 man/                     # Auto-generated Roxygen docs (never edit manually)
 docs/                    # pkgdown website output (gitignored)
@@ -39,7 +45,7 @@ pipeML.Rproj             # RStudio project config
 
 ---
 
-## Exported Functions (7 total)
+## Exported Functions (6 total)
 
 All live in `R/machine_learning.R`.
 
@@ -166,7 +172,7 @@ pkgdown::build_site()      # Rebuild docs website
 - `testthat` (v3) suite in `tests/testthat/`: helpers (`preprocess_features()`, hyperparameter grids, example data, `ensure_caret()`), survival helpers (failed fits, empty `bestTune`, predictions without outcome, `aggregate_results()` exclusion of failed configurations) and end-to-end workflows (training, prediction, SHAP additivity/reproducibility; standard and custom folds).
 - End-to-end tests are `skip_on_cran()`; the survival training test (several minutes) is also `skip_on_ci()`, so run `devtools::test()` locally before releasing.
 - Tests run in a temporary working directory (`local_temp_wd()` in `helper-data.R`), since pipeML writes to `Results/`.
-- The vignette code is `eval = FALSE`: run its chunks manually when changing user-facing behaviour.
+- The vignette code is `eval = FALSE`: run its chunks when changing user-facing behaviour. `a3_shap`'s survival section uses `res_survival` from `a2_survival`, so run the articles in order in one session.
 
 ---
 
@@ -182,8 +188,8 @@ pkgdown::build_site()      # Rebuild docs website
 1. Add calculation helper (follow `calculate_auroc()` pattern)
 2. Wire into `calculate_cv_metrics()` and `compute_prediction()`
 
-### Modifying the vignette
-Edit `vignettes/pipeML.Rmd`. Run `devtools::build_vignettes()` to test locally. The pkgdown CI will publish on merge to main.
+### Modifying the vignettes
+The vignettes follow multideconv's layout: `pipeML.Rmd` is a short landing page and each topic is an article `aN_<topic>.Rmd`, listed in both the navbar `articles` menu and the `articles:` index of `_pkgdown.yml`. A new article must be added in both places. Run `devtools::build_vignettes()` to test locally. The pkgdown CI will publish on merge to main.
 
 ---
 
@@ -197,6 +203,7 @@ Edit `vignettes/pipeML.Rmd`. Run `devtools::build_vignettes()` to test locally. 
 - Survival models need the `censored` package (in Suggests) to register parsnip's "censored regression" engines. Every survival entry point calls the internal `ensure_censored()`, which loads its namespace; users don't need `library(censored)`. Survival formulas must use `survival::Surv(...)`, not bare `Surv(...)` — the bare form only works when some other package happened to attach `survival`.
 - `multideconv` is a remote (GitHub) dependency — not on CRAN. Installation requires `remotes::install_github("VeraPancaldiLab/multideconv")`.
 - SHAP computation via `fastshap::explain()` can be memory-intensive on large datasets.
+- xgboost >= 3 breaks caret's own `"xgbTree"` model (the booster is an ALTREP object: `modelFit$xNames <- ...` fails with "ALTLIST classes must provide a Set_elt method"). All `caret::train()` calls that may get `"xgbTree"` go through the internal `caret_train()`, which substitutes `xgbtree_model()` (booster stored in `modelFit$booster`) and resets `$method` to `"xgbTree"`. Use `caret_train()` for any new call site.
 - XGBoost parallel contention: when using `doParallel`, XGBoost nthread is set to 1 internally to prevent nested parallelism crashes.
 - The `docs/` directory is gitignored — pkgdown output is built and deployed by CI only.
 - `compute_shap_values(model_trained, ...)` expects `res$Model` from `compute_features.training.ML()` (for classification, the caret `train` object). It validates this and stops with a clear error if given the wrong object (e.g. `res` instead of `res$Model`).

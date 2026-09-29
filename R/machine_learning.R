@@ -175,7 +175,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     #If both are ON it can slower performance (lead to over-parallelization and CPU contention)
     trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = F, classProbs = TRUE, savePredictions=T)
 
-    invisible(utils::capture.output({fit.xgbTree <- caret::train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)}, type = "output"))
+    invisible(utils::capture.output({fit.xgbTree <- caret_train(target~., data=train_data, method="xgbTree", metric = "Accuracy", trControl=trainControl)}, type = "output"))
 
     if(is.null(ncores) == F){
       parallel::stopCluster(cl)  # stop the cluster after parallel execution
@@ -857,7 +857,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     cat("\nRunning XGboost....................\n")
     # Train model with bestTune from CV
     temp = fit.xgbTree
-    fit.xgbTree <- caret::train(
+    fit.xgbTree <- caret_train(
       target ~ .,
       data = training_sets$XGboost,
       method = "xgbTree",
@@ -1016,7 +1016,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
     hp <- tuneGrid[grid_row, , drop = FALSE]
 
     # Train model
-    model <- suppressWarnings({caret::train(
+    model <- suppressWarnings({caret_train(
       target ~ .,
       data = train_data,
       method = ml_method,
@@ -1074,8 +1074,9 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #' @param task_type Character. Prediction task type: \code{"classification"} or \code{"survival"}.
 #' @param target_var Vector. Target variable for classification tasks.
 #' @param trait.positive Value in \code{target_var} representing the positive class.
-#' @param time_var Character. Name of the survival time variable (required for survival tasks).
-#' @param event_var Character. Name of the event indicator (1 = event occurred, 0 = censored) for survival tasks.
+#' @param time_var Numeric vector. Survival/follow-up time of each sample (required for survival tasks).
+#' @param event_var Numeric vector. Event indicator of each sample (1 = event occurred, 0 = censored; required for
+#'   survival tasks).
 #' @param metric Character. Performance metric for model selection and tuning (classification):
 #'   \itemize{
 #'     \item \code{"AUROC"} - area under the ROC curve (used when \code{NULL})
@@ -1084,12 +1085,15 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #'   Survival models are always selected by the concordance index (C-index); \code{metric} is ignored.
 #' @param k_folds Integer. Number of folds for cross-validation. Default: 10.
 #' @param n_rep Integer. Number of repetitions for repeated CV. Default: 5.
-#' @param LODO Logical. If \code{TRUE}, constructs folds stratified by cohort (LODO scheme).
-#' @param batch_var Character. Batch membership for each sample. Required if \code{LODO = TRUE}.
+#' @param LODO Logical. If \code{TRUE}, the cross-validation folds are stratified by cohort and outcome, for
+#'   Leave-One-Dataset-Out analyses (train on some cohorts, test on a left-out one). The cohort is not used as
+#'   a predictor.
+#' @param batch_var Vector. Cohort/batch of each sample. Required if \code{LODO = TRUE}.
 #' @param file_name Character. File name prefix used to save performance plots in \code{"Results/"}.
 #' @param ncores Integer. Number of CPU cores for parallelization (cross-validation folds are processed in parallel).
 #'   Default: \code{NULL} (sequential).
-#' @param return Logical. Whether to return the trained models and plots. Default: \code{FALSE}.
+#' @param return Logical. Whether to save the cross-validation performance plots in \code{"Results/"}.
+#'   Default: \code{FALSE}.
 #' @param fold_construction_fun Function. Optional user-defined function for fold construction. It is called with
 #'   \code{data} (the training features plus the outcome: a \code{target} column coded \code{"no"}/\code{"yes"} for
 #'   classification, \code{time} and \code{event} columns for survival), \code{folds} and \code{bestune}. It must
@@ -1115,25 +1119,62 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #'   workers is not covered: seed those workers inside that function.
 #'
 #' @details
-#' The function provides:
-#' \itemize{
-#'   \item Automatic feature preprocessing (e.g., correlation filtering, low-variance removal)
-#'   \item Parallelized cross-validation across folds and repetitions
-#'   \item Integration with custom model pipelines (e.g., CellTFusion, pathway-based deconvolution)
-#'   \item Unified handling of both survival and classification models
+#' Classification trains and tunes 11 algorithms with \pkg{caret} (\code{treebag}, \code{rf}, \code{C5.0},
+#' \code{glmnet}, lasso, ridge, \code{knn}, \code{rpart}, \code{svmRadial}, \code{svmLinear}, \code{xgbTree}).
+#' Survival trains and tunes 6 models with \pkg{parsnip} and \pkg{censored} (Cox PH, elastic-net Cox,
+#' parametric AFT, conditional inference tree, bagged CART, oblique random survival forest). The best model is
+#' selected by the cross-validation \code{metric} (classification) or C-index (survival), and trained on all
+#' training samples with its tuned hyperparameters.
+#'
+#' When \code{fold_construction_fun} is provided, the features of each fold are built by that function, and
+#' near-constant, highly correlated (|r| > 0.9) and, for classification, class-constant features are removed
+#' from the features built on each training part. The final model is trained on the features the function
+#' builds on all training samples. See \code{vignette("a5_custom_folds", package = "pipeML")}.
+#'
+#' @return A named list, or \code{NULL} if no model could be trained:
+#' \describe{
+#'   \item{Model}{The selected model, trained on all training samples. Classification: a caret \code{train}
+#'     object (tuned hyperparameters in \code{$bestTune}, performance per resample in \code{$resample}).
+#'     Survival: a list with the model name (\code{$model}), the fitted workflow (\code{$Model_object}), the
+#'     tuned hyperparameters (\code{$bestTune}), the C-index per resample (\code{$Resample_matrix}) and the
+#'     training data (\code{$trainingData}).}
+#'   \item{ML_Models}{All trained models.}
+#'   \item{AUROC_median, AUPRC_median}{Classification: median and MAD of the cross-validation AUROC and AUPRC
+#'     of each model.}
+#'   \item{C_index_median}{Survival: median cross-validation C-index of the selected model.}
+#'   \item{Custom_output}{Only with \code{fold_construction_fun}: the custom output returned by that function
+#'     on all training samples, and the selected feature parameters in \code{$Parameters}.}
 #' }
 #'
-#' When a custom fold constructor is provided, default k-fold logic is bypassed, and
-#' results are computed using the pre-generated folds.
+#' @examples
+#' \dontrun{
+#' # --- Classification ---
+#' data(data_example_classification)
+#' X <- data_example_classification[, setdiff(colnames(data_example_classification), "target")]
+#' res <- compute_features.training.ML(features_train = X,
+#'                                     target_var = data_example_classification$target,
+#'                                     task_type = "classification",
+#'                                     trait.positive = "1",
+#'                                     metric = "AUROC",
+#'                                     k_folds = 5,
+#'                                     n_rep = 2,
+#'                                     ncores = 2)
+#' res$Model
+#' res$AUROC_median
 #'
-#' @return A list containing:
-#' \itemize{
-#'   \item Trained model(s)
-#'   \item Features used for training
-#'   \item Cross-validation performance results and plots
-#'   \item Best hyperparameter configuration (if applicable)
+#' # --- Survival ---
+#' data(data_example_survival)
+#' X <- data_example_survival[, setdiff(colnames(data_example_survival), c("time", "status"))]
+#' res_survival <- compute_features.training.ML(features_train = X,
+#'                                              task_type = "survival",
+#'                                              time_var = data_example_survival$time,
+#'                                              event_var = data_example_survival$status,
+#'                                              k_folds = 5,
+#'                                              n_rep = 2,
+#'                                              ncores = 2)
+#' res_survival$Model$model
+#' res_survival$C_index_median
 #' }
-#'
 #'
 #' @export
 compute_features.training.ML = function(features_train, task_type = c("classification", "survival"), target_var = NULL, trait.positive = NULL,
@@ -1261,12 +1302,12 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #' @param coldata A data frame containing outcome information. Row names must match
 #'   those of \code{features_train} and \code{features_test}.
 #' @param task_type Character. Type of task: \code{"classification"} or \code{"survival"}.
-#' @param trait Character. Column name in \code{clinical} used as the target variable
+#' @param trait Character. Column name in \code{coldata} used as the target variable
 #'   (required for classification tasks).
 #' @param trait.positive Value in \code{trait} that represents the positive class (classification only).
 #'   Ensures all performance metrics and interpretability analyses consistently treat the correct class as positive.
-#' @param time_var Character. Column name in \code{clinical} containing survival/follow-up time (required for survival tasks).
-#' @param event_var Character. Column name in \code{clinical} indicating event occurrence
+#' @param time_var Character. Column name in \code{coldata} containing survival/follow-up time (required for survival tasks).
+#' @param event_var Character. Column name in \code{coldata} indicating event occurrence
 #'   (1 = event occurred, 0 = censored; required for survival tasks).
 #' @param metric Character. Performance metric used for model tuning and selection:
 #'   \itemize{
@@ -1275,8 +1316,10 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #'   }
 #' @param k_folds Integer. Number of folds for cross-validation. Default: 10.
 #' @param n_rep Integer. Number of repetitions for cross-validation. Default: 5.
-#' @param LODO Logical. If \code{TRUE}, performs Leave-One-Dataset-Out cross-validation based on cohorts.
-#' @param batch_id Column name indicating cohort or batch membership for each sample (required if \code{LODO = TRUE}).
+#' @param LODO Logical. If \code{TRUE}, the cross-validation folds are stratified by cohort and outcome (see
+#'   \code{compute_features.training.ML()}).
+#' @param batch_id Character. Column name in \code{coldata} with the cohort/batch of each sample (required if
+#'   \code{LODO = TRUE}). The cross-validation folds are then stratified by cohort and outcome.
 #' @param file_name Character. Base name used to save plots/results under \code{Results/}. For survival tasks,
 #'   Kaplan-Meier plots are saved as \code{"Results/Survival_KM_<file_name>.pdf"}.
 #' @param ncores Integer. Number of CPU cores for parallelization (cross-validation folds are processed in parallel).
@@ -1287,7 +1330,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #'   this function (e.g. the test samples projected onto the structure learned on the training samples).
 #' @param fold_construction_args_fixed List. Fixed arguments passed to \code{fold_construction_fun} for both CV and final training.
 #' @param fold_construction_args_tunable List. Arguments passed to \code{fold_construction_fun} defining hyperparameters to explore during CV.
-#' @param return Logical. Whether to return and save plots/results. Default: \code{FALSE}.
+#' @param return Logical. Whether to save the plots in \code{Results/}. Default: \code{FALSE}.
 #' @param seed Integer. Random seed for reproducible cross-validation (fold assignment and model fitting,
 #'   including parallel runs). Default: \code{123}. Use \code{NULL} to leave the random number generator
 #'   untouched. See \code{compute_features.training.ML()} for details.
@@ -1297,50 +1340,55 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #' with hyperparameter tuning, followed by evaluation on the test set. ROC and PR curves are generated.
 #'
 #' For **survival tasks**, it performs model selection using the C-index, refits the best model
-#' on the full training data, evaluates test-set C-index, and plots Kaplan-Meier curves across
-#' quantile-based risk strata (Low/Medium/High). The C-index and log-rank test p-value are displayed.
+#' on the full training data and evaluates the C-index on the test set. With \code{return = TRUE}, Kaplan-Meier
+#' curves of the test samples split at the median predicted risk are saved, with the C-index and log-rank test
+#' p-value.
 #'
-#' @return A named list containing:
+#' @return A named list, or \code{NULL} if no model could be trained (classification):
 #' \describe{
-#'   \item{Model}{Trained model or workflow (classification) or refitted best model (survival).}
-#'   \item{Metrics}{Performance metrics computed on the test data.}
-#'   \item{AUC}{For classification tasks, a list containing AUROC and AUPRC values.}
-#'   \item{Prediction}{Predicted class probabilities (classification) or risk scores (survival).}
-#'   \item{Curve_bands}{Pointwise 95% bootstrap bands around the ROC and precision-recall curves (classification only; see \code{compute_prediction()}).}
-#'   \item{CV_Results}{Cross-validation results, including median and MAD of C-index for survival tasks.}
-#'   \item{Test_CINDEX}{Concordance index on test data (survival only).}
-#'   \item{KM_Plot}{Kaplan-Meier plot object (if \code{return = TRUE}).}
+#'   \item{Model}{The output of \code{compute_features.training.ML()} on the training set (the selected model
+#'     is \code{$Model$Model}).}
+#'   \item{AUC}{Classification: AUROC and AUPRC on the test set, with bootstrap confidence intervals (see
+#'     \code{compute_prediction()}).}
+#'   \item{Metrics}{Classification: threshold-based performance metrics on the test set.}
+#'   \item{Prediction}{Predicted class probabilities (classification) or risk scores (survival) of the test samples.}
+#'   \item{Curve_bands}{Classification: pointwise 95% bootstrap bands around the ROC and precision-recall curves.}
+#'   \item{C_index}{Survival: C-index on the test set.}
 #' }
 #'
 #' @examples
 #' \dontrun{
-#' # --- Classification Example ---
-#' results_classif <- compute_features.ML(
-#'   features_train = X_train,
-#'   features_test  = X_test,
-#'   coldata        = clin_df,
-#'   task_type      = "classification",
-#'   trait          = "Response",
-#'   trait.positive = "Responder",
-#'   k_folds        = 5,
-#'   n_rep          = 1,
-#'   file_name      = "classification_example",
-#'   return         = TRUE
-#' )
+#' # --- Classification ---
+#' data(data_example_classification)
+#' X <- data_example_classification[, setdiff(colnames(data_example_classification), "target")]
+#' set.seed(123)
+#' train_idx <- caret::createDataPartition(data_example_classification$target, p = 0.7, list = FALSE)
+#' res <- compute_features.ML(features_train = X[train_idx, ],
+#'                            features_test = X[-train_idx, ],
+#'                            coldata = data_example_classification,
+#'                            task_type = "classification",
+#'                            trait = "target",
+#'                            trait.positive = "1",
+#'                            k_folds = 5,
+#'                            n_rep = 2,
+#'                            ncores = 2)
+#' res$AUC
 #'
-#' # --- Survival Example ---
-#' results_surv <- compute_features.ML(
-#'   features_train = X_train,
-#'   features_test  = X_test,
-#'   coldata        = clin_df,
-#'   task_type      = "survival",
-#'   time_var       = "time",
-#'   event_var      = "status",
-#'   k_folds        = 5,
-#'   n_rep          = 1,
-#'   file_name      = "cox_survival_example",
-#'   return         = TRUE
-#' )
+#' # --- Survival ---
+#' data(data_example_survival)
+#' X <- data_example_survival[, setdiff(colnames(data_example_survival), c("time", "status"))]
+#' set.seed(123)
+#' train_idx <- caret::createDataPartition(data_example_survival$status, p = 0.7, list = FALSE)
+#' res_survival <- compute_features.ML(features_train = X[train_idx, ],
+#'                                     features_test = X[-train_idx, ],
+#'                                     coldata = data_example_survival,
+#'                                     task_type = "survival",
+#'                                     time_var = "time",
+#'                                     event_var = "status",
+#'                                     k_folds = 5,
+#'                                     n_rep = 2,
+#'                                     ncores = 2)
+#' res_survival$C_index
 #' }
 #'
 #' @export
@@ -1839,50 +1887,70 @@ calculate_auprc <- function(recall, precision) {
 
 #' Compute Prediction Metrics for a Trained Machine Learning Model
 #'
-#' Computes prediction metrics for a trained machine learning model, including the confusion matrix,
-#' AUROC, AUPRC, Accuracy, Sensitivity, Specificity, Precision, Recall, F1 score, and MCC. For
-#' classification tasks, it also determines the optimal classification threshold and generates
-#' ROC, PRC, and confusion matrix plots. For survival analysis tasks, it predicts risk scores and
-#' optionally generates Kaplan-Meier plots.
+#' Applies a trained model to a test set and evaluates it. For classification, it computes AUROC and AUPRC
+#' with bootstrap confidence intervals, and Accuracy, Sensitivity, Specificity, Precision, Recall, F1 score and
+#' MCC at each probability threshold. For survival, it predicts risk scores and computes the C-index.
 #'
-#' @param model The trained machine learning model returned from \code{compute_features.ML()} or
-#'   \code{compute_features.training.ML()}.
+#' @param model The trained model returned as \code{$Model} by \code{compute_features.training.ML()}
+#'   (e.g. \code{res$Model}).
 #' @param test_data A data frame or matrix of predictor variables for the test set.
 #' @param target_var Vector of true labels for the test set (classification only).
 #' @param trait.positive Value in \code{target_var} representing the positive class (classification only).
 #' @param task_type Character. Either \code{"classification"} or \code{"survival"}.
 #' @param time_var Column or vector of survival/follow-up times (required for survival tasks).
 #' @param event_var Column or vector of event indicators (1 = event, 0 = censored; required for survival tasks).
-#' @param file.name Character. Filename prefix for saving plots (optional). If NULL, plots are not saved.
-#' @param return Logical. Whether to return metrics, predictions, and plots. Default = FALSE.
+#' @param file.name Character. File name prefix of the plots saved in \code{Results/}.
+#' @param return Logical. Whether to save the plots in \code{Results/} (ROC and precision-recall curves for
+#'   classification, Kaplan-Meier curves by predicted risk group for survival). Default = FALSE.
 #'
-#' @return A list containing:
+#' @return For classification, a list containing:
 #' \describe{
 #'   \item{\code{Metrics}}{Data frame of performance metrics (Accuracy, Sensitivity, Specificity,
-#'                         Precision, Recall, F1 score, MCC) for each threshold (classification only).}
-#'   \item{\code{AUC}}{List containing AUROC and AUPRC values with optional bootstrap confidence intervals (classification only).}
-#'   \item{\code{Predictions}}{Data frame of predicted probabilities for each class (classification) or risk scores (survival).}
+#'                         Precision, Recall, F1 score, MCC) for each threshold.}
+#'   \item{\code{AUC}}{List with \code{AUROC} and \code{AUPRC}, each a list with the \code{estimate} on the
+#'     test set and the \code{lower} and \code{upper} bounds of its 95% bootstrap confidence interval.}
+#'   \item{\code{Predictions}}{Data frame of predicted probabilities for each class.}
 #'   \item{\code{Curve_bands}}{List with \code{ROC} (columns \code{fpr}, \code{lower}, \code{upper}) and
 #'     \code{PRC} (columns \code{recall}, \code{lower}, \code{upper}): pointwise 95% bootstrap bands
-#'     around the ROC and precision-recall curves (classification only).}
+#'     around the ROC and precision-recall curves.}
+#' }
+#' For survival, a list containing:
+#' \describe{
+#'   \item{\code{preds}}{Predicted risk scores (higher values mean higher risk).}
+#'   \item{\code{c_index}, \code{c_index_lower}, \code{c_index_upper}}{C-index on the test set and its 95%
+#'     confidence interval.}
 #' }
 #'
 #' @details
-#' For **classification**, the function:
-#' \enumerate{
-#'   \item Uses the trained model to predict probabilities for the test data.
-#'   \item Computes performance metrics across thresholds and selects the optimal threshold based on a chosen metric.
-#'   \item Calculates AUROC and AUPRC and optionally bootstrapped confidence intervals.
-#'   \item Generates ROC, PRC, and confusion matrix plots if \code{return = TRUE} and \code{file.name} is provided.
-#' }
+#' Confidence intervals of AUROC and AUPRC come from 1000 bootstrap resamples of the test samples.
 #'
-#' For **survival analysis**, the function:
-#' \enumerate{
-#'   \item Predicts risk scores using the trained survival model.
-#'   \item Optionally generates Kaplan-Meier plots stratified by predicted risk groups.
-#' }
+#' Survival models can predict a risk score, a survival time or a survival probability. The last two are
+#' reversed, so that higher predictions always mean higher risk.
 #'
-#' @seealso \code{\link[caret]{confusionMatrix}}, \code{\link[caret]{varImp}}, \code{\link[ggplot2]{ggplot}}
+#' @seealso \code{\link{get_curves}}, \code{\link{plot_survival_performance}}
+#'
+#' @examples
+#' \dontrun{
+#' data(data_example_classification)
+#' X <- data_example_classification[, setdiff(colnames(data_example_classification), "target")]
+#' y <- data_example_classification$target
+#' set.seed(123)
+#' train_idx <- caret::createDataPartition(y, p = 0.7, list = FALSE)
+#'
+#' res <- compute_features.training.ML(features_train = X[train_idx, ],
+#'                                     target_var = y[train_idx],
+#'                                     task_type = "classification",
+#'                                     trait.positive = "1",
+#'                                     k_folds = 5,
+#'                                     n_rep = 2)
+#'
+#' pred <- compute_prediction(model = res$Model,
+#'                            test_data = X[-train_idx, ],
+#'                            target_var = y[-train_idx],
+#'                            task_type = "classification",
+#'                            trait.positive = "1")
+#' pred$AUC
+#' }
 #'
 #' @import caret
 #' @import dplyr
@@ -2137,6 +2205,18 @@ calculate_recall <- function(metrics, target) {
 #'
 #' @return Saves two PDF plots: one for the ROC curve and one for the Precision-Recall curve
 #'         in the "Results/" directory.
+#'
+#' @examples
+#' \dontrun{
+#' # pred: output of compute_prediction() (classification)
+#' get_curves(data = pred$Metrics,
+#'            color = "model",
+#'            auc_roc = pred$AUC$AUROC,
+#'            auc_prc = pred$AUC$AUPRC,
+#'            roc_band = pred$Curve_bands$ROC,
+#'            prc_band = pred$Curve_bands$PRC,
+#'            file.name = "Example")
+#' }
 #' @export
 #'
 get_curves = function(data, spec = "Specificity", sens = "Sensitivity", reca = "Recall", prec = "Precision", color, auc_roc, auc_prc, LODO = FALSE, file.name, width = 6, height = 6,
@@ -2570,6 +2650,24 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
 #' importance to features that help fit the training samples but do not generalize: compare the training
 #' performance with the cross-validation performance before interpreting them.
 #'
+#' @examples
+#' \dontrun{
+#' data(data_example_classification)
+#' X <- data_example_classification[, setdiff(colnames(data_example_classification), "target")]
+#' res <- compute_features.training.ML(features_train = X,
+#'                                     target_var = data_example_classification$target,
+#'                                     task_type = "classification",
+#'                                     trait.positive = "1",
+#'                                     k_folds = 5,
+#'                                     n_rep = 2)
+#'
+#' shap <- compute_shap_values(res$Model, task_type = "classification")
+#' head(shap)
+#'
+#' # Global importance: mean absolute SHAP value of each feature
+#' sort(colMeans(abs(shap)), decreasing = TRUE)
+#' }
+#'
 #' @import dplyr
 #' @import caret
 #' @export
@@ -2722,6 +2820,101 @@ ensure_caret <- function() {
     suppressPackageStartupMessages(attachNamespace("caret"))
   }
   invisible(TRUE)
+}
+
+#' caret model definition for xgbTree compatible with xgboost >= 3
+#'
+#' Internal helper returning a copy of caret's \code{"xgbTree"} model definition that works with every
+#' xgboost version. Since xgboost 3, a booster is an ALTREP object to which caret cannot add fields
+#' (\code{modelFit$xNames <- ...} fails with "ALTLIST classes must provide a Set_elt method"), passing
+#' \code{objective} outside \code{params} is deprecated and \code{ntreelimit} was removed. Here the booster
+#' is stored in \code{modelFit$booster}, the objective goes in \code{params} and sub-models are predicted with
+#' \code{iterationrange}.
+#'
+#' @return A caret model definition (list) to pass as \code{method} to \code{caret::train()}.
+#'
+#' @keywords internal
+xgbtree_model <- function() {
+  model <- caret::getModelInfo("xgbTree", regex = FALSE)[["xgbTree"]]
+
+  model$fit <- function(x, y, wts, param, lev, last, classProbs, ...) {
+    x <- as.matrix(x)
+    params <- list(eta = param$eta, max_depth = param$max_depth, gamma = param$gamma,
+                   colsample_bytree = param$colsample_bytree, min_child_weight = param$min_child_weight,
+                   subsample = param$subsample)
+    if (is.factor(y)) {
+      if (length(lev) == 2) {
+        y <- ifelse(y == lev[1], 1, 0)
+        params$objective <- "binary:logistic"
+      } else {
+        y <- as.numeric(y) - 1
+        params$objective <- "multi:softprob"
+        params$num_class <- length(lev)
+      }
+    } else {
+      params$objective <- "reg:squarederror"
+    }
+    dtrain <- xgboost::xgb.DMatrix(x, label = y, missing = NA)
+    if (!is.null(wts)) xgboost::setinfo(dtrain, "weight", wts)
+    list(booster = xgboost::xgb.train(params = params, data = dtrain, nrounds = param$nrounds, ...))
+  }
+
+  # Raw predictions of the first n_trees rounds (all rounds when NULL)
+  booster_predict <- function(modelFit, newdata, n_trees = NULL) {
+    newdata <- xgboost::xgb.DMatrix(as.matrix(newdata), missing = NA)
+    if (is.null(n_trees)) stats::predict(modelFit$booster, newdata)
+    else stats::predict(modelFit$booster, newdata, iterationrange = c(1, n_trees + 1))
+  }
+
+  as_class <- function(modelFit, p) {
+    if (modelFit$problemType != "Classification") return(p)
+    lev <- modelFit$obsLevels
+    if (length(lev) == 2) return(ifelse(p >= 0.5, lev[1], lev[2]))
+    lev[apply(matrix(p, ncol = length(lev), byrow = TRUE), 1, which.max)]
+  }
+
+  as_prob <- function(modelFit, p) {
+    lev <- modelFit$obsLevels
+    p <- if (length(lev) == 2) cbind(p, 1 - p) else matrix(p, ncol = length(lev), byrow = TRUE)
+    colnames(p) <- lev
+    as.data.frame(p, stringsAsFactors = TRUE)
+  }
+
+  with_submodels <- function(modelFit, newdata, submodels, transform) {
+    out <- transform(modelFit, booster_predict(modelFit, newdata))
+    if (is.null(submodels)) return(out)
+    c(list(out), lapply(submodels$nrounds, function(n) transform(modelFit, booster_predict(modelFit, newdata, n))))
+  }
+
+  model$predict <- function(modelFit, newdata, submodels = NULL) with_submodels(modelFit, newdata, submodels, as_class)
+  model$prob <- function(modelFit, newdata, submodels = NULL) with_submodels(modelFit, newdata, submodels, as_prob)
+
+  model$varImp <- function(object, numTrees = NULL, ...) {
+    imp <- as.data.frame(xgboost::xgb.importance(feature_names = object$xNames, model = object$booster))
+    overall <- stats::setNames(rep(0, length(object$xNames)), object$xNames)
+    overall[as.character(imp$Feature)] <- imp$Gain
+    data.frame(Overall = overall, row.names = names(overall))
+  }
+
+  model
+}
+
+#' Train a caret model, with pipeML's xgbTree definition
+#'
+#' Internal wrapper around \code{caret::train()} that replaces \code{method = "xgbTree"} with
+#' \code{xgbtree_model()} and keeps \code{"xgbTree"} as the \code{method} of the returned object.
+#'
+#' @param ... Arguments passed to \code{caret::train()}.
+#' @param method Character. caret method name.
+#'
+#' @return A caret \code{train} object.
+#'
+#' @keywords internal
+caret_train <- function(..., method) {
+  if (!identical(method, "xgbTree")) return(caret::train(..., method = method))
+  fit <- caret::train(..., method = xgbtree_model())
+  fit$method <- "xgbTree"
+  fit
 }
 
 #' Preprocess Features for Machine Learning
@@ -2931,7 +3124,7 @@ wrapper_train_best_hyperparams_classification <- function(train_data, optimized,
   }
 
   # Retrain ML model with tuned ML hyperparams
-  fit <- caret::train(
+  fit <- caret_train(
     target ~ .,
     data = training_set,
     method = ml_method,
@@ -4540,15 +4733,18 @@ compute_cv_CINDEX <- function(models, file_name = NULL, plot_results = TRUE){
   return(list(CINDEX_summary = summary_cindex, All_folds = res_cindex, Top_model = top_model))
 }
 
-#' Plot and Save Survival Performance of a Model (Internal)
+#' Plot Kaplan-Meier Curves by Predicted Risk Group
 #'
 #' Stratifies individuals into risk groups based on predicted risk scores from
 #' a fitted survival model, plots Kaplan-Meier survival curves per risk group,
 #' performs a log-rank test, and displays the concordance index (C-index) with
 #' confidence interval. Optionally saves the plot as a PDF in "Results/".
 #'
-#' @param df_test Data frame containing observed survival, event indicator and predicted risk score.
-#' @param prediction List containing prediction results
+#' @param df_test Data frame with the observed outcome of the test samples, in columns \code{time} and
+#'   \code{event} (1 = event, 0 = censored), in the order of the predictions.
+#' @param prediction The output of \code{compute_prediction()} with \code{task_type = "survival"} (risk scores
+#'   in \code{$preds}, C-index and its confidence interval in \code{$c_index}, \code{$c_index_lower} and
+#'   \code{$c_index_upper}).
 #' @param n_groups Integer. Number of risk groups for stratification (default = 3).
 #' @param file_name Optional character. If provided, saves the Kaplan-Meier plot
 #'   to "Results/Survival_KM_<file_name>.pdf".
@@ -4560,6 +4756,21 @@ compute_cv_CINDEX <- function(models, file_name = NULL, plot_results = TRUE){
 #' plot subtitle.
 #'
 #' @return Invisibly returns the \code{ggsurvplot} object for further customization.
+#'
+#' @examples
+#' \dontrun{
+#' # res_survival: output of compute_features.training.ML(task_type = "survival")
+#' pred <- compute_prediction(model = res_survival$Model,
+#'                            test_data = X_test,
+#'                            task_type = "survival",
+#'                            time_var = time_test,
+#'                            event_var = event_test)
+#'
+#' plot_survival_performance(df_test = data.frame(time = time_test, event = event_test),
+#'                           prediction = pred,
+#'                           n_groups = 3,
+#'                           file_name = "Example")
+#' }
 #'
 #' @export
 plot_survival_performance <- function(df_test,

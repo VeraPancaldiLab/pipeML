@@ -28,7 +28,7 @@ pak::pkg_install("VeraPancaldiLab/pipeML")
 `pipeML` is a flexible and leakage-aware machine learning framework for
 R designed for predictive modeling in high-dimensional biological data.
 The package integrates all key steps of the machine learning workflow —
-feature selection, model training, validation, prediction, and
+feature filtering, model training, validation, prediction, and
 interpretation — into a single reproducible pipeline.
 
 A key design goal of `pipeML` is to support fold-aware feature
@@ -47,6 +47,7 @@ machine learning applications.
 <img src="man/figures/pipeML.svg?raw=true"/>
 
 </p>
+
 <p align="center">
 
 <i> Figure 1. General structure of the `pipeML` machine learning
@@ -58,7 +59,7 @@ pipeline. </i>
 
 ### End-to-end ML workflow
 
-- Integrated pipeline for feature selection, model training, validation,
+- Integrated pipeline for feature filtering, model training, validation,
   prediction, and interpretation
 
 ### Leakage-aware validation
@@ -73,9 +74,10 @@ pipeline. </i>
 - Leave-one-dataset-out (LODO) evaluation for cross-cohort
   generalization
 
-### Feature selection
+### Feature filtering
 
-- Optional correlation-based feature filtering
+- Near-constant and highly correlated features built by custom fold
+  functions are removed inside each fold
 
 ### Hyperparameter tuning
 
@@ -87,9 +89,10 @@ pipeline. </i>
 
 ### Model interpretation
 
-- SHAP-based feature importance
-- Variable importance summaries
-- Performance visualization (ROC and PR curves)
+- SHAP values of the selected model, per sample and as global feature
+  importance
+- Performance visualization (ROC and PR curves with bootstrap confidence
+  bands, Kaplan-Meier curves by predicted risk group)
 
 ### Parallel computing
 
@@ -98,8 +101,10 @@ pipeline. </i>
 ### Custom workflows
 
 - Users can define custom fold construction functions
-- These functions can receive a bestTune argument after hyperparameter
-  optimization to retrain models on the full training dataset.
+- The parameters of the feature construction can be tuned inside the
+  cross-validation, like model hyperparameters
+- These functions receive a `bestune` argument after tuning, to rebuild
+  the features on the full training dataset for the final model
 
 ## Supported Machine Learning Methods
 
@@ -132,18 +137,32 @@ across multiple survival model families.
 - Parametric accelerated failure time (AFT) models
 - Conditional inference survival trees
 - Bagged CART survival models
-- Random survival forests
-- Gradient boosting for censored outcomes
+- Oblique random survival forests
 
 ## General usage
 
-Below are basic examples showing how to use `pipeML`
-
-For a detailed tutorial, see [Get
+Below are basic examples showing how to use `pipeML`. For detailed
+tutorials, see [Get
 started](https://VeraPancaldiLab.github.io/pipeML/articles/pipeML.html)
+and the
+[Articles](https://VeraPancaldiLab.github.io/pipeML/articles/index.html).
+
+Results (plots, fold files of custom workflows) are written to a
+`Results/` folder in the working directory.
 
 ``` r
 library(pipeML)
+
+data <- data_example_classification
+X <- data[, setdiff(colnames(data), "target")]
+y <- data$target
+
+set.seed(123)
+train_idx <- caret::createDataPartition(y, p = 0.7, list = FALSE)
+X_train <- X[train_idx, ]
+X_test <- X[-train_idx, ]
+y_train <- y[train_idx]
+y_test <- y[-train_idx]
 ```
 
 ### Training models
@@ -156,7 +175,7 @@ res <- compute_features.training.ML(features_train = X_train,
                                     metric = "AUROC",
                                     k_folds = 5,
                                     n_rep = 10,
-                                    return = F)
+                                    ncores = 2)
 ```
 
 ### Predicting on new data
@@ -166,8 +185,14 @@ pred = compute_prediction(model = res$Model,
                           test_data = X_test, 
                           target_var = y_test, 
                           task_type = "classification",
-                          trait.positive = "1", 
-                          return = F)
+                          trait.positive = "1")
+pred$AUC
+```
+
+### Explaining the model
+
+``` r
+shap <- compute_shap_values(model_trained = res$Model, task_type = "classification")
 ```
 
 ### Training and Testing Workflow
@@ -202,10 +227,9 @@ is the primary maintainer of this package.
 
 ## Citing pipeML
 
-If you use `pipeML` in a scientific publication, we would appreciate
-citation to the :
+If you use `pipeML` in a scientific publication, please cite:
 
-Hurtado M, Pancaldi V (2026). pipeML: A flexible and modular machine
-learning framework designed to support leakage-free model training
-through custom cross-validation fold construction. R package version
-0.0.1, <https://verapancaldilab.github.io/pipeML>
+> Hurtado, M., & Pancaldi, V. (2026). *A new pipeline for
+> cross-validation fold-aware machine learning prediction of clinical
+> outcomes addresses hidden data-leakage in omics based ‘predictors’.*
+> bioRxiv. <https://doi.org/10.64898/2026.03.12.711429>

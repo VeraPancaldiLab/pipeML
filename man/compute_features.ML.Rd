@@ -38,15 +38,15 @@ those of \code{features_train} and \code{features_test}.}
 
 \item{task_type}{Character. Type of task: \code{"classification"} or \code{"survival"}.}
 
-\item{trait}{Character. Column name in \code{clinical} used as the target variable
+\item{trait}{Character. Column name in \code{coldata} used as the target variable
 (required for classification tasks).}
 
 \item{trait.positive}{Value in \code{trait} that represents the positive class (classification only).
 Ensures all performance metrics and interpretability analyses consistently treat the correct class as positive.}
 
-\item{time_var}{Character. Column name in \code{clinical} containing survival/follow-up time (required for survival tasks).}
+\item{time_var}{Character. Column name in \code{coldata} containing survival/follow-up time (required for survival tasks).}
 
-\item{event_var}{Character. Column name in \code{clinical} indicating event occurrence
+\item{event_var}{Character. Column name in \code{coldata} indicating event occurrence
 (1 = event occurred, 0 = censored; required for survival tasks).}
 
 \item{metric}{Character. Performance metric used for model tuning and selection:
@@ -59,9 +59,11 @@ Ensures all performance metrics and interpretability analyses consistently treat
 
 \item{n_rep}{Integer. Number of repetitions for cross-validation. Default: 5.}
 
-\item{LODO}{Logical. If \code{TRUE}, performs Leave-One-Dataset-Out cross-validation based on cohorts.}
+\item{LODO}{Logical. If \code{TRUE}, the cross-validation folds are stratified by cohort and outcome (see
+\code{compute_features.training.ML()}).}
 
-\item{batch_id}{Column name indicating cohort or batch membership for each sample (required if \code{LODO = TRUE}).}
+\item{batch_id}{Character. Column name in \code{coldata} with the cohort/batch of each sample (required if
+\code{LODO = TRUE}). The cross-validation folds are then stratified by cohort and outcome.}
 
 \item{file_name}{Character. Base name used to save plots/results under \code{Results/}. For survival tasks,
 Kaplan-Meier plots are saved as \code{"Results/Survival_KM_<file_name>.pdf"}.}
@@ -69,7 +71,7 @@ Kaplan-Meier plots are saved as \code{"Results/Survival_KM_<file_name>.pdf"}.}
 \item{ncores}{Integer. Number of CPU cores for parallelization (cross-validation folds are processed in parallel).
 Default: \code{NULL} (sequential).}
 
-\item{return}{Logical. Whether to return and save plots/results. Default: \code{FALSE}.}
+\item{return}{Logical. Whether to save the plots in \code{Results/}. Default: \code{FALSE}.}
 
 \item{fold_construction_fun}{Function. Optional custom function to construct cross-validation folds.
 Must accept a \code{bestune} argument internally to inject optimized hyperparameters. Used for both
@@ -85,16 +87,16 @@ including parallel runs). Default: \code{123}. Use \code{NULL} to leave the rand
 untouched. See \code{compute_features.training.ML()} for details.}
 }
 \value{
-A named list containing:
+A named list, or \code{NULL} if no model could be trained (classification):
 \describe{
-\item{Model}{Trained model or workflow (classification) or refitted best model (survival).}
-\item{Metrics}{Performance metrics computed on the test data.}
-\item{AUC}{For classification tasks, a list containing AUROC and AUPRC values.}
-\item{Prediction}{Predicted class probabilities (classification) or risk scores (survival).}
-\item{Curve_bands}{Pointwise 95\% bootstrap bands around the ROC and precision-recall curves (classification only; see \code{compute_prediction()}).}
-\item{CV_Results}{Cross-validation results, including median and MAD of C-index for survival tasks.}
-\item{Test_CINDEX}{Concordance index on test data (survival only).}
-\item{KM_Plot}{Kaplan-Meier plot object (if \code{return = TRUE}).}
+\item{Model}{The output of \code{compute_features.training.ML()} on the training set (the selected model
+is \code{$Model$Model}).}
+\item{AUC}{Classification: AUROC and AUPRC on the test set, with bootstrap confidence intervals (see
+\code{compute_prediction()}).}
+\item{Metrics}{Classification: threshold-based performance metrics on the test set.}
+\item{Prediction}{Predicted class probabilities (classification) or risk scores (survival) of the test samples.}
+\item{Curve_bands}{Classification: pointwise 95\% bootstrap bands around the ROC and precision-recall curves.}
+\item{C_index}{Survival: C-index on the test set.}
 }
 }
 \description{
@@ -109,38 +111,43 @@ For \strong{classification tasks}, the function performs repeated k-fold cross-v
 with hyperparameter tuning, followed by evaluation on the test set. ROC and PR curves are generated.
 
 For \strong{survival tasks}, it performs model selection using the C-index, refits the best model
-on the full training data, evaluates test-set C-index, and plots Kaplan-Meier curves across
-quantile-based risk strata (Low/Medium/High). The C-index and log-rank test p-value are displayed.
+on the full training data and evaluates the C-index on the test set. With \code{return = TRUE}, Kaplan-Meier
+curves of the test samples split at the median predicted risk are saved, with the C-index and log-rank test
+p-value.
 }
 \examples{
 \dontrun{
-# --- Classification Example ---
-results_classif <- compute_features.ML(
-  features_train = X_train,
-  features_test  = X_test,
-  coldata        = clin_df,
-  task_type      = "classification",
-  trait          = "Response",
-  trait.positive = "Responder",
-  k_folds        = 5,
-  n_rep          = 1,
-  file_name      = "classification_example",
-  return         = TRUE
-)
+# --- Classification ---
+data(data_example_classification)
+X <- data_example_classification[, setdiff(colnames(data_example_classification), "target")]
+set.seed(123)
+train_idx <- caret::createDataPartition(data_example_classification$target, p = 0.7, list = FALSE)
+res <- compute_features.ML(features_train = X[train_idx, ],
+                           features_test = X[-train_idx, ],
+                           coldata = data_example_classification,
+                           task_type = "classification",
+                           trait = "target",
+                           trait.positive = "1",
+                           k_folds = 5,
+                           n_rep = 2,
+                           ncores = 2)
+res$AUC
 
-# --- Survival Example ---
-results_surv <- compute_features.ML(
-  features_train = X_train,
-  features_test  = X_test,
-  coldata        = clin_df,
-  task_type      = "survival",
-  time_var       = "time",
-  event_var      = "status",
-  k_folds        = 5,
-  n_rep          = 1,
-  file_name      = "cox_survival_example",
-  return         = TRUE
-)
+# --- Survival ---
+data(data_example_survival)
+X <- data_example_survival[, setdiff(colnames(data_example_survival), c("time", "status"))]
+set.seed(123)
+train_idx <- caret::createDataPartition(data_example_survival$status, p = 0.7, list = FALSE)
+res_survival <- compute_features.ML(features_train = X[train_idx, ],
+                                    features_test = X[-train_idx, ],
+                                    coldata = data_example_survival,
+                                    task_type = "survival",
+                                    time_var = "time",
+                                    event_var = "status",
+                                    k_folds = 5,
+                                    n_rep = 2,
+                                    ncores = 2)
+res_survival$C_index
 }
 
 }
