@@ -32,7 +32,6 @@ compute_features.training.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = NULL,
   seed = 123
 )
 ```
@@ -57,26 +56,25 @@ compute_features.training.ML(
 
 - time_var:
 
-  Character. Name of the survival time variable (required for survival
-  tasks).
+  Numeric vector. Survival/follow-up time of each sample (required for
+  survival tasks).
 
 - event_var:
 
-  Character. Name of the event indicator (1 = event occurred, 0 =
-  censored) for survival tasks.
+  Numeric vector. Event indicator of each sample (1 = event occurred, 0
+  = censored; required for survival tasks).
 
 - metric:
 
-  Character. Performance metric for model selection and tuning.
-  Supported values:
+  Character. Performance metric for model selection and tuning
+  (classification):
 
-  - `"Accuracy"` - classification accuracy
-
-  - `"AUROC"` - area under the ROC curve
+  - `"AUROC"` - area under the ROC curve (used when `NULL`)
 
   - `"AUPRC"` - area under the precision-recall curve
 
-  - `"C-index"` - concordance index (for survival tasks)
+  Survival models are always selected by the concordance index
+  (C-index); `metric` is ignored.
 
 - k_folds:
 
@@ -88,13 +86,14 @@ compute_features.training.ML(
 
 - LODO:
 
-  Logical. If `TRUE`, constructs folds stratified by cohort (LODO
-  scheme).
+  Logical. If `TRUE`, the cross-validation folds are stratified by
+  cohort and outcome, for Leave-One-Dataset-Out analyses (train on some
+  cohorts, test on a left-out one). The cohort is not used as a
+  predictor.
 
 - batch_var:
 
-  Character. Batch membership for each sample. Required if
-  `LODO = TRUE`.
+  Vector. Cohort/batch of each sample. Required if `LODO = TRUE`.
 
 - file_name:
 
@@ -103,33 +102,38 @@ compute_features.training.ML(
 
 - ncores:
 
-  Integer. Number of CPU cores for parallelization. Default:
-  `parallel::detectCores() - 1`.
+  Integer. Number of CPU cores for parallelization (cross-validation
+  folds are processed in parallel). Default: `NULL` (sequential).
 
 - return:
 
-  Logical. Whether to return the trained models and plots. Default:
-  `FALSE`.
+  Logical. Whether to save the cross-validation performance plots in
+  `"Results/"`. Default: `FALSE`.
 
 - fold_construction_fun:
 
-  Function. Optional user-defined function for fold construction. Must
-  accept a `bestune` argument:
+  Function. Optional user-defined function for fold construction. It is
+  called with `data` (the training features plus the outcome: a `target`
+  column coded `"no"`/`"yes"` for classification, `time` and `event`
+  columns for survival), `folds` and `bestune`. It must remove the
+  outcome columns before building features. Must accept a `bestune`
+  argument:
 
   - `bestune = NULL` - explore parameter grid across folds (parallelized
     via `foreach`).
 
   - `bestune provided` - rebuild features on the full dataset using
-    optimized parameters.
+    optimized parameters, and return a list with the features plus the
+    outcome columns, any custom output, and `bestune`.
 
   The function should save individual folds as `"Results/fold_*.rds"`
   with:
 
-  - `train_data` - training data
+  - `train_data` - training features plus the outcome columns
 
-  - `test_data` - testing data
+  - `test_data` - test features (plus `time` and `event` for survival)
 
-  - `obs_test` - observed outcomes
+  - `obs_test` - observed outcomes (classification)
 
   - `params` - parameters used (if applicable)
 
@@ -143,15 +147,6 @@ compute_features.training.ML(
   List of arguments passed to `fold_construction_fun` for hyperparameter
   tuning.
 
-- fold_models_dir:
-
-  Character. Directory where per-fold models are saved/read from when
-  `fold_construction_fun` is used. If `NULL` (default), uses
-  `"Results/fold_models/<task_type>"` so classification and survival
-  runs never share (or prune) each other's files. Use a distinct
-  directory per analysis when running several analyses of the same task
-  type from one folder.
-
 - seed:
 
   Integer. Random seed for reproducible cross-validation: it fixes the
@@ -164,15 +159,35 @@ compute_features.training.ML(
 
 ## Value
 
-A list containing:
+A named list, or `NULL` if no model could be trained:
 
-- Trained model(s)
+- Model:
 
-- Features used for training
+  The selected model, trained on all training samples. Classification: a
+  caret `train` object (tuned hyperparameters in `$bestTune`,
+  performance per resample in `$resample`). Survival: a list with the
+  model name (`$model`), the fitted workflow (`$Model_object`), the
+  tuned hyperparameters (`$bestTune`), the C-index per resample
+  (`$Resample_matrix`) and the training data (`$trainingData`).
 
-- Cross-validation performance results and plots
+- ML_Models:
 
-- Best hyperparameter configuration (if applicable)
+  All trained models.
+
+- AUROC_median, AUPRC_median:
+
+  Classification: median and MAD of the cross-validation AUROC and AUPRC
+  of each model.
+
+- C_index_median:
+
+  Survival: median cross-validation C-index of the selected model.
+
+- Custom_output:
+
+  Only with `fold_construction_fun`: the custom output returned by that
+  function on all training samples, and the selected feature parameters
+  in `$Parameters`.
 
 ## Details
 
@@ -180,17 +195,51 @@ The function supports both classification and survival analysis
 pipelines via `task_type = "classification"` or
 `task_type = "survival"`.
 
-The function provides:
+Classification trains and tunes 11 algorithms with caret (`treebag`,
+`rf`, `C5.0`, `glmnet`, lasso, ridge, `knn`, `rpart`, `svmRadial`,
+`svmLinear`, `xgbTree`). Survival trains and tunes 6 models with parsnip
+and censored (Cox PH, elastic-net Cox, parametric AFT, conditional
+inference tree, bagged CART, oblique random survival forest). The best
+model is selected by the cross-validation `metric` (classification) or
+C-index (survival), and trained on all training samples with its tuned
+hyperparameters.
 
-- Automatic feature preprocessing (e.g., correlation filtering,
-  low-variance removal)
+When `fold_construction_fun` is provided, the features of each fold are
+built by that function, and near-constant, highly correlated (\|r\| \>
+0.9) and, for classification, class-constant features are removed from
+the features built on each training part. The final model is trained on
+the features the function builds on all training samples. See
+[`vignette("a5_custom_folds", package = "pipeML")`](https://verapancaldilab.github.io/pipeML/articles/a5_custom_folds.md).
 
-- Parallelized cross-validation across folds and repetitions
+## Examples
 
-- Integration with custom model pipelines (e.g., CellTFusion,
-  pathway-based deconvolution)
+``` r
+if (FALSE) { # \dontrun{
+# --- Classification ---
+data(data_example_classification)
+X <- data_example_classification[, setdiff(colnames(data_example_classification), "target")]
+res <- compute_features.training.ML(features_train = X,
+                                    target_var = data_example_classification$target,
+                                    task_type = "classification",
+                                    trait.positive = "1",
+                                    metric = "AUROC",
+                                    k_folds = 5,
+                                    n_rep = 2,
+                                    ncores = 2)
+res$Model
+res$AUROC_median
 
-- Unified handling of both survival and classification models
-
-When a custom fold constructor is provided, default k-fold logic is
-bypassed, and results are computed using the pre-generated folds.
+# --- Survival ---
+data(data_example_survival)
+X <- data_example_survival[, setdiff(colnames(data_example_survival), c("time", "status"))]
+res_survival <- compute_features.training.ML(features_train = X,
+                                             task_type = "survival",
+                                             time_var = data_example_survival$time,
+                                             event_var = data_example_survival$status,
+                                             k_folds = 5,
+                                             n_rep = 2,
+                                             ncores = 2)
+res_survival$Model$model
+res_survival$C_index_median
+} # }
+```

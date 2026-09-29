@@ -22,8 +22,7 @@ calculate_cv_metrics(ml_model, metric, hyperparameters = NULL)
 - metric:
 
   Character string specifying the metric to optimize when selecting
-  hyperparameters. Typical values are `"AUROC"`, `"AUPRC"`, or
-  `"Accuracy"`.
+  hyperparameters. Either `"AUROC"` or `"AUPRC"`.
 
 - hyperparameters:
 

@@ -20,7 +20,7 @@ compute_features.ML(
   trait.positive = NULL,
   time_var = NULL,
   event_var = NULL,
-  metric = "Accuracy",
+  metric = "AUROC",
   k_folds = 10,
   n_rep = 5,
   LODO = FALSE,
@@ -31,7 +31,6 @@ compute_features.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = NULL,
   seed = 123
 )
 ```
@@ -58,7 +57,7 @@ compute_features.ML(
 
 - trait:
 
-  Character. Column name in `clinical` used as the target variable
+  Character. Column name in `coldata` used as the target variable
   (required for classification tasks).
 
 - trait.positive:
@@ -69,19 +68,19 @@ compute_features.ML(
 
 - time_var:
 
-  Character. Column name in `clinical` containing survival/follow-up
-  time (required for survival tasks).
+  Character. Column name in `coldata` containing survival/follow-up time
+  (required for survival tasks).
 
 - event_var:
 
-  Character. Column name in `clinical` indicating event occurrence (1 =
+  Character. Column name in `coldata` indicating event occurrence (1 =
   event occurred, 0 = censored; required for survival tasks).
 
 - metric:
 
   Character. Performance metric used for model tuning and selection:
 
-  - Classification: `"Accuracy"`, `"AUROC"`, `"AUPRC"`.
+  - Classification: `"AUROC"` (default) or `"AUPRC"`.
 
   - Survival: evaluated using concordance index (C-index).
 
@@ -95,13 +94,15 @@ compute_features.ML(
 
 - LODO:
 
-  Logical. If `TRUE`, performs Leave-One-Dataset-Out cross-validation
-  based on cohorts.
+  Logical. If `TRUE`, the cross-validation folds are stratified by
+  cohort and outcome (see
+  [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)).
 
 - batch_id:
 
-  Column name indicating cohort or batch membership for each sample
-  (required if `LODO = TRUE`).
+  Character. Column name in `coldata` with the cohort/batch of each
+  sample (required if `LODO = TRUE`). The cross-validation folds are
+  then stratified by cohort and outcome.
 
 - file_name:
 
@@ -111,18 +112,21 @@ compute_features.ML(
 
 - ncores:
 
-  Integer. Number of CPU cores for parallelization. Default:
-  `parallel::detectCores() - 1`.
+  Integer. Number of CPU cores for parallelization (cross-validation
+  folds are processed in parallel). Default: `NULL` (sequential).
 
 - return:
 
-  Logical. Whether to return and save plots/results. Default: `FALSE`.
+  Logical. Whether to save the plots in `Results/`. Default: `FALSE`.
 
 - fold_construction_fun:
 
   Function. Optional custom function to construct cross-validation
   folds. Must accept a `bestune` argument internally to inject optimized
-  hyperparameters.
+  hyperparameters. Used for both classification and survival.
+  `features_test` is used as given: it must contain the features built
+  by this function (e.g. the test samples projected onto the structure
+  learned on the training samples).
 
 - fold_construction_args_fixed:
 
@@ -134,15 +138,6 @@ compute_features.ML(
   List. Arguments passed to `fold_construction_fun` defining
   hyperparameters to explore during CV.
 
-- fold_models_dir:
-
-  Character. Directory where per-fold models are saved/read from when
-  `fold_construction_fun` is used. If `NULL` (default), uses
-  `"Results/fold_models/<task_type>"` so classification and survival
-  runs never share (or prune) each other's files. Use a distinct
-  directory per analysis when running several analyses of the same task
-  type from one folder.
-
 - seed:
 
   Integer. Random seed for reproducible cross-validation (fold
@@ -153,44 +148,37 @@ compute_features.ML(
 
 ## Value
 
-A named list containing:
+A named list, or `NULL` if no model could be trained (classification):
 
 - Model:
 
-  Trained model or workflow (classification) or refitted best model
-  (survival).
-
-- Metrics:
-
-  Performance metrics computed on the test data.
+  The output of
+  [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
+  on the training set (the selected model is `$Model$Model`).
 
 - AUC:
 
-  For classification tasks, a list containing AUROC and AUPRC values.
+  Classification: AUROC and AUPRC on the test set, with bootstrap
+  confidence intervals (see
+  [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md)).
+
+- Metrics:
+
+  Classification: threshold-based performance metrics on the test set.
 
 - Prediction:
 
   Predicted class probabilities (classification) or risk scores
-  (survival).
+  (survival) of the test samples.
 
 - Curve_bands:
 
-  Pointwise 95% bootstrap bands around the ROC and precision-recall
-  curves (classification only; see
-  [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md)).
+  Classification: pointwise 95% bootstrap bands around the ROC and
+  precision-recall curves.
 
-- CV_Results:
+- C_index:
 
-  Cross-validation results, including median and MAD of C-index for
-  survival tasks.
-
-- Test_CINDEX:
-
-  Concordance index on test data (survival only).
-
-- KM_Plot:
-
-  Kaplan-Meier plot object (if `return = TRUE`).
+  Survival: C-index on the test set.
 
 ## Details
 
@@ -199,40 +187,45 @@ cross-validation with hyperparameter tuning, followed by evaluation on
 the test set. ROC and PR curves are generated.
 
 For **survival tasks**, it performs model selection using the C-index,
-refits the best model on the full training data, evaluates test-set
-C-index, and plots Kaplan-Meier curves across quantile-based risk strata
-(Low/Medium/High). The C-index and log-rank test p-value are displayed.
+refits the best model on the full training data and evaluates the
+C-index on the test set. With `return = TRUE`, Kaplan-Meier curves of
+the test samples split at the median predicted risk are saved, with the
+C-index and log-rank test p-value.
 
 ## Examples
 
 ``` r
 if (FALSE) { # \dontrun{
-# --- Classification Example ---
-results_classif <- compute_features.ML(
-  features_train = X_train,
-  features_test  = X_test,
-  coldata        = clin_df,
-  task_type      = "classification",
-  trait          = "Response",
-  trait.positive = "Responder",
-  k_folds        = 5,
-  n_rep          = 1,
-  file_name      = "classification_example",
-  return         = TRUE
-)
+# --- Classification ---
+data(data_example_classification)
+X <- data_example_classification[, setdiff(colnames(data_example_classification), "target")]
+set.seed(123)
+train_idx <- caret::createDataPartition(data_example_classification$target, p = 0.7, list = FALSE)
+res <- compute_features.ML(features_train = X[train_idx, ],
+                           features_test = X[-train_idx, ],
+                           coldata = data_example_classification,
+                           task_type = "classification",
+                           trait = "target",
+                           trait.positive = "1",
+                           k_folds = 5,
+                           n_rep = 2,
+                           ncores = 2)
+res$AUC
 
-# --- Survival Example ---
-results_surv <- compute_features.ML(
-  features_train = X_train,
-  features_test  = X_test,
-  coldata        = clin_df,
-  task_type      = "survival",
-  time_var       = "time",
-  event_var      = "status",
-  k_folds        = 5,
-  n_rep          = 1,
-  file_name      = "cox_survival_example",
-  return         = TRUE
-)
+# --- Survival ---
+data(data_example_survival)
+X <- data_example_survival[, setdiff(colnames(data_example_survival), c("time", "status"))]
+set.seed(123)
+train_idx <- caret::createDataPartition(data_example_survival$status, p = 0.7, list = FALSE)
+res_survival <- compute_features.ML(features_train = X[train_idx, ],
+                                    features_test = X[-train_idx, ],
+                                    coldata = data_example_survival,
+                                    task_type = "survival",
+                                    time_var = "time",
+                                    event_var = "status",
+                                    k_folds = 5,
+                                    n_rep = 2,
+                                    ncores = 2)
+res_survival$C_index
 } # }
 ```

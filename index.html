@@ -37,16 +37,18 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
-<li class="active nav-item"><a class="nav-link" href="index.html">Get started</a></li>
-<li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
+<li class="nav-item"><a class="nav-link" href="articles/pipeML.html">Get started</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
-<li><a class="dropdown-item" href="articles/pipeML.html">pipeML vignette</a></li>
-    <li><a class="dropdown-item" href="articles/pipeML.html#classification-and-survival">Classification and survival</a></li>
-    <li><a class="dropdown-item" href="articles/pipeML.html#advanced">Advanced</a></li>
+<li><a class="dropdown-item" href="articles/a1_classification.html">Classification</a></li>
+    <li><a class="dropdown-item" href="articles/a2_survival.html">Survival analysis</a></li>
+    <li><a class="dropdown-item" href="articles/a3_shap.html">Interpreting models with SHAP values</a></li>
+    <li><a class="dropdown-item" href="articles/a4_lodo.html">Multi-cohort validation (LODO)</a></li>
+    <li><a class="dropdown-item" href="articles/a5_custom_folds.html">Leakage-aware custom cross-validation</a></li>
   </ul>
 </li>
+<li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
       </ul>
 <ul class="navbar-nav">
 <li class="nav-item"><form class="form-inline" role="search">
@@ -78,7 +80,7 @@
 <div class="section level2">
 <h2 id="description">Description<a class="anchor" aria-label="anchor" href="#description"></a>
 </h2>
-<p><code>pipeML</code> is a flexible and leakage-aware machine learning framework for R designed for predictive modeling in high-dimensional biological data. The package integrates all key steps of the machine learning workflow — feature selection, model training, validation, prediction, and interpretation — into a single reproducible pipeline.</p>
+<p><code>pipeML</code> is a flexible and leakage-aware machine learning framework for R designed for predictive modeling in high-dimensional biological data. The package integrates all key steps of the machine learning workflow — feature filtering, model training, validation, prediction, and interpretation — into a single reproducible pipeline.</p>
 <p>A key design goal of <code>pipeML</code> is to support fold-aware feature construction, allowing features that depend on the dataset (e.g. enrichment scores, correlation-based features, or network-derived features) to be recomputed within each cross-validation fold. This prevents information leakage and ensures reliable performance estimation.</p>
 <p>The framework is designed to integrate naturally with R/Bioconductor workflows, making it particularly suitable for omics and biomedical machine learning applications.</p>
 <p align="center">
@@ -97,7 +99,7 @@
 <h3 id="end-to-end-ml-workflow">End-to-end ML workflow<a class="anchor" aria-label="anchor" href="#end-to-end-ml-workflow"></a>
 </h3>
 <ul>
-<li>Integrated pipeline for feature selection, model training, validation, prediction, and interpretation</li>
+<li>Integrated pipeline for feature filtering, model training, validation, prediction, and interpretation</li>
 </ul>
 </div>
 <div class="section level3">
@@ -118,10 +120,10 @@
 </ul>
 </div>
 <div class="section level3">
-<h3 id="feature-selection">Feature selection<a class="anchor" aria-label="anchor" href="#feature-selection"></a>
+<h3 id="feature-filtering">Feature filtering<a class="anchor" aria-label="anchor" href="#feature-filtering"></a>
 </h3>
 <ul>
-<li>Optional correlation-based feature filtering</li>
+<li>Near-constant and highly correlated features built by custom fold functions are removed inside each fold</li>
 </ul>
 </div>
 <div class="section level3">
@@ -133,7 +135,7 @@
 <ul>
 <li>AUROC</li>
 <li>AUPRC</li>
-<li>Accuracy</li>
+<li>C-index (survival)</li>
 </ul>
 </li>
 </ul>
@@ -142,9 +144,8 @@
 <h3 id="model-interpretation">Model interpretation<a class="anchor" aria-label="anchor" href="#model-interpretation"></a>
 </h3>
 <ul>
-<li>SHAP-based feature importance</li>
-<li>Variable importance summaries</li>
-<li>Performance visualization (ROC and PR curves)</li>
+<li>SHAP values of the selected model, per sample and as global feature importance</li>
+<li>Performance visualization (ROC and PR curves with bootstrap confidence bands, Kaplan-Meier curves by predicted risk group)</li>
 </ul>
 </div>
 <div class="section level3">
@@ -159,7 +160,8 @@
 </h3>
 <ul>
 <li>Users can define custom fold construction functions</li>
-<li>These functions can receive a bestTune argument after hyperparameter optimization to retrain models on the full training dataset.</li>
+<li>The parameters of the feature construction can be tuned inside the cross-validation, like model hyperparameters</li>
+<li>These functions receive a <code>bestune</code> argument after tuning, to rebuild the features on the full training dataset for the final model</li>
 </ul>
 </div>
 </div>
@@ -193,18 +195,28 @@
 <li>Parametric accelerated failure time (AFT) models</li>
 <li>Conditional inference survival trees</li>
 <li>Bagged CART survival models</li>
-<li>Random survival forests</li>
-<li>Gradient boosting for censored outcomes</li>
+<li>Oblique random survival forests</li>
 </ul>
 </div>
 </div>
 <div class="section level2">
 <h2 id="general-usage">General usage<a class="anchor" aria-label="anchor" href="#general-usage"></a>
 </h2>
-<p>Below are basic examples showing how to use <code>pipeML</code></p>
-<p>For a detailed tutorial, see <a href="https://VeraPancaldiLab.github.io/pipeML/articles/pipeML.html" class="external-link">Get started</a></p>
+<p>Below are basic examples showing how to use <code>pipeML</code>. For detailed tutorials, see <a href="https://VeraPancaldiLab.github.io/pipeML/articles/pipeML.html" class="external-link">Get started</a> and the <a href="https://VeraPancaldiLab.github.io/pipeML/articles/index.html" class="external-link">Articles</a>.</p>
+<p>Results (plots, fold files of custom workflows) are written to a <code>Results/</code> folder in the working directory.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://verapancaldilab.github.io/pipeML">pipeML</a></span><span class="op">)</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://verapancaldilab.github.io/pipeML">pipeML</a></span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">data</span> <span class="op">&lt;-</span> <span class="va">data_example_classification</span></span>
+<span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">data</span><span class="op">)</span>, <span class="st">"target"</span><span class="op">)</span><span class="op">]</span></span>
+<span><span class="va">y</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">target</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span>
+<span><span class="va">train_idx</span> <span class="op">&lt;-</span> <span class="fu">caret</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/caret/man/createDataPartition.html" class="external-link">createDataPartition</a></span><span class="op">(</span><span class="va">y</span>, p <span class="op">=</span> <span class="fl">0.7</span>, list <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">X_train</span> <span class="op">&lt;-</span> <span class="va">X</span><span class="op">[</span><span class="va">train_idx</span>, <span class="op">]</span></span>
+<span><span class="va">X_test</span> <span class="op">&lt;-</span> <span class="va">X</span><span class="op">[</span><span class="op">-</span><span class="va">train_idx</span>, <span class="op">]</span></span>
+<span><span class="va">y_train</span> <span class="op">&lt;-</span> <span class="va">y</span><span class="op">[</span><span class="va">train_idx</span><span class="op">]</span></span>
+<span><span class="va">y_test</span> <span class="op">&lt;-</span> <span class="va">y</span><span class="op">[</span><span class="op">-</span><span class="va">train_idx</span><span class="op">]</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="training-models">Training models<a class="anchor" aria-label="anchor" href="#training-models"></a>
 </h3>
@@ -216,7 +228,7 @@
 <span>                                    metric <span class="op">=</span> <span class="st">"AUROC"</span>,</span>
 <span>                                    k_folds <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>                                    n_rep <span class="op">=</span> <span class="fl">10</span>,</span>
-<span>                                    return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span></code></pre></div>
+<span>                                    ncores <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="predicting-on-new-data">Predicting on new data<a class="anchor" aria-label="anchor" href="#predicting-on-new-data"></a>
@@ -226,13 +238,19 @@
 <span>                          test_data <span class="op">=</span> <span class="va">X_test</span>, </span>
 <span>                          target_var <span class="op">=</span> <span class="va">y_test</span>, </span>
 <span>                          task_type <span class="op">=</span> <span class="st">"classification"</span>,</span>
-<span>                          trait.positive <span class="op">=</span> <span class="st">"1"</span>, </span>
-<span>                          return <span class="op">=</span> <span class="cn">F</span><span class="op">)</span></span></code></pre></div>
+<span>                          trait.positive <span class="op">=</span> <span class="st">"1"</span><span class="op">)</span></span>
+<span><span class="va">pred</span><span class="op">$</span><span class="va">AUC</span></span></code></pre></div>
+</div>
+<div class="section level3">
+<h3 id="explaining-the-model">Explaining the model<a class="anchor" aria-label="anchor" href="#explaining-the-model"></a>
+</h3>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">shap</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/compute_shap_values.html">compute_shap_values</a></span><span class="op">(</span>model_trained <span class="op">=</span> <span class="va">res</span><span class="op">$</span><span class="va">Model</span>, task_type <span class="op">=</span> <span class="st">"classification"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="training-and-testing-workflow">Training and Testing Workflow<a class="anchor" aria-label="anchor" href="#training-and-testing-workflow"></a>
 </h3>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/compute_features.ML.html">compute_features.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">X_train</span>, </span>
 <span>                           features_test <span class="op">=</span> <span class="va">X_test</span>, </span>
 <span>                           coldata <span class="op">=</span> <span class="va">data</span>,</span>
@@ -258,8 +276,10 @@
 <div class="section level2">
 <h2 id="citing-pipeml">Citing pipeML<a class="anchor" aria-label="anchor" href="#citing-pipeml"></a>
 </h2>
-<p>If you use <code>pipeML</code> in a scientific publication, we would appreciate citation to the :</p>
-<p>Hurtado M, Pancaldi V (2026). pipeML: A flexible and modular machine learning framework designed to support leakage-free model training through custom cross-validation fold construction. R package version 0.0.1, <a href="https://verapancaldilab.github.io/pipeML" class="uri">https://verapancaldilab.github.io/pipeML</a></p>
+<p>If you use <code>pipeML</code> in a scientific publication, please cite:</p>
+<blockquote>
+<p>Hurtado, M., &amp; Pancaldi, V. (2026). <em>A new pipeline for cross-validation fold-aware machine learning prediction of clinical outcomes addresses hidden data-leakage in omics based ‘predictors’.</em> bioRxiv. <a href="https://doi.org/10.64898/2026.03.12.711429" class="external-link uri">https://doi.org/10.64898/2026.03.12.711429</a></p>
+</blockquote>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="license">
@@ -291,6 +311,13 @@
 <ul class="list-unstyled">
 <li><a href="https://github.com/VeraPancaldiLab/pipeML/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/VeraPancaldiLab/pipeML/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
 <li><a href="https://github.com/VeraPancaldiLab/pipeML/actions/workflows/pkgdown.yaml" class="external-link"><img src="https://github.com/VeraPancaldiLab/pipeML/actions/workflows/pkgdown.yaml/badge.svg" alt="pkgdown"></a></li>
+</ul>
+</div>
+
+<div class="table-of-contents">
+<h2 data-toc-skip>Table of contents</h2>
+<ul class="list-unstyled">
+<li><nav id="toc"></nav></li>
 </ul>
 </div>
 

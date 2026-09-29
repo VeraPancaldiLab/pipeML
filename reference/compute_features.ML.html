@@ -23,14 +23,16 @@ and generates Kaplan-Meier plots stratified by predicted risk."><meta property="
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../index.html">Get started</a></li>
-<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/pipeML.html">Get started</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/pipeML.html">pipeML vignette</a></li>
-    <li><a class="dropdown-item" href="../articles/pipeML.html#classification-and-survival">Classification and survival</a></li>
-    <li><a class="dropdown-item" href="../articles/pipeML.html#advanced">Advanced</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/a1_classification.html">Classification</a></li>
+    <li><a class="dropdown-item" href="../articles/a2_survival.html">Survival analysis</a></li>
+    <li><a class="dropdown-item" href="../articles/a3_shap.html">Interpreting models with SHAP values</a></li>
+    <li><a class="dropdown-item" href="../articles/a4_lodo.html">Multi-cohort validation (LODO)</a></li>
+    <li><a class="dropdown-item" href="../articles/a5_custom_folds.html">Leakage-aware custom cross-validation</a></li>
   </ul></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
       </ul></div>
@@ -64,7 +66,7 @@ and generates Kaplan-Meier plots stratified by predicted risk.</p>
 <span>  trait.positive <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  time_var <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  event_var <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  metric <span class="op">=</span> <span class="st">"Accuracy"</span>,</span>
+<span>  metric <span class="op">=</span> <span class="st">"AUROC"</span>,</span>
 <span>  k_folds <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>  n_rep <span class="op">=</span> <span class="fl">5</span>,</span>
 <span>  LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -75,7 +77,6 @@ and generates Kaplan-Meier plots stratified by predicted risk.</p>
 <span>  fold_construction_fun <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  fold_construction_args_fixed <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  fold_construction_args_tunable <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  fold_models_dir <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  seed <span class="op">=</span> <span class="fl">123</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -103,7 +104,7 @@ those of <code>features_train</code> and <code>features_test</code>.</p></dd>
 
 
 <dt id="arg-trait">trait<a class="anchor" aria-label="anchor" href="#arg-trait"></a></dt>
-<dd><p>Character. Column name in <code>clinical</code> used as the target variable
+<dd><p>Character. Column name in <code>coldata</code> used as the target variable
 (required for classification tasks).</p></dd>
 
 
@@ -113,16 +114,16 @@ Ensures all performance metrics and interpretability analyses consistently treat
 
 
 <dt id="arg-time-var">time_var<a class="anchor" aria-label="anchor" href="#arg-time-var"></a></dt>
-<dd><p>Character. Column name in <code>clinical</code> containing survival/follow-up time (required for survival tasks).</p></dd>
+<dd><p>Character. Column name in <code>coldata</code> containing survival/follow-up time (required for survival tasks).</p></dd>
 
 
 <dt id="arg-event-var">event_var<a class="anchor" aria-label="anchor" href="#arg-event-var"></a></dt>
-<dd><p>Character. Column name in <code>clinical</code> indicating event occurrence
+<dd><p>Character. Column name in <code>coldata</code> indicating event occurrence
 (1 = event occurred, 0 = censored; required for survival tasks).</p></dd>
 
 
 <dt id="arg-metric">metric<a class="anchor" aria-label="anchor" href="#arg-metric"></a></dt>
-<dd><p>Character. Performance metric used for model tuning and selection:</p><ul><li><p>Classification: <code>"Accuracy"</code>, <code>"AUROC"</code>, <code>"AUPRC"</code>.</p></li>
+<dd><p>Character. Performance metric used for model tuning and selection:</p><ul><li><p>Classification: <code>"AUROC"</code> (default) or <code>"AUPRC"</code>.</p></li>
 <li><p>Survival: evaluated using concordance index (C-index).</p></li>
 </ul></dd>
 
@@ -136,11 +137,13 @@ Ensures all performance metrics and interpretability analyses consistently treat
 
 
 <dt id="arg-lodo">LODO<a class="anchor" aria-label="anchor" href="#arg-lodo"></a></dt>
-<dd><p>Logical. If <code>TRUE</code>, performs Leave-One-Dataset-Out cross-validation based on cohorts.</p></dd>
+<dd><p>Logical. If <code>TRUE</code>, the cross-validation folds are stratified by cohort and outcome (see
+<code><a href="compute_features.training.ML.html">compute_features.training.ML()</a></code>).</p></dd>
 
 
 <dt id="arg-batch-id">batch_id<a class="anchor" aria-label="anchor" href="#arg-batch-id"></a></dt>
-<dd><p>Column name indicating cohort or batch membership for each sample (required if <code>LODO = TRUE</code>).</p></dd>
+<dd><p>Character. Column name in <code>coldata</code> with the cohort/batch of each sample (required if
+<code>LODO = TRUE</code>). The cross-validation folds are then stratified by cohort and outcome.</p></dd>
 
 
 <dt id="arg-file-name">file_name<a class="anchor" aria-label="anchor" href="#arg-file-name"></a></dt>
@@ -149,16 +152,19 @@ Kaplan-Meier plots are saved as <code>"Results/Survival_KM_&lt;file_name&gt;.pdf
 
 
 <dt id="arg-ncores">ncores<a class="anchor" aria-label="anchor" href="#arg-ncores"></a></dt>
-<dd><p>Integer. Number of CPU cores for parallelization. Default: <code>parallel::detectCores() - 1</code>.</p></dd>
+<dd><p>Integer. Number of CPU cores for parallelization (cross-validation folds are processed in parallel).
+Default: <code>NULL</code> (sequential).</p></dd>
 
 
 <dt id="arg-return">return<a class="anchor" aria-label="anchor" href="#arg-return"></a></dt>
-<dd><p>Logical. Whether to return and save plots/results. Default: <code>FALSE</code>.</p></dd>
+<dd><p>Logical. Whether to save the plots in <code>Results/</code>. Default: <code>FALSE</code>.</p></dd>
 
 
 <dt id="arg-fold-construction-fun">fold_construction_fun<a class="anchor" aria-label="anchor" href="#arg-fold-construction-fun"></a></dt>
 <dd><p>Function. Optional custom function to construct cross-validation folds.
-Must accept a <code>bestune</code> argument internally to inject optimized hyperparameters.</p></dd>
+Must accept a <code>bestune</code> argument internally to inject optimized hyperparameters. Used for both
+classification and survival. <code>features_test</code> is used as given: it must contain the features built by
+this function (e.g. the test samples projected onto the structure learned on the training samples).</p></dd>
 
 
 <dt id="arg-fold-construction-args-fixed">fold_construction_args_fixed<a class="anchor" aria-label="anchor" href="#arg-fold-construction-args-fixed"></a></dt>
@@ -169,13 +175,6 @@ Must accept a <code>bestune</code> argument internally to inject optimized hyper
 <dd><p>List. Arguments passed to <code>fold_construction_fun</code> defining hyperparameters to explore during CV.</p></dd>
 
 
-<dt id="arg-fold-models-dir">fold_models_dir<a class="anchor" aria-label="anchor" href="#arg-fold-models-dir"></a></dt>
-<dd><p>Character. Directory where per-fold models are saved/read from when
-<code>fold_construction_fun</code> is used. If <code>NULL</code> (default), uses <code>"Results/fold_models/&lt;task_type&gt;"</code>
-so classification and survival runs never share (or prune) each other's files. Use a distinct
-directory per analysis when running several analyses of the same task type from one folder.</p></dd>
-
-
 <dt id="arg-seed">seed<a class="anchor" aria-label="anchor" href="#arg-seed"></a></dt>
 <dd><p>Integer. Random seed for reproducible cross-validation (fold assignment and model fitting,
 including parallel runs). Default: <code>123</code>. Use <code>NULL</code> to leave the random number generator
@@ -184,29 +183,25 @@ untouched. See <code><a href="compute_features.training.ML.html">compute_feature
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A named list containing:</p><dl><dt>Model</dt>
-<dd><p>Trained model or workflow (classification) or refitted best model (survival).</p></dd>
-
-<dt>Metrics</dt>
-<dd><p>Performance metrics computed on the test data.</p></dd>
+    <p>A named list, or <code>NULL</code> if no model could be trained (classification):</p><dl><dt>Model</dt>
+<dd><p>The output of <code><a href="compute_features.training.ML.html">compute_features.training.ML()</a></code> on the training set (the selected model
+is <code>$Model$Model</code>).</p></dd>
 
 <dt>AUC</dt>
-<dd><p>For classification tasks, a list containing AUROC and AUPRC values.</p></dd>
+<dd><p>Classification: AUROC and AUPRC on the test set, with bootstrap confidence intervals (see
+<code><a href="compute_prediction.html">compute_prediction()</a></code>).</p></dd>
+
+<dt>Metrics</dt>
+<dd><p>Classification: threshold-based performance metrics on the test set.</p></dd>
 
 <dt>Prediction</dt>
-<dd><p>Predicted class probabilities (classification) or risk scores (survival).</p></dd>
+<dd><p>Predicted class probabilities (classification) or risk scores (survival) of the test samples.</p></dd>
 
 <dt>Curve_bands</dt>
-<dd><p>Pointwise 95% bootstrap bands around the ROC and precision-recall curves (classification only; see <code><a href="compute_prediction.html">compute_prediction()</a></code>).</p></dd>
+<dd><p>Classification: pointwise 95% bootstrap bands around the ROC and precision-recall curves.</p></dd>
 
-<dt>CV_Results</dt>
-<dd><p>Cross-validation results, including median and MAD of C-index for survival tasks.</p></dd>
-
-<dt>Test_CINDEX</dt>
-<dd><p>Concordance index on test data (survival only).</p></dd>
-
-<dt>KM_Plot</dt>
-<dd><p>Kaplan-Meier plot object (if <code>return = TRUE</code>).</p></dd>
+<dt>C_index</dt>
+<dd><p>Survival: C-index on the test set.</p></dd>
 
 
 </dl></div>
@@ -215,40 +210,45 @@ untouched. See <code><a href="compute_features.training.ML.html">compute_feature
     <p>For <strong>classification tasks</strong>, the function performs repeated k-fold cross-validation
 with hyperparameter tuning, followed by evaluation on the test set. ROC and PR curves are generated.</p>
 <p>For <strong>survival tasks</strong>, it performs model selection using the C-index, refits the best model
-on the full training data, evaluates test-set C-index, and plots Kaplan-Meier curves across
-quantile-based risk strata (Low/Medium/High). The C-index and log-rank test p-value are displayed.</p>
+on the full training data and evaluates the C-index on the test set. With <code>return = TRUE</code>, Kaplan-Meier
+curves of the test samples split at the median predicted risk are saved, with the C-index and log-rank test
+p-value.</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="cn">FALSE</span><span class="op">)</span> <span class="op">{</span> <span class="co"># \dontrun{</span></span></span>
-<span class="r-in"><span><span class="co"># --- Classification Example ---</span></span></span>
-<span class="r-in"><span><span class="va">results_classif</span> <span class="op">&lt;-</span> <span class="fu">compute_features.ML</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  features_train <span class="op">=</span> <span class="va">X_train</span>,</span></span>
-<span class="r-in"><span>  features_test  <span class="op">=</span> <span class="va">X_test</span>,</span></span>
-<span class="r-in"><span>  coldata        <span class="op">=</span> <span class="va">clin_df</span>,</span></span>
-<span class="r-in"><span>  task_type      <span class="op">=</span> <span class="st">"classification"</span>,</span></span>
-<span class="r-in"><span>  trait          <span class="op">=</span> <span class="st">"Response"</span>,</span></span>
-<span class="r-in"><span>  trait.positive <span class="op">=</span> <span class="st">"Responder"</span>,</span></span>
-<span class="r-in"><span>  k_folds        <span class="op">=</span> <span class="fl">5</span>,</span></span>
-<span class="r-in"><span>  n_rep          <span class="op">=</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>  file_name      <span class="op">=</span> <span class="st">"classification_example"</span>,</span></span>
-<span class="r-in"><span>  return         <span class="op">=</span> <span class="cn">TRUE</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># --- Classification ---</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">data_example_classification</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">data_example_classification</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">data_example_classification</span><span class="op">)</span>, <span class="st">"target"</span><span class="op">)</span><span class="op">]</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">train_idx</span> <span class="op">&lt;-</span> <span class="fu">caret</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/caret/man/createDataPartition.html" class="external-link">createDataPartition</a></span><span class="op">(</span><span class="va">data_example_classification</span><span class="op">$</span><span class="va">target</span>, p <span class="op">=</span> <span class="fl">0.7</span>, list <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu">compute_features.ML</span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">X</span><span class="op">[</span><span class="va">train_idx</span>, <span class="op">]</span>,</span></span>
+<span class="r-in"><span>                           features_test <span class="op">=</span> <span class="va">X</span><span class="op">[</span><span class="op">-</span><span class="va">train_idx</span>, <span class="op">]</span>,</span></span>
+<span class="r-in"><span>                           coldata <span class="op">=</span> <span class="va">data_example_classification</span>,</span></span>
+<span class="r-in"><span>                           task_type <span class="op">=</span> <span class="st">"classification"</span>,</span></span>
+<span class="r-in"><span>                           trait <span class="op">=</span> <span class="st">"target"</span>,</span></span>
+<span class="r-in"><span>                           trait.positive <span class="op">=</span> <span class="st">"1"</span>,</span></span>
+<span class="r-in"><span>                           k_folds <span class="op">=</span> <span class="fl">5</span>,</span></span>
+<span class="r-in"><span>                           n_rep <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>                           ncores <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">res</span><span class="op">$</span><span class="va">AUC</span></span></span>
 <span class="r-in"><span></span></span>
-<span class="r-in"><span><span class="co"># --- Survival Example ---</span></span></span>
-<span class="r-in"><span><span class="va">results_surv</span> <span class="op">&lt;-</span> <span class="fu">compute_features.ML</span><span class="op">(</span></span></span>
-<span class="r-in"><span>  features_train <span class="op">=</span> <span class="va">X_train</span>,</span></span>
-<span class="r-in"><span>  features_test  <span class="op">=</span> <span class="va">X_test</span>,</span></span>
-<span class="r-in"><span>  coldata        <span class="op">=</span> <span class="va">clin_df</span>,</span></span>
-<span class="r-in"><span>  task_type      <span class="op">=</span> <span class="st">"survival"</span>,</span></span>
-<span class="r-in"><span>  time_var       <span class="op">=</span> <span class="st">"time"</span>,</span></span>
-<span class="r-in"><span>  event_var      <span class="op">=</span> <span class="st">"status"</span>,</span></span>
-<span class="r-in"><span>  k_folds        <span class="op">=</span> <span class="fl">5</span>,</span></span>
-<span class="r-in"><span>  n_rep          <span class="op">=</span> <span class="fl">1</span>,</span></span>
-<span class="r-in"><span>  file_name      <span class="op">=</span> <span class="st">"cox_survival_example"</span>,</span></span>
-<span class="r-in"><span>  return         <span class="op">=</span> <span class="cn">TRUE</span></span></span>
-<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="co"># --- Survival ---</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">data_example_survival</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">X</span> <span class="op">&lt;-</span> <span class="va">data_example_survival</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">data_example_survival</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"time"</span>, <span class="st">"status"</span><span class="op">)</span><span class="op">)</span><span class="op">]</span></span></span>
+<span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">123</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">train_idx</span> <span class="op">&lt;-</span> <span class="fu">caret</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/caret/man/createDataPartition.html" class="external-link">createDataPartition</a></span><span class="op">(</span><span class="va">data_example_survival</span><span class="op">$</span><span class="va">status</span>, p <span class="op">=</span> <span class="fl">0.7</span>, list <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">res_survival</span> <span class="op">&lt;-</span> <span class="fu">compute_features.ML</span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">X</span><span class="op">[</span><span class="va">train_idx</span>, <span class="op">]</span>,</span></span>
+<span class="r-in"><span>                                    features_test <span class="op">=</span> <span class="va">X</span><span class="op">[</span><span class="op">-</span><span class="va">train_idx</span>, <span class="op">]</span>,</span></span>
+<span class="r-in"><span>                                    coldata <span class="op">=</span> <span class="va">data_example_survival</span>,</span></span>
+<span class="r-in"><span>                                    task_type <span class="op">=</span> <span class="st">"survival"</span>,</span></span>
+<span class="r-in"><span>                                    time_var <span class="op">=</span> <span class="st">"time"</span>,</span></span>
+<span class="r-in"><span>                                    event_var <span class="op">=</span> <span class="st">"status"</span>,</span></span>
+<span class="r-in"><span>                                    k_folds <span class="op">=</span> <span class="fl">5</span>,</span></span>
+<span class="r-in"><span>                                    n_rep <span class="op">=</span> <span class="fl">2</span>,</span></span>
+<span class="r-in"><span>                                    ncores <span class="op">=</span> <span class="fl">2</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">res_survival</span><span class="op">$</span><span class="va">C_index</span></span></span>
 <span class="r-in"><span><span class="op">}</span> <span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>

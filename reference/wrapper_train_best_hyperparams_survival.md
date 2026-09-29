@@ -26,7 +26,8 @@ wrapper_train_best_hyperparams_survival(
 - train_data:
 
   A data frame containing the original training data used for
-  cross-validation.
+  cross-validation (features plus `time` and `event`), passed to
+  `fold_construction_fun` as `data`.
 
 - optimized:
 

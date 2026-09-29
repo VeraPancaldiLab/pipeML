@@ -10,13 +10,7 @@ including performance metrics and predictions.
 ## Usage
 
 ``` r
-compute_custom_k_fold_CV(
-  processed_folds,
-  ml_method,
-  tuneGrid,
-  fold_models_dir = "Results/fold_models/classification",
-  file_id_offset = 0
-)
+compute_custom_k_fold_CV(processed_folds, ml_method, tuneGrid)
 ```
 
 ## Arguments
@@ -37,19 +31,6 @@ compute_custom_k_fold_CV(
   Optional. A data frame specifying the grid of hyperparameters to
   evaluate. If `NULL`, a default grid of length 3 is generated using
   [`caret::getModelInfo()`](https://rdrr.io/pkg/caret/man/modelLookup.html).
-
-- fold_models_dir:
-
-  Character. Directory where the fitted model of each fold is saved, for
-  reuse by
-  [`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md).
-
-- file_id_offset:
-
-  Integer added to the hyperparameter row number in the saved file
-  names, so that models sharing a caret method (glmnet, lasso, ridge) or
-  fitted with different fold construction parameters get different
-  files. Default 0.
 
 ## Value
 

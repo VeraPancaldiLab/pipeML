@@ -1,12 +1,10 @@
 # Compute Prediction Metrics for a Trained Machine Learning Model
 
-Computes prediction metrics for a trained machine learning model,
-including the confusion matrix, AUROC, AUPRC, Accuracy, Sensitivity,
-Specificity, Precision, Recall, F1 score, and MCC. For classification
-tasks, it also determines the optimal classification threshold and
-generates ROC, PRC, and confusion matrix plots. For survival analysis
-tasks, it predicts risk scores and optionally generates Kaplan-Meier
-plots.
+Applies a trained model to a test set and evaluates it. For
+classification, it computes AUROC and AUPRC with bootstrap confidence
+intervals, and Accuracy, Sensitivity, Specificity, Precision, Recall, F1
+score and MCC at each probability threshold. For survival, it predicts
+risk scores and computes the C-index.
 
 ## Usage
 
@@ -28,10 +26,9 @@ compute_prediction(
 
 - model:
 
-  The trained machine learning model returned from
-  [`compute_features.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.ML.md)
-  or
-  [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md).
+  The trained model returned as `$Model` by
+  [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
+  (e.g. `res$Model`).
 
 - test_data:
 
@@ -62,64 +59,85 @@ compute_prediction(
 
 - file.name:
 
-  Character. Filename prefix for saving plots (optional). If NULL, plots
-  are not saved.
+  Character. File name prefix of the plots saved in `Results/`.
 
 - return:
 
-  Logical. Whether to return metrics, predictions, and plots. Default =
-  FALSE.
+  Logical. Whether to save the plots in `Results/` (ROC and
+  precision-recall curves for classification, Kaplan-Meier curves by
+  predicted risk group for survival). Default = FALSE.
 
 ## Value
 
-A list containing:
+For classification, a list containing:
 
 - `Metrics`:
 
   Data frame of performance metrics (Accuracy, Sensitivity, Specificity,
-  Precision, Recall, F1 score, MCC) for each threshold (classification
-  only).
+  Precision, Recall, F1 score, MCC) for each threshold.
 
 - `AUC`:
 
-  List containing AUROC and AUPRC values with optional bootstrap
-  confidence intervals (classification only).
+  List with `AUROC` and `AUPRC`, each a list with the `estimate` on the
+  test set and the `lower` and `upper` bounds of its 95% bootstrap
+  confidence interval.
 
 - `Predictions`:
 
-  Data frame of predicted probabilities for each class (classification)
-  or risk scores (survival).
+  Data frame of predicted probabilities for each class.
 
 - `Curve_bands`:
 
   List with `ROC` (columns `fpr`, `lower`, `upper`) and `PRC` (columns
   `recall`, `lower`, `upper`): pointwise 95% bootstrap bands around the
-  ROC and precision-recall curves (classification only).
+  ROC and precision-recall curves.
+
+For survival, a list containing:
+
+- `preds`:
+
+  Predicted risk scores (higher values mean higher risk).
+
+- `c_index`, `c_index_lower`, `c_index_upper`:
+
+  C-index on the test set and its 95% confidence interval.
 
 ## Details
 
-For **classification**, the function:
+Confidence intervals of AUROC and AUPRC come from 1000 bootstrap
+resamples of the test samples.
 
-1.  Uses the trained model to predict probabilities for the test data.
-
-2.  Computes performance metrics across thresholds and selects the
-    optimal threshold based on a chosen metric.
-
-3.  Calculates AUROC and AUPRC and optionally bootstrapped confidence
-    intervals.
-
-4.  Generates ROC, PRC, and confusion matrix plots if `return = TRUE`
-    and `file.name` is provided.
-
-For **survival analysis**, the function:
-
-1.  Predicts risk scores using the trained survival model.
-
-2.  Optionally generates Kaplan-Meier plots stratified by predicted risk
-    groups.
+Survival models can predict a risk score, a survival time or a survival
+probability. The last two are reversed, so that higher predictions
+always mean higher risk.
 
 ## See also
 
-[`confusionMatrix`](https://rdrr.io/pkg/caret/man/confusionMatrix.html),
-[`varImp`](https://rdrr.io/pkg/caret/man/varImp.html),
-[`ggplot`](https://ggplot2.tidyverse.org/reference/ggplot.html)
+[`get_curves`](https://verapancaldilab.github.io/pipeML/reference/get_curves.md),
+[`plot_survival_performance`](https://verapancaldilab.github.io/pipeML/reference/plot_survival_performance.md)
+
+## Examples
+
+``` r
+if (FALSE) { # \dontrun{
+data(data_example_classification)
+X <- data_example_classification[, setdiff(colnames(data_example_classification), "target")]
+y <- data_example_classification$target
+set.seed(123)
+train_idx <- caret::createDataPartition(y, p = 0.7, list = FALSE)
+
+res <- compute_features.training.ML(features_train = X[train_idx, ],
+                                    target_var = y[train_idx],
+                                    task_type = "classification",
+                                    trait.positive = "1",
+                                    k_folds = 5,
+                                    n_rep = 2)
+
+pred <- compute_prediction(model = res$Model,
+                           test_data = X[-train_idx, ],
+                           target_var = y[-train_idx],
+                           task_type = "classification",
+                           trait.positive = "1")
+pred$AUC
+} # }
+```

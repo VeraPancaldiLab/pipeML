@@ -101,3 +101,18 @@ get_curves(
 
 Saves two PDF plots: one for the ROC curve and one for the
 Precision-Recall curve in the "Results/" directory.
+
+## Examples
+
+``` r
+if (FALSE) { # \dontrun{
+# pred: output of compute_prediction() (classification)
+get_curves(data = pred$Metrics,
+           color = "model",
+           auc_roc = pred$AUC$AUROC,
+           auc_prc = pred$AUC$AUPRC,
+           roc_band = pred$Curve_bands$ROC,
+           prc_band = pred$Curve_bands$PRC,
+           file.name = "Example")
+} # }
+```

@@ -2,6 +2,11 @@
 <url><loc>https://verapancaldilab.github.io/pipeML/404.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/CLAUDE.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/LICENSE.html</loc></url>
+<url><loc>https://verapancaldilab.github.io/pipeML/articles/a1_classification.html</loc></url>
+<url><loc>https://verapancaldilab.github.io/pipeML/articles/a2_survival.html</loc></url>
+<url><loc>https://verapancaldilab.github.io/pipeML/articles/a3_shap.html</loc></url>
+<url><loc>https://verapancaldilab.github.io/pipeML/articles/a4_lodo.html</loc></url>
+<url><loc>https://verapancaldilab.github.io/pipeML/articles/a5_custom_folds.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/articles/index.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/articles/pipeML.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/authors.html</loc></url>
@@ -20,12 +25,13 @@
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/calculate_mcc.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/calculate_precision.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/calculate_recall.html</loc></url>
+<url><loc>https://verapancaldilab.github.io/pipeML/reference/caret_train.html</loc></url>
+<url><loc>https://verapancaldilab.github.io/pipeML/reference/check_survival_fold_features.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/coldata_example.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/compute_cindex_ci.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/compute_custom_k_fold_CV.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/compute_cv_AUC.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/compute_cv_CINDEX.html</loc></url>
-<url><loc>https://verapancaldilab.github.io/pipeML/reference/compute_cv_accuracy.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/compute_features.ML.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV.html</loc></url>
@@ -45,7 +51,6 @@
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/get_tune_grid.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/index.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/pipeML-package.html</loc></url>
-<url><loc>https://verapancaldilab.github.io/pipeML/reference/plot_shap_stability.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/plot_survival_performance.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/prc_at_grid.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/predict_and_evaluate_survival.html</loc></url>
@@ -54,5 +59,6 @@
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/unregister_dopar.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_classification.html</loc></url>
 <url><loc>https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_survival.html</loc></url>
+<url><loc>https://verapancaldilab.github.io/pipeML/reference/xgbtree_model.html</loc></url>
 </urlset>
 

@@ -26,7 +26,13 @@ preventing information leakage.
       data.R                 # Documentation for bundled example datasets
       machine_learning.R     # All implementation (~5,500 lines, core file)
     vignettes/
-      pipeML.Rmd             # Main tutorial vignette
+      pipeML.Rmd             # "Get started" landing page (intro, install, workflow chooser, citation)
+      a1_classification.Rmd  # Articles, one per topic (same layout as multideconv)
+      a2_survival.Rmd
+      a3_shap.Rmd
+      a4_lodo.Rmd
+      a5_custom_folds.Rmd
+      figures/               # Static figures shown by the articles (code chunks are eval = FALSE)
     data/                    # Bundled example datasets (.rda)
     man/                     # Auto-generated Roxygen docs (never edit manually)
     docs/                    # pkgdown website output (gitignored)
@@ -42,7 +48,7 @@ preventing information leakage.
 
 ------------------------------------------------------------------------
 
-## Exported Functions (7 total)
+## Exported Functions (6 total)
 
 All live in `R/machine_learning.R`.
 
@@ -52,8 +58,7 @@ All live in `R/machine_learning.R`.
 | [`compute_features.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.ML.md) | Combined train + predict workflow (training + testing) |
 | [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md) | Generate predictions on test data using trained model (returns AUROC/AUPRC with bootstrap CIs and `Curve_bands`) |
 | [`get_curves()`](https://verapancaldilab.github.io/pipeML/reference/get_curves.md) | ROC and Precision-Recall curves with pointwise bootstrap confidence bands |
-| [`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md) | Per-fold SHAP values (each sample explained only by the fold models that held it out); takes only the trained model |
-| [`plot_shap_stability()`](https://verapancaldilab.github.io/pipeML/reference/plot_shap_stability.md) | Visualize SHAP importance stability across resamples (input: `compute_shap_values(..., return_resamples = TRUE)$shap_resamples`) |
+| [`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md) | SHAP values of the final model (trained on all training samples) for every training sample; takes only the trained model |
 | [`plot_survival_performance()`](https://verapancaldilab.github.io/pipeML/reference/plot_survival_performance.md) | Kaplan-Meier curves stratified by predicted risk groups |
 
 ------------------------------------------------------------------------
@@ -110,6 +115,23 @@ accept custom fold construction functions. These functions receive a
 independently per fold — then be called again on the full training set
 with best hyperparameters.
 
+Contract of a fold construction function: - It receives `data` =
+training features **plus the outcome**: a `target` column
+(`"no"`/`"yes"`) for classification, `time` and `event` columns for
+survival. It must remove them before building features and add them back
+to what it returns. - Fold mode (`bestune = NULL`): saves
+`Results/fold_<fold name>.rds` with `train_data` (features + outcome
+columns), `test_data` (features; plus `time`/`event` for survival),
+`obs_test` (classification), `rowIndex`, `fold_name`, and `params` when
+there are tunable arguments. - Final mode (`bestune` given): returns
+`list(features + outcome columns, custom output, bestune or the selected parameters)`. -
+For survival,
+[`check_survival_fold_features()`](https://verapancaldilab.github.io/pipeML/reference/check_survival_fold_features.md)
+stops if the returned features contain a copy of `time` or `event`
+(outcome not removed). Before 2026-09-29 survival fold functions
+received the features only and had to get time/event through
+`fold_construction_args_fixed`.
+
 ### Cross-Validation Strategies
 
 - Default: Repeated stratified k-fold
@@ -124,7 +146,8 @@ with best hyperparameters.
 
 ### Hyperparameter Tuning
 
-- Metric-based optimization: AUROC, AUPRC, Accuracy, C-index
+- Metric-based optimization: AUROC or AUPRC (classification), C-index
+  (survival)
 - Grid search within CV folds → best params applied to full training
   data
 
@@ -150,28 +173,36 @@ with best hyperparameters.
   per-resample seeds for its parallel workers from the main session’s
   RNG, so this also covers `ncores > 1`.
 - `%dopar%` loops don’t share the main RNG, so each iteration seeds
-  itself: `seed + match(resample, resamples)` in
-  [`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md),
-  and `seed + 1000L * fold_i + parameter_i` in the survival custom-fold
+  itself: `seed + fold_i` in the standard survival CV (folds run in
+  parallel with `ncores > 1`, sequentially otherwise) and
+  `seed + 1000L * fold_i + parameter_i` in the survival custom-fold
   branch. Results are therefore independent of worker scheduling and
-  `n_cores`.
+  `ncores`.
+- [`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md)
+  passes `seed` to
+  [`fastshap::explain()`](https://bgreenwell.github.io/fastshap/reference/explain.html)
+  and runs sequentially: fastshap’s `parallel = TRUE` does not seed its
+  workers, so its results change between runs.
 - Randomness inside a user-supplied `fold_construction_fun` that runs
   its own parallel workers is not covered.
 
-### Fold Models & SHAP
+### SHAP
 
-- During CV the model of each fold is saved to `fold_models_dir`
-  (default `Results/fold_models/<task_type>`), and only the files of the
-  selected model and `bestTune` are kept.
-- `compute_shap_values(model_trained, task_type, ...)` takes everything
-  (training data, outcome, folds, tuned hyperparameters) from the model:
-  caret’s `$trainingData` / `$pred` for classification, `$trainingData`
-  / `$Resample_matrix` for survival. Each sample is explained only by
-  the fold models that held it out, then summarized across repeats by
-  the median.
-- Standard-CV folds are refitted if their saved model is missing;
-  custom-fold models (`fold_construction_fun`) cannot be rebuilt, so a
-  missing fold model is an error.
+- `compute_shap_values(model_trained, task_type, seed)` explains the
+  **final model** (trained on all training samples with `bestTune`) on
+  all its training samples, which are also the background data.
+  Classification: the caret `train` object and its `$trainingData`;
+  survival: `$Model_object` and `$trainingData`.
+- `$trainingData` always holds the final model’s features, so each
+  feature has one fixed definition (custom-fold features are computed
+  once on all training samples). For survival,
+  [`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md)
+  stores the custom `training_set` on the custom path and `df_all`
+  (minus `strata`) on the standard path.
+- The output data frame (samples x features) carries the model’s average
+  prediction in `attr(, "baseline")`; baseline + row sums = the sample’s
+  prediction.
+- Fold models are not saved during CV: SHAP doesn’t use them.
 
 ### Performance Curves (`compute_prediction()` → `get_curves()`)
 
@@ -244,11 +275,25 @@ pkgdown::build_site()      # Rebuild docs website
 
 ### Testing
 
-- `testthat` (v3) is configured in DESCRIPTION but **no test suite
-  exists yet**
-- Current testing is done via manual vignette execution
-- New functionality should eventually be covered by tests in
-  `tests/testthat/`
+- `testthat` (v3) suite in `tests/testthat/`: helpers
+  ([`preprocess_features()`](https://verapancaldilab.github.io/pipeML/reference/preprocess_features.md),
+  hyperparameter grids, example data,
+  [`ensure_caret()`](https://verapancaldilab.github.io/pipeML/reference/ensure_caret.md)),
+  survival helpers (failed fits, empty `bestTune`, predictions without
+  outcome,
+  [`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md)
+  exclusion of failed configurations) and end-to-end workflows
+  (training, prediction, SHAP additivity/reproducibility; standard and
+  custom folds).
+- End-to-end tests are `skip_on_cran()`; the survival training test
+  (several minutes) is also `skip_on_ci()`, so run `devtools::test()`
+  locally before releasing.
+- Tests run in a temporary working directory (`local_temp_wd()` in
+  `helper-data.R`), since pipeML writes to `Results/`.
+- The vignette code is `eval = FALSE`: run its chunks when changing
+  user-facing behaviour. `a3_shap`’s survival section uses
+  `res_survival` from `a2_survival`, so run the articles in order in one
+  session.
 
 ------------------------------------------------------------------------
 
@@ -277,10 +322,14 @@ pkgdown::build_site()      # Rebuild docs website
     and
     [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md)
 
-### Modifying the vignette
+### Modifying the vignettes
 
-Edit `vignettes/pipeML.Rmd`. Run `devtools::build_vignettes()` to test
-locally. The pkgdown CI will publish on merge to main.
+The vignettes follow multideconv’s layout: `pipeML.Rmd` is a short
+landing page and each topic is an article `aN_<topic>.Rmd`, listed in
+both the navbar `articles` menu and the `articles:` index of
+`_pkgdown.yml`. A new article must be added in both places. Run
+`devtools::build_vignettes()` to test locally. The pkgdown CI will
+publish on merge to main.
 
 ------------------------------------------------------------------------
 
@@ -289,23 +338,28 @@ locally. The pkgdown CI will publish on merge to main.
 - The core implementation is a single large file (`machine_learning.R`,
   ~5,500 lines). Internal helpers are not exported — check NAMESPACE
   before assuming a function is public.
+
 - caret must be *attached*, not just loaded: its `"knn"` model code
   calls `knn3()` without a namespace prefix, so a knn fit with
   `trainControl(method = "none")` fails with
   `could not find function "knn3"` otherwise. Classification entry
   points call the internal
   [`ensure_caret()`](https://verapancaldilab.github.io/pipeML/reference/ensure_caret.md).
+
 - Don’t add [`set.seed()`](https://rdrr.io/r/base/Random.html) calls
   inside helpers: they override the user’s `seed` mid-run
   ([`get_tune_grid()`](https://verapancaldilab.github.io/pipeML/reference/get_tune_grid.md)
   used to do this). Seed only at the entry points described under
   Reproducibility.
+
 - Roxygen markdown is enabled (`Roxygen: list(markdown = TRUE)`): write
   `95%`, not `95\%` (it becomes `\\%` in the Rd, which comments out the
   rest of the line), and avoid `[a, b]`-style ranges in plain text
   (parsed as links). Run `devtools::check_man()` after doc edits.
+
 - CRAN doesn’t allow non-CRAN required dependencies: `multideconv` and
   `fastshap` (both in `Remotes`) block a CRAN submission.
+
 - Survival models need the `censored` package (in Suggests) to register
   parsnip’s “censored regression” engines. Every survival entry point
   calls the internal
@@ -315,50 +369,55 @@ locally. The pkgdown CI will publish on merge to main.
   Survival formulas must use `survival::Surv(...)`, not bare `Surv(...)`
   — the bare form only works when some other package happened to attach
   `survival`.
+
 - `multideconv` is a remote (GitHub) dependency — not on CRAN.
   Installation requires
   `remotes::install_github("VeraPancaldiLab/multideconv")`.
+
 - SHAP computation via
   [`fastshap::explain()`](https://bgreenwell.github.io/fastshap/reference/explain.html)
   can be memory-intensive on large datasets.
+
+- xgboost \>= 3 breaks caret’s own `"xgbTree"` model (the booster is an
+  ALTREP object: `modelFit$xNames <- ...` fails with “ALTLIST classes
+  must provide a Set_elt method”). All
+  [`caret::train()`](https://rdrr.io/pkg/caret/man/train.html) calls
+  that may get `"xgbTree"` go through the internal
+  [`caret_train()`](https://verapancaldilab.github.io/pipeML/reference/caret_train.md),
+  which substitutes
+  [`xgbtree_model()`](https://verapancaldilab.github.io/pipeML/reference/xgbtree_model.md)
+  (booster stored in `modelFit$booster`) and resets `$method` to
+  `"xgbTree"`. Use
+  [`caret_train()`](https://verapancaldilab.github.io/pipeML/reference/caret_train.md)
+  for any new call site.
+
 - XGBoost parallel contention: when using `doParallel`, XGBoost nthread
   is set to 1 internally to prevent nested parallelism crashes.
+
 - The `docs/` directory is gitignored — pkgdown output is built and
   deployed by CI only.
+
 - `compute_shap_values(model_trained, ...)` expects `res$Model` from
   [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
   (for classification, the caret `train` object). It validates this and
   stops with a clear error if given the wrong object (e.g. `res` instead
   of `res$Model`).
 
+- Survival LODO:
+  [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
+  /
+  [`compute_features.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.ML.md)
+  now pass `LODO` and `batch_id = "dataset"` to
+  [`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md),
+  which builds cohort x event stratified folds and then drops `dataset`
+  and `strata`, so the cohort is not a predictor. Before 2026-09-28,
+  survival LODO never built cohort folds: text cohort labels crashed and
+  numeric labels were silently used as a predictor.
+
 ## Known Issues / TODO
 
 ### Open bugs
 
-- **LODO is ignored for survival and leaks the cohort label.**
-  [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
-  and
-  [`compute_features.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.ML.md)
-  add a `dataset` column when `LODO = TRUE`, but never pass
-  `LODO`/`batch_id` to
-  [`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md).
-  No cohort-stratified folds are built, and `dataset` is fit as an
-  ordinary predictor (`Surv(time, event) ~ .`) — silently.
-- **`ncores` is ignored in standard survival CV.**
-  [`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md)
-  only creates a cluster in the custom-fold branch; the standard branch
-  loops sequentially over folds and hyperparameter grids (up to 125
-  combinations per model), so a 2-fold run can take 10+ minutes.
-- **[`compute_ml_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_ml_survival.md)
-  swallows fitting errors**: it converts them into a warning and returns
-  `NULL`, so failures go unnoticed (this is how the bare-`Surv()` bug
-  stayed hidden). It also accepts a `fold_models_dir` argument it never
-  uses.
-- **`data_example_survival` codes events as 1/2** (from
-  [`survival::lung`](https://rdrr.io/pkg/survival/man/lung.html)), while
-  the docs say 0/1. It works because `Surv()` accepts both.
-- **No test suite.** `tests/testthat/` doesn’t exist; verification is
-  manual.
 - Cosmetic: on precision-recall plots, the curve’s final vertical drop
   at recall = 1 (to precision = prevalence) falls below the confidence
   band, which ends at the first threshold reaching full recall.
@@ -366,40 +425,9 @@ locally. The pkgdown CI will publish on merge to main.
 ### Performance
 
 - **[`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md)’s
-  cost is extremely method-dependent, and this is invisible to the
-  caller until it’s too late.** Measured empirically (melanoma LODO
-  dataset, ~250-300 x ~15 NMF-factor features, `nsim = 100`, one
+  cost depends on the model’s prediction speed**: it runs one
   [`fastshap::explain()`](https://bgreenwell.github.io/fastshap/reference/explain.html)
-  call per CV resample): `glmnet` ≈ 16s/resample, `KNN` ≈ 25s/resample,
-  but `svmRadial` ≈ **930s/resample** — a ~58x slowdown, because
-  SVM/KNN-family predict methods are computationally heavier per call
-  (KNN recomputes distances to the full training set; SVM’s kernel
-  evaluation is per-support-vector) and
-  [`fastshap::explain()`](https://bgreenwell.github.io/fastshap/reference/explain.html)
-  calls the prediction function repeatedly (proportional to `nsim`) for
-  every resample. With the default `k_folds x n_rep` producing up to 100
-  resamples, an SVM-selected model can turn what’s normally a ~30min job
-  into a ~26-hour one, with zero warning beforehand. Concrete
-  improvements worth making:
-  - **Expose `nsim`** as a
-    [`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md)
-    parameter instead of the hardcoded 100 (`machine_learning.R` line
-    ~2964) — callers with a slow-predict method could trade precision
-    for speed deliberately, instead of being stuck with a fixed cost
-    multiplier they can’t control.
-  - **Expose which/how many resamples to explain**, rather than always
-    looping over every one of `unique(model_trained$pred$Resample)` —
-    explaining a representative subset (e.g. 10-20 of 100) would give an
-    approximate-but-fast SHAP estimate on request.
-  - **Print a per-resample time estimate after the first resample
-    completes** (before committing to the rest of the loop) — currently
-    there’s no feedback at all until the whole thing finishes or the
-    caller gives up waiting; even a single
-    `cat(sprintf("First resample took %.1fs; estimated total: %.1fmin for %d resamples\n", ...))`
-    after resample 1 would let users abort early with an informed
-    decision instead of guessing.
-  - Consider flagging known-slow methods (`svmRadial`, `svmLinear`,
-    `knn`, and other instance-/kernel-based predictors) with a
-    [`message()`](https://rdrr.io/r/base/message.html) up front
-    suggesting a reduced `nsim` or resample subset for those
-    specifically.
+  call on the final model (`nsim = 100`, sequential). Measured on 73
+  samples x 118 features: `xgbTree` ≈ 17 s, `glmnet` ≈ 15 s, `svmRadial`
+  ≈ 75 s. `nsim` is hardcoded; exposing it would let callers trade
+  precision for speed with slow-predict models.

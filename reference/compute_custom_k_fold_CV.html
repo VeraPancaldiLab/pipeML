@@ -25,14 +25,16 @@ and predictions."><meta property="og:image" content="https://verapancaldilab.git
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../index.html">Get started</a></li>
-<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/pipeML.html">Get started</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/pipeML.html">pipeML vignette</a></li>
-    <li><a class="dropdown-item" href="../articles/pipeML.html#classification-and-survival">Classification and survival</a></li>
-    <li><a class="dropdown-item" href="../articles/pipeML.html#advanced">Advanced</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/a1_classification.html">Classification</a></li>
+    <li><a class="dropdown-item" href="../articles/a2_survival.html">Survival analysis</a></li>
+    <li><a class="dropdown-item" href="../articles/a3_shap.html">Interpreting models with SHAP values</a></li>
+    <li><a class="dropdown-item" href="../articles/a4_lodo.html">Multi-cohort validation (LODO)</a></li>
+    <li><a class="dropdown-item" href="../articles/a5_custom_folds.html">Leakage-aware custom cross-validation</a></li>
   </ul></li>
+<li class="active nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
       </ul></div>
@@ -58,13 +60,7 @@ and predictions.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">compute_custom_k_fold_CV</span><span class="op">(</span></span>
-<span>  <span class="va">processed_folds</span>,</span>
-<span>  <span class="va">ml_method</span>,</span>
-<span>  <span class="va">tuneGrid</span>,</span>
-<span>  fold_models_dir <span class="op">=</span> <span class="st">"Results/fold_models/classification"</span>,</span>
-<span>  file_id_offset <span class="op">=</span> <span class="fl">0</span></span>
-<span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">compute_custom_k_fold_CV</span><span class="op">(</span><span class="va">processed_folds</span>, <span class="va">ml_method</span>, <span class="va">tuneGrid</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -86,17 +82,6 @@ as supported by the <code>caret</code> package (e.g., <code>"rf"</code>, <code>"
 <dd><p>Optional. A data frame specifying the grid of hyperparameters
 to evaluate. If <code>NULL</code>, a default grid of length 3 is generated using
 <code><a href="https://rdrr.io/pkg/caret/man/modelLookup.html" class="external-link">caret::getModelInfo()</a></code>.</p></dd>
-
-
-<dt id="arg-fold-models-dir">fold_models_dir<a class="anchor" aria-label="anchor" href="#arg-fold-models-dir"></a></dt>
-<dd><p>Character. Directory where the fitted model of each fold is saved, for reuse by
-<code><a href="compute_shap_values.html">compute_shap_values()</a></code>.</p></dd>
-
-
-<dt id="arg-file-id-offset">file_id_offset<a class="anchor" aria-label="anchor" href="#arg-file-id-offset"></a></dt>
-<dd><p>Integer added to the hyperparameter row number in the saved file names, so that models
-sharing a caret method (glmnet, lasso, ridge) or fitted with different fold construction parameters get
-different files. Default 0.</p></dd>
 
 </dl></div>
     <div class="section level2">

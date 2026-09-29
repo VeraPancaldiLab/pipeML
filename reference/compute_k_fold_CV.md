@@ -12,7 +12,7 @@ compute_k_fold_CV(
   train_data,
   k_folds,
   n_rep,
-  metric = "Accuracy",
+  metric = "AUROC",
   file_name = NULL,
   LODO = FALSE,
   ncores = NULL,
@@ -20,7 +20,6 @@ compute_k_fold_CV(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = "Results/fold_models/classification",
   seed = 123
 )
 ```
@@ -45,8 +44,7 @@ compute_k_fold_CV(
 - metric:
 
   Character. Performance metric used for hyperparameter tuning and model
-  evaluation. Supported values include `"Accuracy"`, `"AUROC"`, and
-  `"AUPRC"`.
+  selection: `"AUROC"` (default) or `"AUPRC"`.
 
 - file_name:
 

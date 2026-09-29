@@ -15,14 +15,16 @@
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="index.html">Get started</a></li>
-<li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="articles/pipeML.html">Get started</a></li>
 <li class="nav-item dropdown">
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
-  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="articles/pipeML.html">pipeML vignette</a></li>
-    <li><a class="dropdown-item" href="articles/pipeML.html#classification-and-survival">Classification and survival</a></li>
-    <li><a class="dropdown-item" href="articles/pipeML.html#advanced">Advanced</a></li>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="articles/a1_classification.html">Classification</a></li>
+    <li><a class="dropdown-item" href="articles/a2_survival.html">Survival analysis</a></li>
+    <li><a class="dropdown-item" href="articles/a3_shap.html">Interpreting models with SHAP values</a></li>
+    <li><a class="dropdown-item" href="articles/a4_lodo.html">Multi-cohort validation (LODO)</a></li>
+    <li><a class="dropdown-item" href="articles/a5_custom_folds.html">Leakage-aware custom cross-validation</a></li>
   </ul></li>
+<li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="search.json"></form></li>
       </ul></div>
@@ -65,7 +67,13 @@
   data.R                 # Documentation for bundled example datasets
   machine_learning.R     # All implementation (~5,500 lines, core file)
 vignettes/
-  pipeML.Rmd             # Main tutorial vignette
+  pipeML.Rmd             # "Get started" landing page (intro, install, workflow chooser, citation)
+  a1_classification.Rmd  # Articles, one per topic (same layout as multideconv)
+  a2_survival.Rmd
+  a3_shap.Rmd
+  a4_lodo.Rmd
+  a5_custom_folds.Rmd
+  figures/               # Static figures shown by the articles (code chunks are eval = FALSE)
 data/                    # Bundled example datasets (.rda)
 man/                     # Auto-generated Roxygen docs (never edit manually)
 docs/                    # pkgdown website output (gitignored)
@@ -80,7 +88,7 @@ _pkgdown.yml             # pkgdown website configuration
 pipeML.Rproj             # RStudio project config</code></pre>
 <hr></div>
 <div class="section level2">
-<h2 id="exported-functions-7-total">Exported Functions (7 total)<a class="anchor" aria-label="anchor" href="#exported-functions-7-total"></a></h2>
+<h2 id="exported-functions-6-total">Exported Functions (6 total)<a class="anchor" aria-label="anchor" href="#exported-functions-6-total"></a></h2>
 <p>All live in <code>R/machine_learning.R</code>.</p>
 <table class="table"><colgroup><col width="50%"><col width="50%"></colgroup><thead><tr><th>Function</th>
 <th>Purpose</th>
@@ -93,9 +101,7 @@ pipeML.Rproj             # RStudio project config</code></pre>
 </tr><tr><td><code><a href="reference/get_curves.html">get_curves()</a></code></td>
 <td>ROC and Precision-Recall curves with pointwise bootstrap confidence bands</td>
 </tr><tr><td><code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code></td>
-<td>Per-fold SHAP values (each sample explained only by the fold models that held it out); takes only the trained model</td>
-</tr><tr><td><code><a href="reference/plot_shap_stability.html">plot_shap_stability()</a></code></td>
-<td>Visualize SHAP importance stability across resamples (input: <code>compute_shap_values(..., return_resamples = TRUE)$shap_resamples</code>)</td>
+<td>SHAP values of the final model (trained on all training samples) for every training sample; takes only the trained model</td>
 </tr><tr><td><code><a href="reference/plot_survival_performance.html">plot_survival_performance()</a></code></td>
 <td>Kaplan-Meier curves stratified by predicted risk groups</td>
 </tr></tbody></table><hr></div>
@@ -115,6 +121,7 @@ pipeML.Rproj             # RStudio project config</code></pre>
 <div class="section level3">
 <h3 id="leakage-free-cv">Leakage-Free CV<a class="anchor" aria-label="anchor" href="#leakage-free-cv"></a></h3>
 <p>The key innovation: <code><a href="reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> and <code><a href="reference/compute_features.ML.html">compute_features.ML()</a></code> accept custom fold construction functions. These functions receive a <code>bestune</code> argument, allowing feature pipelines to recompute features independently per fold — then be called again on the full training set with best hyperparameters.</p>
+<p>Contract of a fold construction function: - It receives <code>data</code> = training features <strong>plus the outcome</strong>: a <code>target</code> column (<code>"no"</code>/<code>"yes"</code>) for classification, <code>time</code> and <code>event</code> columns for survival. It must remove them before building features and add them back to what it returns. - Fold mode (<code>bestune = NULL</code>): saves <code>Results/fold_&lt;fold name&gt;.rds</code> with <code>train_data</code> (features + outcome columns), <code>test_data</code> (features; plus <code>time</code>/<code>event</code> for survival), <code>obs_test</code> (classification), <code>rowIndex</code>, <code>fold_name</code>, and <code>params</code> when there are tunable arguments. - Final mode (<code>bestune</code> given): returns <code>list(features + outcome columns, custom output, bestune or the selected parameters)</code>. - For survival, <code><a href="reference/check_survival_fold_features.html">check_survival_fold_features()</a></code> stops if the returned features contain a copy of <code>time</code> or <code>event</code> (outcome not removed). Before 2026-09-29 survival fold functions received the features only and had to get time/event through <code>fold_construction_args_fixed</code>.</p>
 </div>
 <div class="section level3">
 <h3 id="cross-validation-strategies">Cross-Validation Strategies<a class="anchor" aria-label="anchor" href="#cross-validation-strategies"></a></h3>
@@ -130,7 +137,7 @@ pipeML.Rproj             # RStudio project config</code></pre>
 </ul></div>
 <div class="section level3">
 <h3 id="hyperparameter-tuning">Hyperparameter Tuning<a class="anchor" aria-label="anchor" href="#hyperparameter-tuning"></a></h3>
-<ul><li>Metric-based optimization: AUROC, AUPRC, Accuracy, C-index</li>
+<ul><li>Metric-based optimization: AUROC or AUPRC (classification), C-index (survival)</li>
 <li>Grid search within CV folds → best params applied to full training data</li>
 </ul></div>
 <div class="section level3">
@@ -145,15 +152,19 @@ pipeML.Rproj             # RStudio project config</code></pre>
 <code><a href="reference/compute_features.training.ML.html">compute_features.training.ML()</a></code>, <code><a href="reference/compute_features.ML.html">compute_features.ML()</a></code> and <code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code> take <code>seed</code>; <code>NULL</code> leaves the RNG untouched.</li>
 <li>The training functions pass it to <code><a href="reference/compute_k_fold_CV.html">compute_k_fold_CV()</a></code> / <code><a href="reference/compute_k_fold_CV_survival.html">compute_k_fold_CV_survival()</a></code>, which call <code>set.seed(seed)</code> right before drawing folds. caret draws per-resample seeds for its parallel workers from the main session’s RNG, so this also covers <code>ncores &gt; 1</code>.</li>
 <li>
-<code>%dopar%</code> loops don’t share the main RNG, so each iteration seeds itself: <code>seed + match(resample, resamples)</code> in <code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code>, and <code>seed + 1000L * fold_i + parameter_i</code> in the survival custom-fold branch. Results are therefore independent of worker scheduling and <code>n_cores</code>.</li>
+<code>%dopar%</code> loops don’t share the main RNG, so each iteration seeds itself: <code>seed + fold_i</code> in the standard survival CV (folds run in parallel with <code>ncores &gt; 1</code>, sequentially otherwise) and <code>seed + 1000L * fold_i + parameter_i</code> in the survival custom-fold branch. Results are therefore independent of worker scheduling and <code>ncores</code>.</li>
+<li>
+<code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code> passes <code>seed</code> to <code><a href="https://bgreenwell.github.io/fastshap/reference/explain.html" class="external-link">fastshap::explain()</a></code> and runs sequentially: fastshap’s <code>parallel = TRUE</code> does not seed its workers, so its results change between runs.</li>
 <li>Randomness inside a user-supplied <code>fold_construction_fun</code> that runs its own parallel workers is not covered.</li>
 </ul></div>
 <div class="section level3">
-<h3 id="fold-models--shap">Fold Models &amp; SHAP<a class="anchor" aria-label="anchor" href="#fold-models--shap"></a></h3>
-<ul><li>During CV the model of each fold is saved to <code>fold_models_dir</code> (default <code>Results/fold_models/&lt;task_type&gt;</code>), and only the files of the selected model and <code>bestTune</code> are kept.</li>
+<h3 id="shap">SHAP<a class="anchor" aria-label="anchor" href="#shap"></a></h3>
+<ul><li>
+<code>compute_shap_values(model_trained, task_type, seed)</code> explains the <strong>final model</strong> (trained on all training samples with <code>bestTune</code>) on all its training samples, which are also the background data. Classification: the caret <code>train</code> object and its <code>$trainingData</code>; survival: <code>$Model_object</code> and <code>$trainingData</code>.</li>
 <li>
-<code>compute_shap_values(model_trained, task_type, ...)</code> takes everything (training data, outcome, folds, tuned hyperparameters) from the model: caret’s <code>$trainingData</code> / <code>$pred</code> for classification, <code>$trainingData</code> / <code>$Resample_matrix</code> for survival. Each sample is explained only by the fold models that held it out, then summarized across repeats by the median.</li>
-<li>Standard-CV folds are refitted if their saved model is missing; custom-fold models (<code>fold_construction_fun</code>) cannot be rebuilt, so a missing fold model is an error.</li>
+<code>$trainingData</code> always holds the final model’s features, so each feature has one fixed definition (custom-fold features are computed once on all training samples). For survival, <code><a href="reference/compute_k_fold_CV_survival.html">compute_k_fold_CV_survival()</a></code> stores the custom <code>training_set</code> on the custom path and <code>df_all</code> (minus <code>strata</code>) on the standard path.</li>
+<li>The output data frame (samples x features) carries the model’s average prediction in <code>attr(, "baseline")</code>; baseline + row sums = the sample’s prediction.</li>
+<li>Fold models are not saved during CV: SHAP doesn’t use them.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="performance-curves-compute_prediction--get_curves">Performance Curves (<code>compute_prediction()</code> → <code>get_curves()</code>)<a class="anchor" aria-label="anchor" href="#performance-curves-compute_prediction--get_curves"></a></h3>
@@ -207,11 +218,10 @@ pipeML.Rproj             # RStudio project config</code></pre>
 <div class="section level3">
 <h3 id="testing">Testing<a class="anchor" aria-label="anchor" href="#testing"></a></h3>
 <ul><li>
-<code>testthat</code> (v3) is configured in DESCRIPTION but <strong>no test suite exists yet</strong>
-</li>
-<li>Current testing is done via manual vignette execution</li>
-<li>New functionality should eventually be covered by tests in <code>tests/testthat/</code>
-</li>
+<code>testthat</code> (v3) suite in <code>tests/testthat/</code>: helpers (<code><a href="reference/preprocess_features.html">preprocess_features()</a></code>, hyperparameter grids, example data, <code><a href="reference/ensure_caret.html">ensure_caret()</a></code>), survival helpers (failed fits, empty <code>bestTune</code>, predictions without outcome, <code><a href="reference/aggregate_results.html">aggregate_results()</a></code> exclusion of failed configurations) and end-to-end workflows (training, prediction, SHAP additivity/reproducibility; standard and custom folds).</li>
+<li>End-to-end tests are <code>skip_on_cran()</code>; the survival training test (several minutes) is also <code>skip_on_ci()</code>, so run <code>devtools::test()</code> locally before releasing.</li>
+<li>Tests run in a temporary working directory (<code>local_temp_wd()</code> in <code>helper-data.R</code>), since pipeML writes to <code>Results/</code>.</li>
+<li>The vignette code is <code>eval = FALSE</code>: run its chunks when changing user-facing behaviour. <code>a3_shap</code>’s survival section uses <code>res_survival</code> from <code>a2_survival</code>, so run the articles in order in one session.</li>
 </ul><hr></div>
 </div>
 <div class="section level2">
@@ -233,54 +243,36 @@ pipeML.Rproj             # RStudio project config</code></pre>
 </li>
 </ol></div>
 <div class="section level3">
-<h3 id="modifying-the-vignette">Modifying the vignette<a class="anchor" aria-label="anchor" href="#modifying-the-vignette"></a></h3>
-<p>Edit <code>vignettes/pipeML.Rmd</code>. Run <code>devtools::build_vignettes()</code> to test locally. The pkgdown CI will publish on merge to main.</p>
+<h3 id="modifying-the-vignettes">Modifying the vignettes<a class="anchor" aria-label="anchor" href="#modifying-the-vignettes"></a></h3>
+<p>The vignettes follow multideconv’s layout: <code>pipeML.Rmd</code> is a short landing page and each topic is an article <code>aN_&lt;topic&gt;.Rmd</code>, listed in both the navbar <code>articles</code> menu and the <code>articles:</code> index of <code>_pkgdown.yml</code>. A new article must be added in both places. Run <code>devtools::build_vignettes()</code> to test locally. The pkgdown CI will publish on merge to main.</p>
 <hr></div>
 </div>
 <div class="section level2">
 <h2 id="notes--gotchas">Notes &amp; Gotchas<a class="anchor" aria-label="anchor" href="#notes--gotchas"></a></h2>
-<ul><li>The core implementation is a single large file (<code>machine_learning.R</code>, ~5,500 lines). Internal helpers are not exported — check NAMESPACE before assuming a function is public.</li>
-<li>caret must be <em>attached</em>, not just loaded: its <code>"knn"</code> model code calls <code>knn3()</code> without a namespace prefix, so a knn fit with <code>trainControl(method = "none")</code> fails with <code>could not find function "knn3"</code> otherwise. Classification entry points call the internal <code><a href="reference/ensure_caret.html">ensure_caret()</a></code>.</li>
-<li>Don’t add <code><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed()</a></code> calls inside helpers: they override the user’s <code>seed</code> mid-run (<code><a href="reference/get_tune_grid.html">get_tune_grid()</a></code> used to do this). Seed only at the entry points described under Reproducibility.</li>
-<li>Roxygen markdown is enabled (<code>Roxygen: list(markdown = TRUE)</code>): write <code>95%</code>, not <code>95\%</code> (it becomes <code>\\%</code> in the Rd, which comments out the rest of the line), and avoid <code>[a, b]</code>-style ranges in plain text (parsed as links). Run <code>devtools::check_man()</code> after doc edits.</li>
-<li>CRAN doesn’t allow non-CRAN required dependencies: <code>multideconv</code> and <code>fastshap</code> (both in <code>Remotes</code>) block a CRAN submission.</li>
-<li>Survival models need the <code>censored</code> package (in Suggests) to register parsnip’s “censored regression” engines. Every survival entry point calls the internal <code><a href="reference/ensure_censored.html">ensure_censored()</a></code>, which loads its namespace; users don’t need <code><a href="https://github.com/tidymodels/censored" class="external-link">library(censored)</a></code>. Survival formulas must use <code>survival::Surv(...)</code>, not bare <code>Surv(...)</code> — the bare form only works when some other package happened to attach <code>survival</code>.</li>
-<li>
-<code>multideconv</code> is a remote (GitHub) dependency — not on CRAN. Installation requires <code>remotes::install_github("VeraPancaldiLab/multideconv")</code>.</li>
-<li>SHAP computation via <code><a href="https://bgreenwell.github.io/fastshap/reference/explain.html" class="external-link">fastshap::explain()</a></code> can be memory-intensive on large datasets.</li>
-<li>XGBoost parallel contention: when using <code>doParallel</code>, XGBoost nthread is set to 1 internally to prevent nested parallelism crashes.</li>
-<li>The <code>docs/</code> directory is gitignored — pkgdown output is built and deployed by CI only.</li>
-<li>
-<code>compute_shap_values(model_trained, ...)</code> expects <code>res$Model</code> from <code><a href="reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> (for classification, the caret <code>train</code> object). It validates this and stops with a clear error if given the wrong object (e.g. <code>res</code> instead of <code>res$Model</code>).</li>
+<ul><li><p>The core implementation is a single large file (<code>machine_learning.R</code>, ~5,500 lines). Internal helpers are not exported — check NAMESPACE before assuming a function is public.</p></li>
+<li><p>caret must be <em>attached</em>, not just loaded: its <code>"knn"</code> model code calls <code>knn3()</code> without a namespace prefix, so a knn fit with <code>trainControl(method = "none")</code> fails with <code>could not find function "knn3"</code> otherwise. Classification entry points call the internal <code><a href="reference/ensure_caret.html">ensure_caret()</a></code>.</p></li>
+<li><p>Don’t add <code><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed()</a></code> calls inside helpers: they override the user’s <code>seed</code> mid-run (<code><a href="reference/get_tune_grid.html">get_tune_grid()</a></code> used to do this). Seed only at the entry points described under Reproducibility.</p></li>
+<li><p>Roxygen markdown is enabled (<code>Roxygen: list(markdown = TRUE)</code>): write <code>95%</code>, not <code>95\%</code> (it becomes <code>\\%</code> in the Rd, which comments out the rest of the line), and avoid <code>[a, b]</code>-style ranges in plain text (parsed as links). Run <code>devtools::check_man()</code> after doc edits.</p></li>
+<li><p>CRAN doesn’t allow non-CRAN required dependencies: <code>multideconv</code> and <code>fastshap</code> (both in <code>Remotes</code>) block a CRAN submission.</p></li>
+<li><p>Survival models need the <code>censored</code> package (in Suggests) to register parsnip’s “censored regression” engines. Every survival entry point calls the internal <code><a href="reference/ensure_censored.html">ensure_censored()</a></code>, which loads its namespace; users don’t need <code><a href="https://github.com/tidymodels/censored" class="external-link">library(censored)</a></code>. Survival formulas must use <code>survival::Surv(...)</code>, not bare <code>Surv(...)</code> — the bare form only works when some other package happened to attach <code>survival</code>.</p></li>
+<li><p><code>multideconv</code> is a remote (GitHub) dependency — not on CRAN. Installation requires <code>remotes::install_github("VeraPancaldiLab/multideconv")</code>.</p></li>
+<li><p>SHAP computation via <code><a href="https://bgreenwell.github.io/fastshap/reference/explain.html" class="external-link">fastshap::explain()</a></code> can be memory-intensive on large datasets.</p></li>
+<li><p>xgboost &gt;= 3 breaks caret’s own <code>"xgbTree"</code> model (the booster is an ALTREP object: <code>modelFit$xNames &lt;- ...</code> fails with “ALTLIST classes must provide a Set_elt method”). All <code><a href="https://rdrr.io/pkg/caret/man/train.html" class="external-link">caret::train()</a></code> calls that may get <code>"xgbTree"</code> go through the internal <code><a href="reference/caret_train.html">caret_train()</a></code>, which substitutes <code><a href="reference/xgbtree_model.html">xgbtree_model()</a></code> (booster stored in <code>modelFit$booster</code>) and resets <code>$method</code> to <code>"xgbTree"</code>. Use <code><a href="reference/caret_train.html">caret_train()</a></code> for any new call site.</p></li>
+<li><p>XGBoost parallel contention: when using <code>doParallel</code>, XGBoost nthread is set to 1 internally to prevent nested parallelism crashes.</p></li>
+<li><p>The <code>docs/</code> directory is gitignored — pkgdown output is built and deployed by CI only.</p></li>
+<li><p><code>compute_shap_values(model_trained, ...)</code> expects <code>res$Model</code> from <code><a href="reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> (for classification, the caret <code>train</code> object). It validates this and stops with a clear error if given the wrong object (e.g. <code>res</code> instead of <code>res$Model</code>).</p></li>
+<li><p>Survival LODO: <code><a href="reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> / <code><a href="reference/compute_features.ML.html">compute_features.ML()</a></code> now pass <code>LODO</code> and <code>batch_id = "dataset"</code> to <code><a href="reference/compute_k_fold_CV_survival.html">compute_k_fold_CV_survival()</a></code>, which builds cohort x event stratified folds and then drops <code>dataset</code> and <code>strata</code>, so the cohort is not a predictor. Before 2026-09-28, survival LODO never built cohort folds: text cohort labels crashed and numeric labels were silently used as a predictor.</p></li>
 </ul></div>
 <div class="section level2">
 <h2 id="known-issues--todo">Known Issues / TODO<a class="anchor" aria-label="anchor" href="#known-issues--todo"></a></h2>
 <div class="section level3">
 <h3 id="open-bugs">Open bugs<a class="anchor" aria-label="anchor" href="#open-bugs"></a></h3>
-<ul><li>
-<strong>LODO is ignored for survival and leaks the cohort label.</strong> <code><a href="reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> and <code><a href="reference/compute_features.ML.html">compute_features.ML()</a></code> add a <code>dataset</code> column when <code>LODO = TRUE</code>, but never pass <code>LODO</code>/<code>batch_id</code> to <code><a href="reference/compute_k_fold_CV_survival.html">compute_k_fold_CV_survival()</a></code>. No cohort-stratified folds are built, and <code>dataset</code> is fit as an ordinary predictor (<code>Surv(time, event) ~ .</code>) — silently.</li>
-<li>
-<strong><code>ncores</code> is ignored in standard survival CV.</strong> <code><a href="reference/compute_k_fold_CV_survival.html">compute_k_fold_CV_survival()</a></code> only creates a cluster in the custom-fold branch; the standard branch loops sequentially over folds and hyperparameter grids (up to 125 combinations per model), so a 2-fold run can take 10+ minutes.</li>
-<li>
-<strong><code><a href="reference/compute_ml_survival.html">compute_ml_survival()</a></code> swallows fitting errors</strong>: it converts them into a warning and returns <code>NULL</code>, so failures go unnoticed (this is how the bare-<code>Surv()</code> bug stayed hidden). It also accepts a <code>fold_models_dir</code> argument it never uses.</li>
-<li>
-<strong><code>data_example_survival</code> codes events as 1/2</strong> (from <code><a href="https://rdrr.io/pkg/survival/man/lung.html" class="external-link">survival::lung</a></code>), while the docs say 0/1. It works because <code>Surv()</code> accepts both.</li>
-<li>
-<strong>No test suite.</strong> <code>tests/testthat/</code> doesn’t exist; verification is manual.</li>
-<li>Cosmetic: on precision-recall plots, the curve’s final vertical drop at recall = 1 (to precision = prevalence) falls below the confidence band, which ends at the first threshold reaching full recall.</li>
+<ul><li>Cosmetic: on precision-recall plots, the curve’s final vertical drop at recall = 1 (to precision = prevalence) falls below the confidence band, which ends at the first threshold reaching full recall.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="performance">Performance<a class="anchor" aria-label="anchor" href="#performance"></a></h3>
 <ul><li>
-<strong><code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code>’s cost is extremely method-dependent, and this is invisible to the caller until it’s too late.</strong> Measured empirically (melanoma LODO dataset, ~250-300 x ~15 NMF-factor features, <code>nsim = 100</code>, one <code><a href="https://bgreenwell.github.io/fastshap/reference/explain.html" class="external-link">fastshap::explain()</a></code> call per CV resample): <code>glmnet</code> ≈ 16s/resample, <code>KNN</code> ≈ 25s/resample, but <code>svmRadial</code> ≈ <strong>930s/resample</strong> — a ~58x slowdown, because SVM/KNN-family predict methods are computationally heavier per call (KNN recomputes distances to the full training set; SVM’s kernel evaluation is per-support-vector) and <code><a href="https://bgreenwell.github.io/fastshap/reference/explain.html" class="external-link">fastshap::explain()</a></code> calls the prediction function repeatedly (proportional to <code>nsim</code>) for every resample. With the default <code>k_folds x n_rep</code> producing up to 100 resamples, an SVM-selected model can turn what’s normally a ~30min job into a ~26-hour one, with zero warning beforehand. Concrete improvements worth making:
-<ul><li>
-<strong>Expose <code>nsim</code></strong> as a <code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code> parameter instead of the hardcoded 100 (<code>machine_learning.R</code> line ~2964) — callers with a slow-predict method could trade precision for speed deliberately, instead of being stuck with a fixed cost multiplier they can’t control.</li>
-<li>
-<strong>Expose which/how many resamples to explain</strong>, rather than always looping over every one of <code>unique(model_trained$pred$Resample)</code> — explaining a representative subset (e.g. 10-20 of 100) would give an approximate-but-fast SHAP estimate on request.</li>
-<li>
-<strong>Print a per-resample time estimate after the first resample completes</strong> (before committing to the rest of the loop) — currently there’s no feedback at all until the whole thing finishes or the caller gives up waiting; even a single <code>cat(sprintf("First resample took %.1fs; estimated total: %.1fmin for %d resamples\n", ...))</code> after resample 1 would let users abort early with an informed decision instead of guessing.</li>
-<li>Consider flagging known-slow methods (<code>svmRadial</code>, <code>svmLinear</code>, <code>knn</code>, and other instance-/kernel-based predictors) with a <code><a href="https://rdrr.io/r/base/message.html" class="external-link">message()</a></code> up front suggesting a reduced <code>nsim</code> or resample subset for those specifically.</li>
-</ul></li>
+<strong><code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code>’s cost depends on the model’s prediction speed</strong>: it runs one <code><a href="https://bgreenwell.github.io/fastshap/reference/explain.html" class="external-link">fastshap::explain()</a></code> call on the final model (<code>nsim = 100</code>, sequential). Measured on 73 samples x 118 features: <code>xgbTree</code> ≈ 17 s, <code>glmnet</code> ≈ 15 s, <code>svmRadial</code> ≈ 75 s. <code>nsim</code> is hardcoded; exposing it would let callers trade precision for speed with slow-predict models.</li>
 </ul></div>
 </div>
 </div>

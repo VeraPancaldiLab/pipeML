@@ -2,8 +2,13 @@ pandoc: 3.8.3
 pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
+  a1_classification: a1_classification.html
+  a2_survival: a2_survival.html
+  a3_shap: a3_shap.html
+  a4_lodo: a4_lodo.html
+  a5_custom_folds: a5_custom_folds.html
   pipeML: pipeML.html
-last_built: 2026-09-28T09:56Z
+last_built: 2026-09-29T18:57Z
 urls:
   reference: https://verapancaldilab.github.io/pipeML/reference
   article: https://verapancaldilab.github.io/pipeML/articles
