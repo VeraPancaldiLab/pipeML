@@ -83,7 +83,7 @@ pipeline. </i>
 
   - AUROC
   - AUPRC
-  - Accuracy
+  - C-index (survival)
 
 ### Model interpretation
 

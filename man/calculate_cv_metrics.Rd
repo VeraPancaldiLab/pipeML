@@ -9,7 +9,7 @@ calculate_cv_metrics(ml_model, metric, hyperparameters = NULL)
 \arguments{
 \item{ml_model}{A trained machine learning model object containing \code{Prediction_folds} and \code{Resample_matrix}.}
 
-\item{metric}{Character string specifying the metric to optimize when selecting hyperparameters. Typical values are \code{"AUROC"}, \code{"AUPRC"}, or \code{"Accuracy"}.}
+\item{metric}{Character string specifying the metric to optimize when selecting hyperparameters. Either \code{"AUROC"} or \code{"AUPRC"}.}
 
 \item{hyperparameters}{Optional character vector of hyperparameter column names to evaluate. If \code{NULL}, no hyperparameter tuning is performed.}
 }

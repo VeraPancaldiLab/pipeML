@@ -13,7 +13,7 @@ compute_features.ML(
   trait.positive = NULL,
   time_var = NULL,
   event_var = NULL,
-  metric = "Accuracy",
+  metric = "AUROC",
   k_folds = 10,
   n_rep = 5,
   LODO = FALSE,
@@ -24,7 +24,6 @@ compute_features.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = NULL,
   seed = 123
 )
 }
@@ -52,7 +51,7 @@ Ensures all performance metrics and interpretability analyses consistently treat
 
 \item{metric}{Character. Performance metric used for model tuning and selection:
 \itemize{
-\item Classification: \code{"Accuracy"}, \code{"AUROC"}, \code{"AUPRC"}.
+\item Classification: \code{"AUROC"} (default) or \code{"AUPRC"}.
 \item Survival: evaluated using concordance index (C-index).
 }}
 
@@ -67,21 +66,19 @@ Ensures all performance metrics and interpretability analyses consistently treat
 \item{file_name}{Character. Base name used to save plots/results under \code{Results/}. For survival tasks,
 Kaplan-Meier plots are saved as \code{"Results/Survival_KM_<file_name>.pdf"}.}
 
-\item{ncores}{Integer. Number of CPU cores for parallelization. Default: \code{parallel::detectCores() - 1}.}
+\item{ncores}{Integer. Number of CPU cores for parallelization (cross-validation folds are processed in parallel).
+Default: \code{NULL} (sequential).}
 
 \item{return}{Logical. Whether to return and save plots/results. Default: \code{FALSE}.}
 
 \item{fold_construction_fun}{Function. Optional custom function to construct cross-validation folds.
-Must accept a \code{bestune} argument internally to inject optimized hyperparameters.}
+Must accept a \code{bestune} argument internally to inject optimized hyperparameters. Used for both
+classification and survival. \code{features_test} is used as given: it must contain the features built by
+this function (e.g. the test samples projected onto the structure learned on the training samples).}
 
 \item{fold_construction_args_fixed}{List. Fixed arguments passed to \code{fold_construction_fun} for both CV and final training.}
 
 \item{fold_construction_args_tunable}{List. Arguments passed to \code{fold_construction_fun} defining hyperparameters to explore during CV.}
-
-\item{fold_models_dir}{Character. Directory where per-fold models are saved/read from when
-\code{fold_construction_fun} is used. If \code{NULL} (default), uses \code{"Results/fold_models/<task_type>"}
-so classification and survival runs never share (or prune) each other's files. Use a distinct
-directory per analysis when running several analyses of the same task type from one folder.}
 
 \item{seed}{Integer. Random seed for reproducible cross-validation (fold assignment and model fitting,
 including parallel runs). Default: \code{123}. Use \code{NULL} to leave the random number generator

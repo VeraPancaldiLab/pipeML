@@ -15,11 +15,12 @@
 #' data_example_survival
 #'
 #' Example dataset for survival analysis.
-#' Uses the lung cancer dataset from the `survival` package.
+#' Uses the lung cancer dataset from the `survival` package (complete cases only).
 #'
-#' @format A data frame with samples as rows and variables as columns (e.g., survival time, status, covariates)
+#' @format A data frame with 167 samples as rows and 10 columns: the survival time in days (`time`), the event
+#'   indicator (`status`: 1 = death, 0 = censored) and 8 covariates.
 #'
-#' @source `survival::lung`
+#' @source `survival::lung`, with `status` recoded from 1 = censored / 2 = dead to 0 = censored / 1 = death.
 #'
 #' @examples
 #' data(data_example_survival)

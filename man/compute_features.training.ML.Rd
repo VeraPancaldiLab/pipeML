@@ -22,7 +22,6 @@ compute_features.training.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  fold_models_dir = NULL,
   seed = 123
 )
 }
@@ -39,13 +38,12 @@ compute_features.training.ML(
 
 \item{event_var}{Character. Name of the event indicator (1 = event occurred, 0 = censored) for survival tasks.}
 
-\item{metric}{Character. Performance metric for model selection and tuning. Supported values:
+\item{metric}{Character. Performance metric for model selection and tuning (classification):
 \itemize{
-\item \code{"Accuracy"} - classification accuracy
-\item \code{"AUROC"} - area under the ROC curve
+\item \code{"AUROC"} - area under the ROC curve (used when \code{NULL})
 \item \code{"AUPRC"} - area under the precision-recall curve
-\item \code{"C-index"} - concordance index (for survival tasks)
-}}
+}
+Survival models are always selected by the concordance index (C-index); \code{metric} is ignored.}
 
 \item{k_folds}{Integer. Number of folds for cross-validation. Default: 10.}
 
@@ -57,31 +55,31 @@ compute_features.training.ML(
 
 \item{file_name}{Character. File name prefix used to save performance plots in \code{"Results/"}.}
 
-\item{ncores}{Integer. Number of CPU cores for parallelization. Default: \code{parallel::detectCores() - 1}.}
+\item{ncores}{Integer. Number of CPU cores for parallelization (cross-validation folds are processed in parallel).
+Default: \code{NULL} (sequential).}
 
 \item{return}{Logical. Whether to return the trained models and plots. Default: \code{FALSE}.}
 
-\item{fold_construction_fun}{Function. Optional user-defined function for fold construction. Must accept a \code{bestune} argument:
+\item{fold_construction_fun}{Function. Optional user-defined function for fold construction. It is called with
+\code{data} (the training features plus the outcome: a \code{target} column coded \code{"no"}/\code{"yes"} for
+classification, \code{time} and \code{event} columns for survival), \code{folds} and \code{bestune}. It must
+remove the outcome columns before building features. Must accept a \code{bestune} argument:
 \itemize{
 \item \code{bestune = NULL} - explore parameter grid across folds (parallelized via \code{foreach}).
-\item \code{bestune provided} - rebuild features on the full dataset using optimized parameters.
+\item \code{bestune provided} - rebuild features on the full dataset using optimized parameters, and
+return a list with the features plus the outcome columns, any custom output, and \code{bestune}.
 }
 The function should save individual folds as \code{"Results/fold_*.rds"} with:
 \itemize{
-\item \code{train_data} - training data
-\item \code{test_data} - testing data
-\item \code{obs_test} - observed outcomes
+\item \code{train_data} - training features plus the outcome columns
+\item \code{test_data} - test features (plus \code{time} and \code{event} for survival)
+\item \code{obs_test} - observed outcomes (classification)
 \item \code{params} - parameters used (if applicable)
 }}
 
 \item{fold_construction_args_fixed}{List of arguments passed to \code{fold_construction_fun} that remain fixed across CV and final training.}
 
 \item{fold_construction_args_tunable}{List of arguments passed to \code{fold_construction_fun} for hyperparameter tuning.}
-
-\item{fold_models_dir}{Character. Directory where per-fold models are saved/read from when
-\code{fold_construction_fun} is used. If \code{NULL} (default), uses \code{"Results/fold_models/<task_type>"}
-so classification and survival runs never share (or prune) each other's files. Use a distinct
-directory per analysis when running several analyses of the same task type from one folder.}
 
 \item{seed}{Integer. Random seed for reproducible cross-validation: it fixes the fold assignment and
 the randomness in model fitting (e.g. random forest, bagging, boosting), including when running in

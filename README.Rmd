@@ -78,7 +78,7 @@ The framework is designed to integrate naturally with R/Bioconductor workflows, 
 
   * AUROC
   * AUPRC
-  * Accuracy
+  * C-index (survival)
   
 ### Model interpretation
 

@@ -16,7 +16,8 @@ wrapper_train_best_hyperparams_survival(
 }
 \arguments{
 \item{train_data}{A data frame containing the original training data
-used for cross-validation.}
+used for cross-validation (features plus \code{time} and \code{event}), passed to
+\code{fold_construction_fun} as \code{data}.}
 
 \item{optimized}{A list output from \code{\link[=aggregate_results]{aggregate_results()}} or
 \code{\link[=compute_k_fold_CV_survival]{compute_k_fold_CV_survival()}}, containing the best-tuned parameters

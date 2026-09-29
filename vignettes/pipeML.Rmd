@@ -31,7 +31,7 @@ This vignette demonstrates how to use `pipeML` to train, tune, evaluate and inte
 
 - `compute_features.training.ML()`: train and tune models on a training set with repeated k-fold cross-validation, and select the best model.
 - `compute_prediction()`: evaluate the selected model on a test set.
-- `compute_shap_values()`: explain the selected model with SHAP values computed on the cross-validation folds.
+- `compute_shap_values()`: explain the selected model (trained on all training samples) with SHAP values.
 
 If you already have a test set prepared, `compute_features.ML()` performs training and prediction in one step.
 
@@ -47,7 +47,7 @@ If you already have a test set prepared, `compute_features.ML()` performs traini
 
 All three workflows work for both classification and survival tasks, and all of them support prediction on a test set and SHAP values.
 
-Results (plots, fold models) are written to a `Results/` folder in the working directory.
+Results (plots, fold files of custom workflows) are written to a `Results/` folder in the working directory.
 
 # Classification Tasks
 
@@ -73,7 +73,7 @@ y_test  <- y[-train_idx]
 
 ## Train Models
 
-Train and tune models using repeated stratified k-fold cross-validation. `trait.positive` is the value of `target_var` considered as the positive class, and `metric` is the metric used to select the best model (`"AUROC"`, `"AUPRC"` or `"Accuracy"`):
+Train and tune models using repeated stratified k-fold cross-validation. `trait.positive` is the value of `target_var` considered as the positive class, and `metric` is the metric used to select the best model (`"AUROC"` or `"AUPRC"`):
 ```{r, eval=FALSE}
 res <- compute_features.training.ML(features_train = X_train,
                                     target_var = y_train,
@@ -147,11 +147,10 @@ knitr::include_graphics("figures/PR.png")
 
 ## Compute SHAP Values
 
-SHAP values explain which features drive the predictions of the selected model (see [Interpreting models with SHAP values](#interpreting-models-with-shap-values) for details and plots). Everything `compute_shap_values()` needs (training data, outcome, cross-validation folds, tuned hyperparameters) is taken from the trained model, so only the model needs to be passed:
+SHAP values explain which features drive the predictions of the selected model (see [Interpreting models with SHAP values](#interpreting-models-with-shap-values) for details and plots). Everything `compute_shap_values()` needs (the final model and its training data) is taken from the trained model, so only the model needs to be passed:
 ```{r, eval=FALSE}
 shap_classification <- compute_shap_values(model_trained = res$Model,
                                            task_type = "classification",
-                                           n_cores = 2,
                                            seed = 123)
 head(shap_classification)
 ```
@@ -170,12 +169,12 @@ In survival analysis, the response variable is defined by two components:
 install.packages("censored")  # only needed once, if not already installed
 ```
 
-Load example dataset for survival. In this dataset (`survival::lung`), `status` is coded 1 = censored and 2 = death, so we recode it as 0/1:
+Load example dataset for survival. The event indicator `status` is coded 1 = death and 0 = censored:
 ```{r, eval=FALSE}
 data = pipeML::data_example_survival
 X <- data %>% dplyr::select(-time, -status)
 time <- data$time
-event <- ifelse(data$status == 2, 1, 0)
+event <- data$status
 ```
 
 Similar to the previous example, split data into train/test:
@@ -267,8 +266,7 @@ knitr::include_graphics("figures/KM.png")
 `compute_shap_values()` works the same way with `task_type = "survival"`. The training data is taken from the trained model (`res_survival$Model$trainingData`), so only the model needs to be passed. SHAP values are in risk-score units: positive values push the prediction towards higher risk.
 ```{r, eval = FALSE}
 shap_survival <- compute_shap_values(model_trained = res_survival$Model,
-                                     task_type = "survival",
-                                     n_cores = 2)
+                                     task_type = "survival")
 head(shap_survival)
 ```
 
@@ -309,7 +307,7 @@ res_onestep$AUC
 ## Survival Example
 ```{r, eval = FALSE}
 data = pipeML::data_example_survival
-data$event <- ifelse(data$status == 2, 1, 0)   # 1 = death, 0 = censored
+data$event <- data$status   # 1 = death, 0 = censored
 X <- data %>% dplyr::select(-time, -status, -event)
 
 set.seed(123)
@@ -357,42 +355,35 @@ SHAP values are in the units of the model output:
 
 `pipeML` uses the `fastshap` package, which estimates SHAP values via Monte Carlo sampling (100 simulations per feature). For each sample and each feature, it asks: *on average, across random orderings of the features, how much does including this feature change the prediction?* When a feature is "absent", it is replaced by the value of a randomly drawn training sample.
 
-## Per-fold SHAP: why `pipeML` does it differently
+## Which model is explained?
 
-Most SHAP workflows fit one final model on all data and compute SHAP values on training samples. This has a bias: the model already memorized those samples, so features that overfit will appear more important than they really are.
+`compute_shap_values()` explains the **final model**: the model selected by cross-validation and trained on all training samples with the tuned hyperparameters (the model used by `compute_prediction()`). SHAP values are computed for every training sample, and the training samples are also used as background data.
 
-`pipeML` instead computes SHAP values **per cross-validation fold**:
+Because the final model is a single model, each feature has one fixed definition for all samples. This matters for the custom workflows: features built by a custom fold construction function (e.g. clusters or subgroups) can differ between cross-validation folds, but the final model uses the features computed once on all training samples.
 
-1. For each resample, take the model trained on the training part of that fold (with the tuned hyperparameters).
-2. Compute SHAP values only on the held-out samples of that fold — samples the model never saw.
-3. After all folds, aggregate SHAP values per sample via the median across resamples.
-
-How the fold model is obtained depends on the workflow:
-
-- **Standard workflow**: the fold model is refitted on the training part of the fold.
-- **Custom folds**: the fold models are saved during training (in `fold_models_dir`, by default `Results/fold_models/<task_type>`) and loaded by `compute_shap_values()`. They cannot be refitted, because their features were built from the training part of each fold. If a fold model is missing, `compute_shap_values()` stops with an error: point `fold_models_dir` to the directory used during training, or retrain the model.
-
-`compute_shap_values()` prints how many resamples were loaded, refitted or skipped (a resample is skipped when the model predicts the same value for all its held-out samples).
+**Interpretation.** The final model was trained on the samples it explains, so SHAP values describe how the model uses each feature on its training data. This does not affect the cross-validation performance or the tuned hyperparameters, which come from the cross-validation folds. However, a model that overfits (e.g. flexible models on small datasets) can rely on features that help fit the training samples without improving predictions on new samples, and SHAP values will show them as important. Compare the performance of the final model on the training samples with the cross-validation performance: if both are similar, the model does not overfit much and SHAP values reflect features that generalize.
 
 ## Running `compute_shap_values()`
 
-We use the classification model trained above (`res`, trained on `data_example_classification`). With `return_resamples = TRUE`, the function also returns the SHAP values of each resample:
+We use the classification model trained above (`res`, trained on `data_example_classification`):
 ```{r, eval=FALSE}
-shap_res <- compute_shap_values(model_trained = res$Model,
-                                task_type = "classification",
-                                n_cores = 2,
-                                return_resamples = TRUE)
+shap_classification <- compute_shap_values(model_trained = res$Model,
+                                           task_type = "classification")
 ```
 
-`shap_res$shap` has one row per training sample and one column per feature. Each value is the median SHAP value of the sample across the resamples in which it was held out:
+The result has one row per training sample and one column per feature of the final model:
 ```{r, eval=FALSE}
-shap_classification <- shap_res$shap
 head(shap_classification)
 ```
 
-`shap_res$shap_resamples` has one row per held-out sample and resample:
+The average prediction of the model on the training samples is stored in the attribute `baseline`. For each sample, the baseline plus the sum of its SHAP values equals its predicted probability:
 ```{r, eval=FALSE}
-head(shap_res$shap_resamples)
+baseline <- attr(shap_classification, "baseline")
+baseline
+
+X_train_model <- res$Model$trainingData[, colnames(shap_classification)]
+head(cbind(prediction = predict(res$Model, X_train_model, type = "prob")[, "yes"],
+           baseline_plus_shap = baseline + rowSums(shap_classification)))
 ```
 
 ## Feature importance across samples
@@ -402,11 +393,12 @@ The global importance of a feature is its mean absolute SHAP value across sample
 sort(colMeans(abs(shap_classification)), decreasing = TRUE)
 ```
 
-The `shapviz` package provides standard SHAP plots. It needs the SHAP values and the feature values of the same samples, which are in the training data stored in the model:
+The `shapviz` package provides standard SHAP plots. It needs the SHAP values, the feature values of the same samples (the training data stored in the model) and the baseline:
 ```{r, eval=FALSE}
 X_shap <- res$Model$trainingData[rownames(shap_classification), colnames(shap_classification)]
 
-sv <- shapviz::shapviz(as.matrix(shap_classification), X = X_shap)
+sv <- shapviz::shapviz(as.matrix(shap_classification), X = X_shap,
+                       baseline = attr(shap_classification, "baseline"))
 ```
 
 Global feature importance (bar plot):
@@ -441,7 +433,7 @@ knitr::include_graphics("figures/SHAP_dependence.png")
 
 ## SHAP values of a single sample
 
-A waterfall plot shows how the features of one sample move its prediction away from the average prediction. Because `pipeML` takes the median of each sample's SHAP values across resamples, the plot starts from 0 (`E[f(x)]=0`) instead of the average predicted probability: `f(x)` is the total change in predicted probability for that sample, and each bar is the contribution of one feature:
+A waterfall plot shows how the features of one sample move its prediction from the average prediction (`E[f(x)]`, the baseline) to its predicted probability (`f(x)`):
 ```{r, eval=FALSE}
 shapviz::sv_waterfall(sv, row_id = 1) +
   ggplot2::ggtitle(paste("Sample", rownames(shap_classification)[1]))
@@ -460,20 +452,7 @@ shapviz::sv_force(sv, row_id = 1)
 knitr::include_graphics("figures/SHAP_force.png")
 ```
 
-## Stability of feature importance across resamples
-
-`plot_shap_stability()` shows, for each feature, the mean and standard deviation across resamples of its per-resample importance (mean |SHAP| over the held-out samples of each resample). Features with a large standard deviation are important in some folds only:
-```{r, eval=FALSE}
-plot_shap_stability(shap_res$shap_resamples, top_n = 20)
-```
-
-```{r fig-shap-stability, echo = FALSE, fig.cap="Figure 11. Stability of feature importance across resamples.", fig.align='center', out.width='70%'}
-knitr::include_graphics("figures/SHAP_stability.png")
-```
-
-Setting `file.name` in `compute_shap_values()` or `plot_shap_stability()` also saves this plot as `Results/SHAP_stability_resample_<file.name>.pdf`.
-
-The same plots can be made for survival models, using `res_survival$Model$trainingData` for the feature values.
+The same plots can be made for survival models, using `res_survival$Model$trainingData` for the feature values (without the `time` and `event` columns). For survival, SHAP values and the baseline are in risk-score units.
 
 # Advanced
 
@@ -715,7 +694,7 @@ In `pipeML` data corresponds to samples as rows and features as columns. If your
 
 The parameters `data`, `folds`, and `bestune` are handled by `pipeML` automatically once `fold_construction_fun` is set. Do not change these parameter names or remove them.
 
-- **data**: the training features. For classification, it also contains the outcome in a `target` column.
+- **data**: the training features plus the outcome: a `target` column for classification, `time` and `event` columns for survival (see [Custom folds for survival tasks](#custom-folds-for-survival-tasks)).
 - **folds**: named list with the training rows of each fold.
 - **bestune**: `NULL` while running the folds; set by `pipeML` when building the features of the final model (see [below](#why-do-we-need-bestune-argument-even-if-i-dont-have-hyperparams-in-my-function)).
 - **...** : Additional parameters passed to your feature function
@@ -914,8 +893,6 @@ head(res_custom$Custom_output$features)
 head(res_custom$Custom_output$structure)
 ```
 
-During cross-validation, the model of each fold is saved in `fold_models_dir` (by default `Results/fold_models/classification` or `Results/fold_models/survival`), and only the files of the selected model are kept. They are used by `compute_shap_values()`. If you run several analyses of the same task from the same working directory, give each one its own `fold_models_dir` and pass the same directory to `compute_shap_values()`.
-
 ### Step 4 - Prediction on test data
 
 To apply the model to new data, compute the same type of features, projecting the test samples on the structure learned from the training set (here, the WGCNA modules):
@@ -937,11 +914,10 @@ pred_custom$AUC
 
 ### Step 5 - SHAP values
 
-The fold models saved during training are loaded, so no argument other than the model is needed:
+SHAP values explain the final model, trained on the features computed on all training samples (`res_custom$Custom_output$features`), so each module has the same definition for all samples:
 ```{r, eval = FALSE}
 shap_custom <- compute_shap_values(model_trained = res_custom$Model,
-                                   task_type = "classification",
-                                   n_cores = 2)
+                                   task_type = "classification")
 head(shap_custom)
 ```
 
@@ -1331,20 +1307,21 @@ pred_params <- compute_prediction(model = res_params$Model,
 pred_params$AUC
 ```
 
-SHAP values are computed on the fold models built with the selected parameters:
+SHAP values explain the final model, built with the selected parameters:
 ```{r, eval=FALSE}
 shap_params <- compute_shap_values(model_trained = res_params$Model,
-                                   task_type = "classification",
-                                   n_cores = 2)
+                                   task_type = "classification")
 head(shap_params)
 ```
 
 ### Custom folds for survival tasks
 
-Custom fold functions work the same way for survival tasks, with two differences:
+Custom fold functions work the same way for survival tasks. The only difference is the outcome: `data` contains the survival time and event in two columns named `time` and `event` (instead of `target`). As for classification, the function must:
 
-- `data` contains only the features: pass the survival time and event to your fold function through `fold_construction_args_fixed`.
-- the training and test features of each fold, and the training features returned in final mode, must contain the outcome in two columns named `time` and `event` (instead of `target`).
+- remove `time` and `event` from `data` before building the features;
+- add them back to the training **and test** features of each fold, and to the training features returned in final mode.
+
+`pipeML` stops with an error if a feature returned by the function is a copy of `time` or `event` (e.g. because they were not removed before building the features).
 
 Here we build features with a principal component analysis (PCA) learned on the training samples, on the survival example data. First, the base feature function:
 ```{r, eval=FALSE}
@@ -1362,12 +1339,12 @@ compute_pca_features <- function(data, n_comp = 2, structure = NULL) {
 }
 ```
 
-Data, with the event recoded as 0/1:
+Data:
 ```{r, eval=FALSE}
 data = pipeML::data_example_survival
 X <- data %>% dplyr::select(-time, -status)
 time <- data$time
-event <- ifelse(data$status == 2, 1, 0)
+event <- data$status
 
 set.seed(123)
 train_idx <- caret::createDataPartition(event, p = 0.7, list = FALSE)
@@ -1380,9 +1357,14 @@ event_train <- event[train_idx]
 event_test  <- event[-train_idx]
 ```
 
-**Without tunable parameters.** The number of components is fixed, and `time` and `event` are passed as fixed arguments:
+**Without tunable parameters.** The number of components is fixed, and passed as a fixed argument:
 ```{r, eval=FALSE}
-prepare_PCA_folds <- function(data, folds = NULL, bestune = NULL, time, event, n_comp = 2) {
+prepare_PCA_folds <- function(data, folds = NULL, bestune = NULL, n_comp = 2) {
+
+  # Outcome, and features only
+  time <- data$time
+  event <- data$event
+  data <- data[, setdiff(colnames(data), c("time", "event")), drop = FALSE]
 
   if (!is.null(bestune)) {
     # Final mode: features of all training samples
@@ -1423,9 +1405,7 @@ res_pca <- compute_features.training.ML(features_train = X_train,
                                         n_rep = 1,
                                         ncores = 2,
                                         fold_construction_fun = prepare_PCA_folds,
-                                        fold_construction_args_fixed = list(time = time_train,
-                                                                            event = event_train,
-                                                                            n_comp = 5))
+                                        fold_construction_args_fixed = list(n_comp = 5))
 ```
 
 Prediction: project the test samples on the components learned on the training set, then predict:
@@ -1443,14 +1423,18 @@ pred_pca$c_index
 SHAP values:
 ```{r, eval=FALSE}
 shap_pca <- compute_shap_values(model_trained = res_pca$Model,
-                                task_type = "survival",
-                                n_cores = 2)
+                                task_type = "survival")
 head(shap_pca)
 ```
 
 **With tunable parameters.** Here the number of components is tuned. As for classification, each fold file contains one element per candidate value (with the value in `params`), and in final mode the selected value is read from `bestune` and returned as the third element:
 ```{r, eval=FALSE}
-prepare_PCA_folds_tuning <- function(data, folds = NULL, bestune = NULL, time, event, n_comp) {
+prepare_PCA_folds_tuning <- function(data, folds = NULL, bestune = NULL, n_comp) {
+
+  # Outcome, and features only
+  time <- data$time
+  event <- data$event
+  data <- data[, setdiff(colnames(data), c("time", "event")), drop = FALSE]
 
   if (!is.null(bestune)) {
     # Final mode: features of all training samples with the selected number of components
@@ -1496,8 +1480,6 @@ res_pca_tuning <- compute_features.training.ML(features_train = X_train,
                                                n_rep = 1,
                                                ncores = 2,
                                                fold_construction_fun = prepare_PCA_folds_tuning,
-                                               fold_construction_args_fixed = list(time = time_train,
-                                                                                   event = event_train),
                                                fold_construction_args_tunable = list(n_comp = c(3, 5)))
 
 res_pca_tuning$Custom_output$Parameters   # selected number of components
@@ -1517,8 +1499,7 @@ pred_pca_tuning <- compute_prediction(model = res_pca_tuning$Model,
 pred_pca_tuning$c_index
 
 shap_pca_tuning <- compute_shap_values(model_trained = res_pca_tuning$Model,
-                                       task_type = "survival",
-                                       n_cores = 2)
+                                       task_type = "survival")
 head(shap_pca_tuning)
 ```
 

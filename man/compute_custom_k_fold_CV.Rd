@@ -4,13 +4,7 @@
 \alias{compute_custom_k_fold_CV}
 \title{Train and evaluate machine learning models on custom cross-validation folds}
 \usage{
-compute_custom_k_fold_CV(
-  processed_folds,
-  ml_method,
-  tuneGrid,
-  fold_models_dir = "Results/fold_models/classification",
-  file_id_offset = 0
-)
+compute_custom_k_fold_CV(processed_folds, ml_method, tuneGrid)
 }
 \arguments{
 \item{processed_folds}{A list of folds. Each fold should contain processed
@@ -23,13 +17,6 @@ as supported by the \code{caret} package (e.g., \code{"rf"}, \code{"svmRadial"},
 \item{tuneGrid}{Optional. A data frame specifying the grid of hyperparameters
 to evaluate. If \code{NULL}, a default grid of length 3 is generated using
 \code{caret::getModelInfo()}.}
-
-\item{fold_models_dir}{Character. Directory where the fitted model of each fold is saved, for reuse by
-\code{compute_shap_values()}.}
-
-\item{file_id_offset}{Integer added to the hyperparameter row number in the saved file names, so that models
-sharing a caret method (glmnet, lasso, ridge) or fitted with different fold construction parameters get
-different files. Default 0.}
 }
 \value{
 A list containing:

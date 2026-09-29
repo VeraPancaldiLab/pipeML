@@ -4,78 +4,46 @@
 \alias{compute_shap_values}
 \title{Compute SHAP Values for Machine Learning Models}
 \usage{
-compute_shap_values(
-  model_trained,
-  task_type = "classification",
-  n_cores = 2,
-  file.name = NULL,
-  fold_models_dir = NULL,
-  return_resamples = FALSE,
-  seed = 123
-)
+compute_shap_values(model_trained, task_type = "classification", seed = 123)
 }
 \arguments{
 \item{model_trained}{The trained model returned as \code{$Model} by \code{compute_features.training.ML()}
 (e.g. \code{res$Model}). Everything else is taken from it:
 \itemize{
-\item Classification: the caret \code{train} object; training data from \code{$trainingData}, outcome
-\code{.outcome} (coded \code{"no"}/\code{"yes"}), positive class \code{"yes"}.
-\item Survival: training data from \code{$trainingData} (features plus \code{time} and \code{event}
-columns, as standardized by \code{compute_features.training.ML()}).
+\item Classification: the caret \code{train} object; features of the training samples from
+\code{$trainingData}; SHAP values explain the predicted probability of the positive class (\code{"yes"}).
+\item Survival: the final fitted model in \code{$Model_object}; features of the training samples from
+\code{$trainingData} (the \code{time} and \code{event} columns are not used as features);
+SHAP values explain the predicted risk score.
 }}
 
 \item{task_type}{Character. Either \code{"classification"} (default) or \code{"survival"}.}
 
-\item{n_cores}{Integer. Number of cores for parallel computation. Default is 2.}
-
-\item{file.name}{Character. Optional filename suffix. If provided, a SHAP stability plot
-(see \code{plot_shap_stability()}) is saved as \code{"Results/SHAP_stability_resample_<file.name>.pdf"}.
-If \code{NULL} (default), no plot is saved.}
-
-\item{fold_models_dir}{Character. Directory where per-fold models saved during training
-(by \code{compute_custom_k_fold_CV} or \code{compute_k_fold_CV_survival}) are read from,
-to avoid retraining each resample. If \code{NULL} (default), uses
-\code{"Results/fold_models/<task_type>"}, the same default used by \code{compute_features.training.ML}.}
-
-\item{return_resamples}{Logical. If \code{TRUE}, also return the per-resample SHAP values. Default \code{FALSE}.}
-
-\item{seed}{Integer. Random seed for reproducible SHAP values. SHAP values are Monte Carlo estimates, and
-refitted folds (standard CV path) can involve randomness too; each resample is seeded from \code{seed} and
-its position in the resample list, so results are identical across runs and independent of \code{n_cores}.
+\item{seed}{Integer. Random seed for reproducible SHAP values (they are Monte Carlo estimates).
 Default: \code{123}. Use \code{NULL} to leave the random number generator untouched.}
 }
 \value{
-If \code{return_resamples = FALSE} (default), a data frame containing SHAP values for all features,
-summarized (median) across resamples, with rows corresponding to training samples (sample IDs as rownames)
-and columns to features. Values are in the units of the model output (probability of the positive class
-for classification, risk score for survival).
-
-If \code{return_resamples = TRUE}, a list with:
-\itemize{
-\item \code{shap}: the summarized data frame described above.
-\item \code{shap_resamples}: a long data frame with one row per held-out sample and resample, with columns
-\code{Resample}, \code{Samples} and one column per feature. Can be passed to \code{plot_shap_stability()}.
-}
+A data frame of SHAP values, with rows corresponding to training samples (sample IDs as rownames)
+and columns to the features of the final model. Values are in the units of the model output
+(probability of the positive class for classification, risk score for survival). The average prediction
+of the model on the training samples is stored in the attribute \code{"baseline"}: for each sample, the
+baseline plus the sum of its SHAP values equals its prediction. If the model predicts the same value for
+all samples, a warning is issued and \code{NULL} is returned.
 }
 \description{
 This function calculates SHAP (SHapley Additive exPlanations) values to assess feature importance
-for a trained machine learning model. It supports both classification and survival tasks, and
-performs calculations on cross-validation resamples in parallel. Each sample is explained only by
-the fold model(s) that held it out, and its SHAP values are summarized across repeats by the median.
+for the final model selected by \code{compute_features.training.ML()}, i.e. the model trained on all
+training samples with the tuned hyperparameters. SHAP values are computed for every training sample,
+on the features of the final model, so each feature has the same definition for all samples (including
+features built by a custom fold construction function, which are computed once on all training samples).
+It supports both classification and survival tasks.
 }
 \details{
-The function performs the following steps:
-\enumerate{
-\item Sets up classification or survival prediction functions based on the task type.
-\item Loops over all cross-validation resamples in parallel, loading the saved fold model.
-For models trained with \code{fold_construction_fun} (custom folds), every fold model must be found
-in \code{fold_models_dir}, otherwise the function stops: their fold features were built per fold, so a
-fold cannot be rebuilt from the final training data. For models trained on the standard CV path (no saved
-fold models), each fold is refitted on its training samples.
-\item Computes SHAP values using \code{fastshap::explain()} on the held-out samples of each resample,
-skipping resamples with trivial predictions.
-\item Combines SHAP values across resamples and summarizes them (median per sample).
-}
-A summary of how many resamples were loaded, retrained or skipped is printed. Samples that could not be
-explained in any resample are reported with a warning. If no resample could be explained, \code{NULL} is returned.
+SHAP values are estimated with \code{fastshap::explain()} (100 Monte Carlo simulations per feature), using
+the training samples both as the samples to explain and as background data.
+
+Because the final model was trained on the samples it explains, SHAP values describe how the model uses each
+feature on its training data. With flexible models and small datasets, a model that overfits can assign
+importance to features that help fit the training samples but do not generalize: compare the training
+performance with the cross-validation performance before interpreting them.
 }
