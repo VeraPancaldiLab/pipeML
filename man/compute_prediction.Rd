@@ -13,38 +13,48 @@ compute_prediction(
   time_var = NULL,
   event_var = NULL,
   file.name = NULL,
-  return = FALSE
+  return = FALSE,
+  n_groups = 2
 )
 }
 \arguments{
 \item{model}{The trained model returned as \code{$Model} by \code{compute_features.training.ML()}
 (e.g. \code{res$Model}).}
 
-\item{test_data}{A data frame or matrix of predictor variables for the test set.}
+\item{test_data}{A data frame of predictor variables for the test set (for classification, a matrix is also
+accepted). It must contain all the features of the model; other columns are ignored for classification.}
 
-\item{target_var}{Vector of true labels for the test set (classification only).}
+\item{target_var}{Vector of true labels for the test set, in the order of the rows of \code{test_data}
+(classification only).}
 
 \item{trait.positive}{Value in \code{target_var} representing the positive class (classification only).}
 
 \item{task_type}{Character. Either \code{"classification"} or \code{"survival"}.}
 
-\item{time_var}{Column or vector of survival/follow-up times (required for survival tasks).}
+\item{time_var}{Numeric vector of survival/follow-up times of the test samples, in the order of the rows of
+\code{test_data} (required for survival tasks).}
 
-\item{event_var}{Column or vector of event indicators (1 = event, 0 = censored; required for survival tasks).}
+\item{event_var}{Numeric vector of event indicators of the test samples (1 = event, 0 = censored; required for
+survival tasks).}
 
 \item{file.name}{Character. File name prefix of the plots saved in \code{Results/}.}
 
 \item{return}{Logical. Whether to save the plots in \code{Results/} (ROC and precision-recall curves for
 classification, Kaplan-Meier curves by predicted risk group for survival). Default = FALSE.}
+
+\item{n_groups}{Integer. Number of risk groups of the Kaplan-Meier plot (survival only, used with
+\code{return = TRUE}). Default = 2. See \code{plot_survival_performance()}.}
 }
 \value{
 For classification, a list containing:
 \describe{
 \item{\code{Metrics}}{Data frame of performance metrics (Accuracy, Sensitivity, Specificity,
-Precision, Recall, F1 score, MCC) for each threshold.}
+Precision, Recall, F1 score, MCC) for each threshold: one row per test sample,
+sorted by decreasing predicted probability.}
 \item{\code{AUC}}{List with \code{AUROC} and \code{AUPRC}, each a list with the \code{estimate} on the
 test set and the \code{lower} and \code{upper} bounds of its 95\% bootstrap confidence interval.}
-\item{\code{Predictions}}{Data frame of predicted probabilities for each class.}
+\item{\code{Predictions}}{Data frame of predicted probabilities for each class (columns \code{no} and
+\code{yes}), in the order of the rows of \code{test_data}.}
 \item{\code{Curve_bands}}{List with \code{ROC} (columns \code{fpr}, \code{lower}, \code{upper}) and
 \code{PRC} (columns \code{recall}, \code{lower}, \code{upper}): pointwise 95\% bootstrap bands
 around the ROC and precision-recall curves.}
@@ -62,10 +72,14 @@ with bootstrap confidence intervals, and Accuracy, Sensitivity, Specificity, Pre
 MCC at each probability threshold. For survival, it predicts risk scores and computes the C-index.
 }
 \details{
-Confidence intervals of AUROC and AUPRC come from 1000 bootstrap resamples of the test samples.
+Confidence intervals of AUROC and AUPRC come from 1000 bootstrap resamples of the test samples, stratified by
+class (positives and negatives resampled separately, so every resample has both), and the confidence interval
+of the C-index from 1000 bootstrap resamples stratified by event. Both use the fixed seed 123 only inside the
+bootstrap: the state of the random number generator of the session is not changed.
 
-Survival models can predict a risk score, a survival time or a survival probability. The last two are
-reversed, so that higher predictions always mean higher risk.
+Survival models can predict a linear predictor, a survival time or a survival probability. The modelling
+library returns all three so that higher values mean longer survival (also the linear predictor of Cox
+models); they are reversed, so that higher predictions always mean higher risk.
 }
 \examples{
 \dontrun{

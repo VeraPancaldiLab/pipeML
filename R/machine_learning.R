@@ -3,7 +3,7 @@ utils::globalVariables(c(
   "obs", "yes", "AUROC", "AUPRC", "Precision", "F1", "MCC", "Kappa", "AccuracySD",
   "KappaSD", "features", "Overall", "importance", "weighted_importance", "Category",
   "Trait", "dataset", "Models", "binomial", "Actual", "Prediction", ".outcome",
-  "Mean_AUROC", "Mean_AUPRC", "SD_AUROC", "SD_AUPRC", "Mean_Accuracy", "SD_Accuracy",
+  "Median_AUROC", "Median_AUPRC", "SD_AUROC", "SD_AUPRC", "Mean_Accuracy", "SD_Accuracy",
   "resample", "rowIndex", "Samples", "color.roc", "color.prc", "Folder", "AUC_roc",
   "AUC_prc", "Cohort", "medianAUROC", "medianAUPRC", "fpr", ".",
   "Value", "feature", "shap_value", "mean_shap", "direction", "seed",
@@ -35,24 +35,25 @@ utils::globalVariables(c(
 #'
 #' Internal function that performs repeated stratified k-fold cross-validation
 #' to train and tune hyperparameters across multiple machine learning models.
-#' Model performance is evaluated using user-specified metrics such as Accuracy,
-#' AUROC, or AUPRC.
+#' Hyperparameters are tuned and the best model is selected with the
+#' user-specified metric (AUROC or AUPRC).
 #'
 #' @param train_data A data frame containing predictor variables and a column
 #'   named \code{target} corresponding to the response variable.
 #' @param k_folds Integer. Number of folds used for k-fold cross-validation.
-#'   Default is 5.
 #' @param n_rep Integer. Number of repetitions of the k-fold cross-validation.
-#'   Default is 100.
 #' @param metric Character. Performance metric used for hyperparameter tuning
 #'   and model selection: \code{"AUROC"} (default) or \code{"AUPRC"}.
 #' @param file_name Character. File name used when saving output plots in the
 #'   \code{Results/} directory.
-#' @param LODO Logical. If \code{TRUE}, performs Leave-One-Dataset-Out (LODO)
-#'   cross-validation by stratifying folds based on cohort membership.
+#' @param LODO Logical. If \code{TRUE}, the folds are stratified by cohort and by \code{target}
+#'   (for Leave-One-Dataset-Out analyses). \code{train_data} must then contain a column named
+#'   \code{dataset} with the cohort of each sample; it is removed before training.
 #' @param ncores Integer. Number of cores used for parallel computation.
-#'   If \code{NULL}, \code{parallel::detectCores() - 1} will be used.
-#' @param return Logical. Whether to return the results and generated plots.
+#'   If \code{NULL} (default), the computation is sequential. Not used when
+#'   \code{fold_construction_fun} is provided (the models are trained sequentially).
+#' @param return Logical. Whether to save the cross-validation performance plots
+#'   in the \code{Results/} directory.
 #' @param fold_construction_fun Function used to construct cross-validation folds.
 #'   The function must accept a \code{bestune} argument, which is used internally
 #'   to inject optimized parameters after hyperparameter tuning. If
@@ -67,25 +68,28 @@ utils::globalVariables(c(
 #'   cross-validation. Each element should contain candidate values.
 #' @param seed Integer. Random seed set before the folds are drawn, so fold assignment and model
 #'   fitting are reproducible. \code{NULL} leaves the random number generator untouched.
+#' @param preprocess Logical. If \code{TRUE} (default), near-zero variance and highly correlated features are
+#'   removed with \code{preprocess_features()}: once on all training samples before the cross-validation, or,
+#'   with \code{fold_construction_fun}, on the training part of each fold and on the final training set.
 #'
 #' @return A list containing:
 #' \itemize{
-#'   \item Features used during training
-#'   \item The selected machine learning model
-#'   \item All trained machine learning models
+#'   \item \code{Model}: the selected machine learning model, trained on all training samples
+#'   \item \code{ML_Models}: all trained machine learning models (models that predict the same value for all
+#'     training samples are excluded)
+#'   \item \code{AUROC_median}, \code{AUPRC_median}: median and MAD of the cross-validation AUROC and AUPRC of each model
+#'   \item \code{Custom_output}: output of \code{fold_construction_fun} for the selected model (only with a custom function)
 #' }
 #'
 #' @keywords internal
+#' @importFrom caret train trainControl
 compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_name = NULL, LODO = FALSE,
                              ncores = NULL, return = FALSE, fold_construction_fun = NULL,
                              fold_construction_args_fixed = NULL,
                              fold_construction_args_tunable = NULL,
-                             seed = 123){
+                             seed = 123, preprocess = TRUE){
 
   ensure_caret() # the "knn" model needs caret attached (see ensure_caret())
-
-  # caret draws the per-resample seeds of parallel workers from this generator, so seeding here
-  # also makes parallel runs reproducible
   if (!is.null(seed)) set.seed(seed)
 
   ml_methods_names <- c("treebag", "rf", "C5.0",
@@ -117,15 +121,18 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
 
     custom_outputs = NULL
 
+    # Preprocessing features (remove collinear variables and no-variance) on all training samples, before the CV
+    if (preprocess) train_data <- cbind(preprocess_features(train_data[setdiff(names(train_data), "target")]), target = train_data$target)
+
     if(is.null(ncores) == F){
       cl <- parallel::makeCluster(ncores)
       doParallel::registerDoParallel(cl)
+      on.exit({try(parallel::stopCluster(cl), silent = TRUE); unregister_dopar()}) # the cluster is released also on error
     }
 
     trainControl <- caret::trainControl(index = multifolds, method="repeatedcv", number=k_folds, repeats=n_rep, verboseIter = F, allowParallel = threads, classProbs = TRUE, savePredictions=T)
 
     ##################################################### ML models
-    #To do: Re-calculate accuracy values based on tuning parameters optimized by the cv AUC - now the values are based on accuracy! be careful
 
     ################## Bagged CART
     fit.treebag <- caret::train(target~., data = train_data, method = "treebag", metric = "Accuracy",trControl = trainControl)
@@ -146,10 +153,10 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     fit.cart <- caret::train(target~., data = train_data, method="rpart", metric="Accuracy",trControl=trainControl)
 
     ################## Regularized Lasso
-    fit.lasso <- caret::train(target~., data = train_data, method="glmnet", metric="Accuracy",trControl=trainControl, tuneGrid = expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 20)))
+    fit.lasso <- caret::train(target~., data = train_data, method="glmnet", metric="Accuracy",trControl=trainControl, tuneGrid = expand.grid(alpha = 1, lambda = 10^seq(-3, 0, length = 20)))
 
     ################## Ridge regression
-    fit.ridge <- caret::train(target~., data = train_data, method="glmnet", metric="Accuracy",trControl=trainControl, tuneGrid = expand.grid(alpha = 0, lambda = seq(0.001, 1, length = 20)))
+    fit.ridge <- caret::train(target~., data = train_data, method="glmnet", metric="Accuracy",trControl=trainControl, tuneGrid = expand.grid(alpha = 0, lambda = 10^seq(-3, 0, length = 20)))
 
     ################## Support Vector Machine with Radial Kernel
     fit.svm_radial <- caret::train(target ~ ., data = train_data, method = "svmRadial", metric = "Accuracy", trControl = trainControl)
@@ -199,12 +206,29 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
 
   }else{
 
+    # Fold files left in Results/ by an interrupted run would be read below as extra resamples: remove them first
+    invisible(file.remove(list.files("Results", pattern = "^fold_.*\\.rds$", full.names = TRUE)))
+
     # Custom fold construction (is running in parallel)
     do.call(fold_construction_fun, c(list(data = train_data, folds = multifolds), fold_construction_args_fixed, fold_construction_args_tunable))
 
     ### Extract the file names of the folds
     result_files <- list.files("Results", pattern = "^fold_.*\\.rds$", full.names = TRUE)
     fold_data = vector("list", length(result_files))
+
+    # Fold with the fewest features built by the custom function (after preprocessing, as the models are trained on
+    # the preprocessed features): the rf grid is sized from it, so the grid is the same in all folds and valid in
+    # all of them
+    grid_data <- NULL
+    for (f in result_files) {
+      result <- readRDS(f)
+      if (is.null(fold_construction_args_tunable)) result <- list(result)
+      for (r in result) {
+        if (preprocess) r[["train_data"]] <- cbind(preprocess_features(r[["train_data"]][setdiff(names(r[["train_data"]]), "target")]),
+                                                   target = r[["train_data"]]$target)
+        if (is.null(grid_data) || ncol(r[["train_data"]]) < ncol(grid_data)) grid_data <- r[["train_data"]]
+      }
+    }
 
     # Initialize master list to store everything in memory
     models_all_folds <- vector("list", length(result_files))
@@ -226,17 +250,17 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
           test_data_i  <- result[[parameter_i]][["test_data"]]
 
           # Preprocessing features (remove collinear variables and no-variance)
-          train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9, target_col = "target")
+          if (preprocess) train_data_i <- cbind(preprocess_features(train_data_i[setdiff(names(train_data_i), "target")]), target = train_data_i$target)
 
           # Replace in original train/test datasets
           result[[parameter_i]][["train_data"]] <- train_data_i
-          result[[parameter_i]][["test_data"]]  <- test_data_i[, setdiff(colnames(train_data_i), "target")]
+          result[[parameter_i]][["test_data"]]  <- test_data_i[, setdiff(colnames(train_data_i), "target"), drop = FALSE]
 
           # Run all ML methods for this parameter configuration
           models <- lapply(
              ml_methods_names,
              function(method) {
-               tune_grid <- get_tune_grid(method, train_data)
+               tune_grid <- get_tune_grid(method, grid_data)
 
                model_name <- if (method %in% c("lasso", "ridge")) "glmnet" else method
 
@@ -258,17 +282,17 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
         test_data_i <- result[["test_data"]]
 
         # Preprocessing
-        train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9, target_col = "target")
+        if (preprocess) train_data_i <- cbind(preprocess_features(train_data_i[setdiff(names(train_data_i), "target")]), target = train_data_i$target)
 
         # Replace
         result[["train_data"]] = train_data_i
-        result[["test_data"]] = test_data_i[, setdiff(colnames(train_data_i), "target")]
+        result[["test_data"]] = test_data_i[, setdiff(colnames(train_data_i), "target"), drop = FALSE]
 
         models = lapply(
           ml_methods_names,
           function(method){
 
-            tune_grid <- get_tune_grid(method, train_data)
+            tune_grid <- get_tune_grid(method, grid_data)
 
             model_name <- if (method %in% c("lasso", "ridge")) "glmnet" else method
 
@@ -321,32 +345,10 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
       XGboost = "xgbTree"
     )
 
-    ################################ Train model with optimized hyperparameters
-
-    if (!is.null(fold_construction_args_tunable)) {
-      optimized_models <- lapply(seq_along(ml_methods_names), function(i) {
-        wrapper_train_best_hyperparams_classification(
-          train_data,
-          agg[[i]],                     # model-specific aggregated results
-          ml_methods_names[i],
-          fold_construction_fun,
-          fold_construction_args_fixed
-        )
-      })
-
-      # Split components across lists
-      training_sets  <- lapply(optimized_models, `[[`, "training_set")
-      custom_outputs <- lapply(optimized_models, `[[`, "custom_output")
-      models         <- lapply(optimized_models, `[[`, "Model")
-
-      # Assign pretty names
-      names(training_sets) <- names(model_names)
-      names(custom_outputs) <- names(model_names)
-      names(models) <- names(model_names)
-    }else{
-      models = agg
-      names(models) <- names(model_names)
-    }
+    # With and without tunable arguments: the final training set is built (and preprocessed) once below, with the
+    # bestTune selected by `metric`
+    models = agg
+    names(models) <- names(model_names)
 
   }
 
@@ -356,7 +358,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     if(is.null(fold_construction_fun)){
 
       hyperparams <- list(
-        BAG = NULL,
+        BAG = "parameter", # no hyperparameters: the predictions have a `parameter` column with "none"
         RF = "mtry",
         C50 = c("trials", "model", "winnow"),
         GLMNET = c("alpha", "lambda"),
@@ -388,6 +390,22 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
         model$resample <- res$Resample_matrix
         model$results <- res$Results_folds
         model$bestTune = res$bestTune
+
+        # Train model with bestTune selected by `metric` (caret trained it with the one tuned on Accuracy)
+        temp = model
+        model <- caret_train(
+          target ~ .,
+          data = train_data,
+          method = temp$method,
+          trControl = trainControl(method = "none", classProbs = TRUE, allowParallel = FALSE),
+          tuneGrid = temp$bestTune
+        )
+
+        # Return caret-like object
+        model$results = temp$results
+        model$pred = temp$pred
+        model$resample = temp$resample
+        model$bestTune = temp$bestTune
 
         return(model)
       })
@@ -423,7 +441,8 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
           )
 
           # Preprocess features
-          training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9, target_col = "target")
+          training_set <- training_all[[1]]
+          if (preprocess) training_set <- cbind(preprocess_features(training_set[setdiff(names(training_set), "target")]), target = training_set$target)
 
           # Retrieve custom_output
           custom_output <- training_all[[2]]
@@ -455,7 +474,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
 
       }else{
         hyperparams <- list(
-          BAG = NULL,
+          BAG = "parameter", # no hyperparameters: the predictions have a `parameter` column with "none"
           RF = "mtry",
           C50 = c("trials", "model", "winnow"),
           GLMNET = c("alpha", "lambda"),
@@ -472,20 +491,24 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
         updated_results <- lapply(names(models), function(name){
           res <- calculate_cv_metrics(models[[name]], metric, hyperparams[[name]]) #Re-tuned hyperparams based on a different metric than 'Accuracy' (e.g. AUROC)
 
-          # Re-calculate training set
+          ###### Re-calculate training set
+          # Here res$bestTune only has the ML hyperparameters of the model (no feature parameters to tune): it is passed
+          # as bestune only to tell the custom function to build the features on all training samples (bestune != NULL),
+          # its values are not used to build them
           training_all <- do.call(
             fold_construction_fun,
             c(list(data = train_data, bestune = res$bestTune), fold_construction_args_fixed)
           )
 
           # Preprocess features
-          training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9, target_col = "target")
+          training_set <- training_all[[1]]
+          if (preprocess) training_set <- cbind(preprocess_features(training_set[setdiff(names(training_set), "target")]), target = training_set$target)
 
           model <- models[[name]]
           model$Prediction_folds <- res$Prediction_folds
           model$Resample_matrix <- res$Resample_matrix
           model$Results_folds <- res$Results_folds
-
+          model$bestTune <- res$bestTune # bestTune selected by `metric` (the one from aggregate_results() is tuned on Accuracy)
 
           list(
             Model = model,
@@ -599,9 +622,6 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
 
   }else{ # Training data is calculated from custom functions
 
-    cl <- parallel::makeCluster(ncores)
-    doParallel::registerDoParallel(cl)
-
     ######## Bagged CART
     cat("\nRunning BAG....................\n")
 
@@ -622,7 +642,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     fit.treebag$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.bag = predict(fit.treebag, newdata = training_sets$BAG, type = "prob") %>%
+    predictions.bag = stats::predict(fit.treebag, newdata = training_sets$BAG, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(BAG = yes) #Predictions of model (already ordered)
@@ -647,7 +667,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     fit.rf$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.rf = predict(fit.rf, newdata = training_sets$RF, type = "prob") %>%
+    predictions.rf = stats::predict(fit.rf, newdata = training_sets$RF, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(RF = yes) #Predictions of model (already ordered)
@@ -672,7 +692,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     fit.c50$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.c50 = predict(fit.c50, newdata = training_sets$C50, type = "prob") %>%
+    predictions.c50 = stats::predict(fit.c50, newdata = training_sets$C50, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(C50 = yes) #Predictions of model (already ordered)
@@ -697,7 +717,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     fit.glmnet$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.glmnet = predict(fit.glmnet, newdata = training_sets$GLMNET, type = "prob") %>%
+    predictions.glmnet = stats::predict(fit.glmnet, newdata = training_sets$GLMNET, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(GLMNET = yes) #Predictions of model (already ordered)
@@ -722,7 +742,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     fit.knn$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.knn = predict(fit.knn, newdata = training_sets$KNN, type = "prob") %>%
+    predictions.knn = stats::predict(fit.knn, newdata = training_sets$KNN, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(KNN = yes) #Predictions of model (already ordered)
@@ -747,7 +767,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     fit.cart$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.cart = predict(fit.cart, newdata = training_sets$CART, type = "prob") %>%
+    predictions.cart = stats::predict(fit.cart, newdata = training_sets$CART, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(CART = yes) #Predictions of model (already ordered)
@@ -772,7 +792,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     fit.lasso$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.lasso = predict(fit.lasso, newdata = training_sets$LASSO, type = "prob") %>%
+    predictions.lasso = stats::predict(fit.lasso, newdata = training_sets$LASSO, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(LASSO = yes) #Predictions of model (already ordered)
@@ -797,7 +817,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     fit.ridge$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.ridge = predict(fit.ridge, newdata = training_sets$RIDGE, type = "prob") %>%
+    predictions.ridge = stats::predict(fit.ridge, newdata = training_sets$RIDGE, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(RIDGE = yes) #Predictions of model (already ordered)
@@ -822,7 +842,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     fit.svm_radial$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.svm_radial = predict(fit.svm_radial, newdata = training_sets$SVM_radial, type = "prob") %>%
+    predictions.svm_radial = stats::predict(fit.svm_radial, newdata = training_sets$SVM_radial, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(SVM_radial = yes) #Predictions of model (already ordered)
@@ -847,7 +867,7 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     fit.svm_linear$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.svm_linear = predict(fit.svm_linear, newdata = training_sets$SVM_linear, type = "prob") %>%
+    predictions.svm_linear = stats::predict(fit.svm_linear, newdata = training_sets$SVM_linear, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(SVM_linear = yes) #Predictions of model (already ordered)
@@ -872,13 +892,10 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
     fit.xgbTree$bestTune = temp$bestTune
 
     # Predictions in trained model
-    predictions.xgboost = predict(fit.xgbTree, newdata = training_sets$XGboost, type = "prob") %>%
+    predictions.xgboost = stats::predict(fit.xgbTree, newdata = training_sets$XGboost, type = "prob") %>%
       data.frame() %>%
       dplyr::select(yes) %>%
       dplyr::rename(XGboost = yes) #Predictions of model (already ordered)
-
-    parallel::stopCluster(cl)  # stop the cluster after parallel execution
-    unregister_dopar() #Stop Dopar from running in the background
 
   }
   ############################################################## Save models
@@ -934,6 +951,11 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
   model_predictions = Filter(Negate(is.null), model_predictions) #Discard not useful predictions
   ensembleResults = ensembleResults[names(model_predictions)] #Discard not useful models based on predictions
 
+  if (length(ensembleResults) == 0) {
+    stop("No model can be selected: every model predicts the same value for all training samples. ",
+         "The features may not be informative for the outcome.\n")
+  }
+
   #Clean memory
   rm(fit.treebag, fit.rf, fit.c50, fit.knn, fit.cart, fit.glmnet, fit.lasso, fit.ridge, fit.svm_radial, fit.svm_linear)
   gc()
@@ -962,46 +984,44 @@ compute_k_fold_CV = function(train_data, k_folds, n_rep, metric = "AUROC", file_
 
 }
 
-#' Train and evaluate machine learning models on custom cross-validation folds
+#' Train one machine learning model on one custom cross-validation fold
 #'
-#' Internal function that trains and evaluates machine learning models using
-#' pre-constructed k-folds. This function is intended for **cohort-aware or
-#' custom fold strategies** (see package vignette for details). It supports
-#' hyperparameter tuning over a grid and returns a model object that mimics
-#' the structure of caret's \code{train()} output, including performance metrics
-#' and predictions.
+#' Internal function used with **custom fold construction functions** (see package
+#' vignette for details). For one fold built by the custom function and one machine
+#' learning model, it trains the model with each hyperparameter combination of the
+#' grid on the training part of the fold and predicts the test part.
 #'
-#' @param processed_folds A list of folds. Each fold should contain processed
-#'   training and test datasets with features.
+#' @param processed_folds A list with the data of one fold, as saved by the custom
+#'   fold construction function: \code{train_data} (features and \code{target}),
+#'   \code{test_data} (features), \code{rowIndex} (row indices of the test samples),
+#'   \code{fold_name}, \code{obs_test} (observed labels of the test samples, in the
+#'   same order as the rows of \code{test_data}) and, when the function has tunable
+#'   arguments, \code{params} (the parameter combination used to build the features).
 #' @param ml_method Character string specifying the machine learning model to use,
 #'   as supported by the \code{caret} package (e.g., \code{"rf"}, \code{"svmRadial"},
 #'   \code{"glmnet"}).
-#' @param tuneGrid Optional. A data frame specifying the grid of hyperparameters
-#'   to evaluate. If \code{NULL}, a default grid of length 3 is generated using
-#'   \code{caret::getModelInfo()}.
+#' @param tuneGrid A data frame specifying the grid of hyperparameters to evaluate
+#'   (one row per combination), as returned by \code{get_tune_grid()}.
 #'
-#' @return A list containing:
-#' \itemize{
-#'   \item \code{Results_folds}: Data frame summarizing average cross-validated
-#'     Accuracy, Kappa, and standard deviations for each hyperparameter combination.
-#'   \item \code{Prediction_folds}: Data frame of predictions from each fold,
-#'     including class probabilities, observed and predicted labels, and
-#'     hyperparameter values.
-#'   \item \code{Resample_matrix}: Data frame summarizing Accuracy and Kappa
-#'     per fold for the best-tuned model.
-#'   \item \code{Besttune}: List of optimized hyperparameters.
-#' }
-#'
-#' @details The function performs the following steps:
+#' @return A list with two elements:
 #' \enumerate{
-#'   \item Train models for each fold and hyperparameter combination.
-#'   \item Predict on the held-out test data for each fold.
-#'   \item Aggregate predictions and evaluate Accuracy and Kappa for each
-#'     fold and hyperparameter set.
-#'   \item Select the best-performing hyperparameter set based on mean Accuracy
-#'     across folds.
-#'   \item Train the final model on the full dataset using the selected hyperparameters.
+#'   \item Data frame of predictions on the test part of the fold, with one row per
+#'     test sample and hyperparameter combination: \code{rowIndex}, \code{Resample}
+#'     (fold name), \code{obs} and \code{pred} (observed and predicted labels), the
+#'     hyperparameter values, the class probabilities (\code{no}, \code{yes}) and the
+#'     columns of \code{params} (if any).
+#'   \item Character vector with the names of the hyperparameters in \code{tuneGrid}.
 #' }
+#'
+#' @details The function performs the following steps for each row of \code{tuneGrid}:
+#' \enumerate{
+#'   \item Train the model on the training part of the fold with that hyperparameter
+#'     combination (a single fit, without resampling).
+#'   \item Predict the class and the class probabilities of the test part of the fold.
+#'   \item Store the predictions together with the hyperparameter values.
+#' }
+#' The predictions of all folds are combined by \code{aggregate_results()}, and the
+#' hyperparameters are selected afterwards (\code{calculate_cv_metrics()}).
 #'
 #' @keywords internal
 compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
@@ -1026,7 +1046,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
     )})
 
     # Predict
-    test_data <- test_data[, colnames(test_data) %in% model$coefnames]
+    test_data <- test_data[, colnames(test_data) %in% model$coefnames, drop = FALSE]
     probs <- stats::predict(model, newdata = test_data, type = "prob")
     preds <- stats::predict(model, newdata = test_data)
 
@@ -1058,8 +1078,8 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 
 #' Train machine learning or survival models with custom cross-validation
 #'
-#' This function trains one or more machine learning models using repeated k-fold cross-validation,
-#' with optional feature selection, and support for both classification and survival tasks.
+#' This function trains several machine learning models using repeated k-fold cross-validation,
+#' with hyperparameter tuning, and supports both classification and survival tasks.
 #' It allows flexible cross-validation schemes, including:
 #' \itemize{
 #'   \item Standard stratified k-fold cross-validation
@@ -1072,11 +1092,14 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #'
 #' @param features_train A data frame with samples in rows and features in columns.
 #' @param task_type Character. Prediction task type: \code{"classification"} or \code{"survival"}.
-#' @param target_var Vector. Target variable for classification tasks.
-#' @param trait.positive Value in \code{target_var} representing the positive class.
-#' @param time_var Numeric vector. Survival/follow-up time of each sample (required for survival tasks).
-#' @param event_var Numeric vector. Event indicator of each sample (1 = event occurred, 0 = censored; required for
-#'   survival tasks).
+#' @param target_var Vector. Target variable for classification tasks: one value per sample, in the same order
+#'   as the rows of \code{features_train}, without missing values.
+#' @param trait.positive Value in \code{target_var} representing the positive class. All other values form the
+#'   negative class.
+#' @param time_var Numeric vector. Survival/follow-up time of each sample, in the same order as the rows of
+#'   \code{features_train} (required for survival tasks).
+#' @param event_var Vector. Event indicator of each sample (1 = event occurred, 0 = censored), in the same order
+#'   as the rows of \code{features_train} (required for survival tasks).
 #' @param metric Character. Performance metric for model selection and tuning (classification):
 #'   \itemize{
 #'     \item \code{"AUROC"} - area under the ROC curve (used when \code{NULL})
@@ -1088,10 +1111,12 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #' @param LODO Logical. If \code{TRUE}, the cross-validation folds are stratified by cohort and outcome, for
 #'   Leave-One-Dataset-Out analyses (train on some cohorts, test on a left-out one). The cohort is not used as
 #'   a predictor.
-#' @param batch_var Vector. Cohort/batch of each sample. Required if \code{LODO = TRUE}.
+#' @param batch_var Vector. Cohort/batch of each sample, in the same order as the rows of \code{features_train}.
+#'   Required if \code{LODO = TRUE}. For classification, each cohort needs at least \code{k_folds} samples.
 #' @param file_name Character. File name prefix used to save performance plots in \code{"Results/"}.
 #' @param ncores Integer. Number of CPU cores for parallelization (cross-validation folds are processed in parallel).
-#'   Default: \code{NULL} (sequential).
+#'   Default: \code{NULL} (sequential). For classification with \code{fold_construction_fun}, the models are
+#'   trained sequentially and \code{ncores} is not used.
 #' @param return Logical. Whether to save the cross-validation performance plots in \code{"Results/"}.
 #'   Default: \code{FALSE}.
 #' @param fold_construction_fun Function. Optional user-defined function for fold construction. It is called with
@@ -1099,17 +1124,24 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #'   classification, \code{time} and \code{event} columns for survival), \code{folds} and \code{bestune}. It must
 #'   remove the outcome columns before building features. Must accept a \code{bestune} argument:
 #'   \itemize{
-#'     \item \code{bestune = NULL} - explore parameter grid across folds (parallelized via \code{foreach}).
+#'     \item \code{bestune = NULL} - build the features of every fold (for every combination of the tunable
+#'       arguments, if any) and save them. The function can run its own parallel workers for this.
 #'     \item \code{bestune provided} - rebuild features on the full dataset using optimized parameters, and
-#'       return a list with the features plus the outcome columns, any custom output, and \code{bestune}.
+#'       return a list with the features plus the outcome columns, any custom output, and \code{bestune}
+#'       (with tunable arguments: a data frame with the selected values of these arguments).
 #'   }
-#'   The function should save individual folds as \code{"Results/fold_*.rds"} with:
+#'   The function should save each fold as \code{"Results/fold_<fold name>.rds"}, a list with:
 #'   \itemize{
 #'     \item \code{train_data} - training features plus the outcome columns
 #'     \item \code{test_data} - test features (plus \code{time} and \code{event} for survival)
-#'     \item \code{obs_test} - observed outcomes (classification)
-#'     \item \code{params} - parameters used (if applicable)
+#'     \item \code{obs_test} - observed outcomes of the test samples, in the order of the rows of
+#'       \code{test_data} (classification)
+#'     \item \code{rowIndex} - row indices of the test samples in \code{data}
+#'     \item \code{fold_name} - name of the fold
+#'     \item \code{params} - data frame with the values of the tunable arguments used (only with tunable
+#'       arguments)
 #'   }
+#'   With tunable arguments, the file of a fold contains a list with one such element per combination.
 #' @param fold_construction_args_fixed List of arguments passed to \code{fold_construction_fun} that remain fixed across CV and final training.
 #' @param fold_construction_args_tunable List of arguments passed to \code{fold_construction_fun} for hyperparameter tuning.
 #' @param seed Integer. Random seed for reproducible cross-validation: it fixes the fold assignment and
@@ -1117,6 +1149,9 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #'   parallel with \code{ncores}. Default: \code{123}. Use \code{NULL} to leave the random number generator
 #'   untouched. Randomness inside a user-supplied \code{fold_construction_fun} that runs its own parallel
 #'   workers is not covered: seed those workers inside that function.
+#' @param preprocess Logical. If \code{TRUE} (default), near-constant and highly correlated (|r| > 0.9)
+#'   features are removed before training (see Details). The features must then be numeric. Use \code{FALSE}
+#'   to train on the features as given.
 #'
 #' @details
 #' Classification trains and tunes 11 algorithms with \pkg{caret} (\code{treebag}, \code{rf}, \code{C5.0},
@@ -1126,24 +1161,31 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #' selected by the cross-validation \code{metric} (classification) or C-index (survival), and trained on all
 #' training samples with its tuned hyperparameters.
 #'
-#' When \code{fold_construction_fun} is provided, the features of each fold are built by that function, and
-#' near-constant, highly correlated (|r| > 0.9) and, for classification, class-constant features are removed
-#' from the features built on each training part. The final model is trained on the features the function
-#' builds on all training samples. See \code{vignette("a5_custom_folds", package = "pipeML")}.
+#' With \code{preprocess = TRUE}, near-constant features and, for each pair of features with an absolute
+#' correlation above 0.9, one of the two are removed. The outcome is not used. Without
+#' \code{fold_construction_fun}, this is done once on all training samples before the cross-validation, so the
+#' folds and the final model use the same features. The test samples are not involved:
+#' \code{compute_prediction()} keeps the features of the final model.
 #'
-#' @return A named list, or \code{NULL} if no model could be trained:
+#' When \code{fold_construction_fun} is provided, the features of each fold are built by that function, and
+#' the preprocessing is done inside each fold: on the features built on the training part, keeping the same
+#' features in the held-out part. The final model is trained on the features the function
+#' builds on all training samples, preprocessed in the same way. See \code{vignette("a5_custom_folds", package = "pipeML")}.
+#'
+#' @return A named list:
 #' \describe{
 #'   \item{Model}{The selected model, trained on all training samples. Classification: a caret \code{train}
 #'     object (tuned hyperparameters in \code{$bestTune}, performance per resample in \code{$resample}).
-#'     Survival: a list with the model name (\code{$model}), the fitted workflow (\code{$Model_object}), the
-#'     tuned hyperparameters (\code{$bestTune}), the C-index per resample (\code{$Resample_matrix}) and the
-#'     training data (\code{$trainingData}).}
-#'   \item{ML_Models}{All trained models.}
+#'     Survival: a list with the fitted workflow (\code{$Model_object}), the tuned hyperparameters
+#'     (\code{$bestTune}), the C-index per resample (\code{$Resample_matrix}, with the name of the model in its
+#'     column \code{model}) and the training data (\code{$trainingData}).}
+#'   \item{ML_Models}{All trained models. Classification: models that predict the same value for all training
+#'     samples are excluded.}
 #'   \item{AUROC_median, AUPRC_median}{Classification: median and MAD of the cross-validation AUROC and AUPRC
 #'     of each model.}
 #'   \item{C_index_median}{Survival: median cross-validation C-index of the selected model.}
 #'   \item{Custom_output}{Only with \code{fold_construction_fun}: the custom output returned by that function
-#'     on all training samples, and the selected feature parameters in \code{$Parameters}.}
+#'     on all training samples and, with tunable arguments, the selected feature parameters in \code{$Parameters}.}
 #' }
 #'
 #' @examples
@@ -1172,7 +1214,7 @@ compute_custom_k_fold_CV <- function(processed_folds, ml_method, tuneGrid) {
 #'                                              k_folds = 5,
 #'                                              n_rep = 2,
 #'                                              ncores = 2)
-#' res_survival$Model$model
+#' unique(res_survival$Model$Resample_matrix$model) # selected model
 #' res_survival$C_index_median
 #' }
 #'
@@ -1181,20 +1223,36 @@ compute_features.training.ML = function(features_train, task_type = c("classific
                                         time_var = NULL, event_var = NULL, metric = NULL, k_folds = 10, n_rep = 5, LODO = FALSE,
                                         batch_var = NULL, file_name = NULL, ncores = NULL, return = FALSE,
                                         fold_construction_fun = NULL, fold_construction_args_fixed = NULL, fold_construction_args_tunable = NULL,
-                                        seed = 123){
+                                        seed = 123, preprocess = TRUE){
 
   # ---------------------------------------------------------------------------
   # Validate task_type and required arguments
   # ---------------------------------------------------------------------------
 
+  if (length(task_type) != 1) {
+    stop("`task_type` must be provided: either 'classification' or 'survival'.\n")
+  }
+
   if (task_type == "classification") {
     if (is.null(target_var) || is.null(trait.positive)) {
       stop("For classification, both `target_var` and `trait.positive` must be provided.\n")
+    }
+    if (anyNA(target_var)) {
+      stop("`target_var` contains missing values (NA). Remove those samples from `features_train` and `target_var`.\n")
+    }
+    if (!trait.positive %in% target_var || all(target_var == trait.positive)) {
+      stop("`target_var` must contain samples with and without `trait.positive` ('", trait.positive, "'). Values found: ",
+           paste(unique(target_var), collapse = ", "), ".\n")
     }
     if (is.null(metric)) metric <- "AUROC"
   } else if (task_type == "survival") {
     if (is.null(time_var) || is.null(event_var)) {
       stop("For survival, both `time_var` and `event_var` must be provided.\n")
+    }
+    # as.numeric() on a factor returns the position of the levels (1/2), not the 0/1 values
+    if (is.factor(event_var)) event_var <- suppressWarnings(as.numeric(as.character(event_var)))
+    if (!all(event_var %in% c(0, 1))) {
+      stop("`event_var` must be coded 1 = event, 0 = censored, without missing values.\n")
     }
 
     if (!is.null(metric)) {
@@ -1203,6 +1261,10 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 
   } else {
     stop("Invalid task_type. Must be either 'classification' or 'survival'.\n")
+  }
+
+  if (isTRUE(LODO) && is.null(batch_var)) {
+    stop("When `LODO = TRUE`, `batch_var` (the cohort of each sample) must be provided.\n")
   }
 
 
@@ -1231,7 +1293,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
                                  file_name = file_name, LODO = LODO, ncores = ncores, return= return,
                                  fold_construction_fun = fold_construction_fun, fold_construction_args_fixed = fold_construction_args_fixed,
                                  fold_construction_args_tunable = fold_construction_args_tunable,
-                                 seed = seed)
+                                 seed = seed, preprocess = preprocess)
 
   }
 
@@ -1273,18 +1335,12 @@ compute_features.training.ML = function(features_train, task_type = c("classific
       fold_construction_fun = fold_construction_fun,
       fold_construction_args_fixed = fold_construction_args_fixed,
       fold_construction_args_tunable = fold_construction_args_tunable,
-      seed = seed
+      seed = seed, preprocess = preprocess
     )
 
   }
 
-  ####################################################Predicting
-  if(length(training)!=0){
-    return(training)
-  }else{  #No features are selected as predictive
-    message("No model could be trained. No model returned.")
-    return(NULL)
-  }
+  return(training)
 
 }
 
@@ -1294,13 +1350,13 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #' and then evaluates performance on independent test data. It supports both **classification** and
 #' **survival analysis** tasks, including hyperparameter tuning and cohort-based
 #' (Leave-One-Dataset-Out, LODO) validation. For survival models, it computes the **C-index**
-#' and generates Kaplan-Meier plots stratified by predicted risk.
+#' and, with \code{return = TRUE}, generates Kaplan-Meier plots stratified by predicted risk.
 #'
 #' @param features_train A data frame or matrix of predictor variables used for training
 #'   (rows = samples, columns = features).
 #' @param features_test A data frame or matrix of predictor variables used for testing.
-#' @param coldata A data frame containing outcome information. Row names must match
-#'   those of \code{features_train} and \code{features_test}.
+#' @param coldata A data frame containing outcome information. Its row names must include
+#'   those of \code{features_train} and \code{features_test}: the outcome of each sample is taken by row name.
 #' @param task_type Character. Type of task: \code{"classification"} or \code{"survival"}.
 #' @param trait Character. Column name in \code{coldata} used as the target variable
 #'   (required for classification tasks).
@@ -1323,7 +1379,8 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #' @param file_name Character. Base name used to save plots/results under \code{Results/}. For survival tasks,
 #'   Kaplan-Meier plots are saved as \code{"Results/Survival_KM_<file_name>.pdf"}.
 #' @param ncores Integer. Number of CPU cores for parallelization (cross-validation folds are processed in parallel).
-#'   Default: \code{NULL} (sequential).
+#'   Default: \code{NULL} (sequential). For classification with \code{fold_construction_fun}, the models are
+#'   trained sequentially and \code{ncores} is not used.
 #' @param fold_construction_fun Function. Optional custom function to construct cross-validation folds.
 #'   Must accept a \code{bestune} argument internally to inject optimized hyperparameters. Used for both
 #'   classification and survival. \code{features_test} is used as given: it must contain the features built by
@@ -1334,6 +1391,9 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #' @param seed Integer. Random seed for reproducible cross-validation (fold assignment and model fitting,
 #'   including parallel runs). Default: \code{123}. Use \code{NULL} to leave the random number generator
 #'   untouched. See \code{compute_features.training.ML()} for details.
+#' @param preprocess Logical. If \code{TRUE} (default), near-constant and highly correlated (|r| > 0.9)
+#'   features are removed from the training features before training. Use \code{FALSE} to train on the features
+#'   as given. See \code{compute_features.training.ML()} for details.
 #'
 #' @details
 #' For **classification tasks**, the function performs repeated k-fold cross-validation
@@ -1344,7 +1404,7 @@ compute_features.training.ML = function(features_train, task_type = c("classific
 #' curves of the test samples split at the median predicted risk are saved, with the C-index and log-rank test
 #' p-value.
 #'
-#' @return A named list, or \code{NULL} if no model could be trained (classification):
+#' @return A named list:
 #' \describe{
 #'   \item{Model}{The output of \code{compute_features.training.ML()} on the training set (the selected model
 #'     is \code{$Model$Model}).}
@@ -1403,24 +1463,51 @@ compute_features.ML <- function(features_train, features_test, coldata,
                                 fold_construction_fun = NULL,
                                 fold_construction_args_fixed = NULL,
                                 fold_construction_args_tunable = NULL,
-                                seed = 123){
+                                seed = 123, preprocess = TRUE){
 
+  # ---------------------------------------------------------------------------
+  # Validate task_type and required arguments
+  # ---------------------------------------------------------------------------
+
+  if (length(task_type) != 1 || !task_type %in% c("classification", "survival")) {
+    stop("`task_type` must be provided: either 'classification' or 'survival'.\n")
+  }
+
+  if (task_type == "classification" && (is.null(trait) || is.null(trait.positive))) {
+    stop("For classification, both `trait` and `trait.positive` must be provided.\n")
+  }
+
+  if (task_type == "survival" && (is.null(time_var) || is.null(event_var))) {
+    stop("For survival, both `time_var` and `event_var` must be provided.\n")
+  }
+
+  if (isTRUE(LODO) && is.null(batch_id)) {
+    stop("When `LODO = TRUE`, `batch_id` (column of `coldata` with the cohort of each sample) must be provided.\n")
+  }
+
+  missing_ids <- setdiff(c(rownames(features_train), rownames(features_test)), rownames(coldata))
+  if (length(missing_ids) > 0) {
+    stop("These samples are missing from rownames(coldata): ",
+         paste(utils::head(missing_ids, 10), collapse = ", "),
+         if (length(missing_ids) > 10) paste0(" ... (", length(missing_ids), " in total)"))
+  }
 
   # ---------------------------------------------------------------------------
   # === CASE 1: CLASSIFICATION TASK ==========================================
   # ---------------------------------------------------------------------------
   if (task_type == "classification") {
 
-    missing_ids <- setdiff(c(rownames(features_train), rownames(features_test)), rownames(coldata))
-    if (length(missing_ids) > 0) {
-      stop("These samples are missing from rownames(coldata): ",
-           paste(utils::head(missing_ids, 10), collapse = ", "),
-           if (length(missing_ids) > 10) paste0(" ... (", length(missing_ids), " in total)"))
-    }
-
     # Index by rowname so labels follow the row order of the feature matrices
     traitData_train = coldata[rownames(features_train), , drop = FALSE]
     traitData_test = coldata[rownames(features_test), , drop = FALSE]
+
+    if (anyNA(traitData_train[,trait])) {
+      stop("`trait` contains missing values (NA) in the training samples. Remove those samples from `features_train`.\n")
+    }
+    if (!trait.positive %in% traitData_train[,trait] || all(traitData_train[,trait] == trait.positive)) {
+      stop("`trait` must contain training samples with and without `trait.positive` ('", trait.positive, "'). Values found: ",
+           paste(unique(traitData_train[,trait]), collapse = ", "), ".\n")
+    }
 
     ####################################################Training
 
@@ -1443,28 +1530,21 @@ compute_features.ML <- function(features_train, features_test, coldata,
                                  file_name = file_name, LODO = LODO, ncores = ncores, return= return,
                                  fold_construction_fun = fold_construction_fun, fold_construction_args_fixed = fold_construction_args_fixed,
                                  fold_construction_args_tunable = fold_construction_args_tunable,
-                                 seed = seed)
+                                 seed = seed, preprocess = preprocess)
 
     ####################################################Predicting
-    if(length(training)!=0){
-      ####################### Testing set
+    ####################### Testing set
 
-      prediction = compute_prediction(training$Model, features_test, traitData_test[,trait], trait.positive, file.name = file_name, return = return)
+    prediction = compute_prediction(training$Model, features_test, traitData_test[,trait], trait.positive, file.name = file_name, return = return)
 
-      auc_roc_score = prediction[["AUC"]][["AUROC"]]
-      auc_prc_score = prediction[["AUC"]][["AUPRC"]]
+    auc_roc_score = prediction[["AUC"]][["AUROC"]]
+    auc_prc_score = prediction[["AUC"]][["AUPRC"]]
 
-      metrics = prediction[["Metrics"]]
-      predictions = prediction[["Predictions"]]
+    metrics = prediction[["Metrics"]]
+    predictions = prediction[["Predictions"]]
 
-      return(list(Model = training, Metrics = metrics, AUC = list(AUROC = auc_roc_score, AUPRC = auc_prc_score), Prediction = predictions,
-                  Curve_bands = prediction[["Curve_bands"]]))
-    }else{  #No features are selected as predictive
-
-      message("No model could be trained. No model returned.")
-
-      return(NULL)
-    }
+    return(list(Model = training, Metrics = metrics, AUC = list(AUROC = auc_roc_score, AUPRC = auc_prc_score), Prediction = predictions,
+                Curve_bands = prediction[["Curve_bands"]]))
 
   }
 
@@ -1473,16 +1553,23 @@ compute_features.ML <- function(features_train, features_test, coldata,
   # ---------------------------------------------------------------------------
   if (task_type == "survival") {
 
+    # as.numeric() on a factor returns the position of the levels (1/2), not the 0/1 values
+    if (is.factor(coldata[[event_var]])) coldata[[event_var]] <- suppressWarnings(as.numeric(as.character(coldata[[event_var]])))
+    if (!all(coldata[c(rownames(features_train), rownames(features_test)), event_var] %in% c(0, 1))) {
+      stop("`event_var` must be coded 1 = event, 0 = censored, without missing values.\n")
+    }
+
     # ---------------------------- Data prep ----------------------------------
+    # data.frame() makes the feature names syntactically valid, as compute_prediction() does with the test features
     train_data <- features_train %>%
-      as.data.frame() %>%
+      data.frame() %>%
       dplyr::mutate(
         time = coldata[rownames(features_train), time_var],
         event = coldata[rownames(features_train), event_var]
       )
 
     test_data <- features_test %>%
-      as.data.frame() %>%
+      data.frame() %>%
       dplyr::mutate(
         time = coldata[rownames(features_test), time_var],
         event = coldata[rownames(features_test), event_var]
@@ -1512,7 +1599,7 @@ compute_features.ML <- function(features_train, features_test, coldata,
       fold_construction_fun = fold_construction_fun,
       fold_construction_args_fixed = fold_construction_args_fixed,
       fold_construction_args_tunable = fold_construction_args_tunable,
-      seed = seed
+      seed = seed, preprocess = preprocess
     )
 
     # ---------------------------- Refit best model ---------------------------
@@ -1543,15 +1630,19 @@ compute_features.ML <- function(features_train, features_test, coldata,
 #' Internal function to summarize cross-validated AUROC and AUPRC values from a list of trained machine learning models.
 #' Computes median and MAD for each model and optionally generates barplots.
 #'
-#' @param models Named list of trained ML models. Each model must contain a \code{$resample} data frame with \code{AUROC} and \code{AUPRC} columns.
+#' @param models Named list of trained ML models. Each model must contain a \code{$resample} data frame with \code{AUROC} and \code{AUPRC} columns
+#'   (and, to save the plots, \code{$trainingData} with the outcome in \code{.outcome}).
 #' @param file_name Optional character string. Prefix for saving AUROC/AUPRC plots in the \code{Results/} directory.
 #' @param AUC_type Character. Either \code{"AUROC"} or \code{"AUPRC"}, used to select the top-performing model.
-#' @param return Logical. If \code{TRUE}, saves barplots of AUROC and AUPRC values in the \code{Results/} directory.
+#' @param return Logical. If \code{TRUE}, saves barplots of AUROC and AUPRC values in the \code{Results/} directory
+#'   (\code{AUROC_CV_methods_<file_name>.pdf} and \code{AUPRC_CV_methods_<file_name>.pdf}): models sorted from best to worst,
+#'   selected model highlighted, error bars of one MAD and a dashed line for a random classifier
+#'   ([plot_cv_metric()], also used for the survival C-index).
 #'
 #' @return A list containing:
 #' \describe{
-#'   \item{\code{AUROC}}{Data frame with median and MAD of AUROC for each model.}
-#'   \item{\code{AUPRC}}{Data frame with median and MAD of AUPRC for each model.}
+#'   \item{\code{AUROC}}{Data frame with the median (\code{Median_AUROC}) and MAD (\code{MAD_AUROC}) of AUROC for each model, sorted from best to worst.}
+#'   \item{\code{AUPRC}}{Data frame with the median (\code{Median_AUPRC}) and MAD (\code{MAD_AUPRC}) of AUPRC for each model, sorted from best to worst.}
 #'   \item{\code{Top_model}}{Character string: the model with the highest median value for the selected metric (\code{AUC_type}).}
 #' }
 #'
@@ -1584,45 +1675,33 @@ compute_cv_AUC = function(models, file_name = NULL, AUC_type = "AUROC", return =
   res_auroc <- auroc_data %>%
     dplyr::group_by(model) %>%
     dplyr::summarise(
-      Mean_AUROC = median(.data$AUROC),
+      Median_AUROC = median(.data$AUROC),
       MAD_AUROC = stats::mad(.data$AUROC)
     ) %>%
-    dplyr::arrange(desc(Mean_AUROC))
+    dplyr::arrange(desc(Median_AUROC))
 
   res_auprc <- auprc_data %>%
     dplyr::group_by(model) %>%
     dplyr::summarise(
-      Mean_AUPRC = median(.data$AUPRC),
+      Median_AUPRC = median(.data$AUPRC),
       MAD_AUPRC = stats::mad(.data$AUPRC)
     ) %>%
-    dplyr::arrange(desc(Mean_AUPRC))
+    dplyr::arrange(desc(Median_AUPRC))
 
 
   if(return){
+    selected_model <- if (AUC_type == "AUROC") res_auroc$model[1] else res_auprc$model[1]
+    n_resamples <- nrow(models[[1]]$resample)
+
     grDevices::pdf(paste0("Results/AUROC_CV_methods_", file_name, ".pdf"), width = 10)
-    plot(ggplot2::ggplot(res_auroc, ggplot2::aes(x = model, y = Mean_AUROC)) +
-           ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6, fill = "#1f78b4") + # professional blue
-           ggplot2::geom_errorbar(aes(ymin = Mean_AUROC - MAD_AUROC, ymax = Mean_AUROC + MAD_AUROC),
-                                  width = 0.2, position = position_dodge(0.6)) +
-           ggplot2::labs(title = "Performance of Models",
-                         x = "ML Model",
-                         y = "Median AUROC across resamples") +
-           ggplot2::theme_minimal() +
-           ggplot2::theme(legend.position = "none") +
-           ggplot2::scale_y_continuous(breaks = seq(0, 1, by = 0.05)))
+    plot(plot_cv_metric(res_auroc, "AUROC", chance = 0.5, selected_model = selected_model, selected_by = AUC_type,
+                        n_resamples = n_resamples))
     grDevices::dev.off()
 
+    # A random classifier has an AUPRC equal to the proportion of positive samples
     grDevices::pdf(paste0("Results/AUPRC_CV_methods_", file_name, ".pdf"), width = 10)
-    plot(ggplot2::ggplot(res_auprc, ggplot2::aes(x = model, y = Mean_AUPRC)) +
-           ggplot2::geom_bar(stat = "identity", position = ggplot2::position_dodge(), width = 0.6, fill = "#1f78b4") + # same professional blue
-           ggplot2::geom_errorbar(aes(ymin = Mean_AUPRC - MAD_AUPRC, ymax = Mean_AUPRC + MAD_AUPRC),
-                                  width = 0.2, position = ggplot2::position_dodge(0.6)) +
-           ggplot2::labs(title = "Performance of Models",
-                         x = "ML Model",
-                         y = "Median AUPRC across resamples") +
-           ggplot2::theme_minimal() +
-           ggplot2::theme(legend.position = "none") +
-           ggplot2::scale_y_continuous(breaks = seq(0, 1, by = 0.05)))
+    plot(plot_cv_metric(res_auprc, "AUPRC", chance = mean(models[[1]]$trainingData$.outcome == "yes"),
+                        selected_model = selected_model, selected_by = AUC_type, n_resamples = n_resamples))
     grDevices::dev.off()
 
   }
@@ -1642,19 +1721,85 @@ compute_cv_AUC = function(models, file_name = NULL, AUC_type = "AUROC", return =
 
 }
 
+#' Bar plot of the cross-validation performance of each model
+#'
+#' Internal helper used by \code{compute_cv_AUC()} (AUROC, AUPRC) and \code{compute_cv_CINDEX()} (C-index), so the
+#' cross-validation plots of classification and survival look the same: models sorted from best to worst, the
+#' selected model in blue, the median of each model written above its bar, error bars of one MAD (cut at 0 and 1,
+#' the limits of the metrics) and a dashed line for the performance of a random prediction.
+#'
+#' @param res Data frame with one row per model, sorted from best to worst: \code{model},
+#'   \code{Median_<metric>} and \code{MAD_<metric>}.
+#' @param metric Character. Suffix of the median and MAD columns of \code{res} (\code{"AUROC"}, \code{"AUPRC"} or
+#'   \code{"CINDEX"}).
+#' @param chance Numeric. Value of a random prediction (dashed line).
+#' @param selected_model Character. Name of the selected model (blue bar).
+#' @param selected_by Character. Metric used to select the model, shown in the subtitle.
+#' @param n_resamples Integer. Number of cross-validation resamples, shown in the subtitle.
+#' @param label Character. Name of the metric in the title and axis. Default: \code{metric}.
+#' @param wrap_names Logical. If \code{TRUE}, the model names are split at \code{"_"} over several lines (long
+#'   survival model names).
+#' @param chance_label Character. Name of the random prediction in the caption. Default:
+#'   \code{"random classifier"}.
+#'
+#' @return A ggplot object.
+#' @keywords internal
+plot_cv_metric <- function(res, metric, chance, selected_model, selected_by, n_resamples, label = metric,
+                           wrap_names = FALSE, chance_label = "random classifier") {
+  df <- data.frame(model = factor(res$model, levels = res$model),
+                   median = res[[paste0("Median_", metric)]],
+                   mad = res[[paste0("MAD_", metric)]])
+  df$selected <- ifelse(df$model == selected_model, "selected", "other")
+  df$lower <- pmax(0, df$median - df$mad)
+  df$upper <- pmin(1, df$median + df$mad)
+
+  ggplot2::ggplot(df, ggplot2::aes(x = .data$model, y = .data$median)) +
+    ggplot2::geom_col(ggplot2::aes(fill = .data$selected), width = 0.55) +
+    ggplot2::geom_hline(yintercept = chance, linetype = "dashed", linewidth = 0.4, colour = "#52514e") +
+    ggplot2::geom_errorbar(ggplot2::aes(ymin = .data$lower, ymax = .data$upper), width = 0.15, linewidth = 0.4, colour = "#0b0b0b") +
+    ggplot2::geom_text(ggplot2::aes(y = .data$upper, label = sprintf("%.2f", .data$median)), vjust = -0.7, size = 3.3, colour = "#52514e") +
+    ggplot2::scale_fill_manual(values = c(selected = "#2a78d6", other = "#c3c2b7"), guide = "none") +
+    ggplot2::scale_x_discrete(labels = if (wrap_names) function(x) gsub("_", "\n", x) else ggplot2::waiver()) +
+    ggplot2::scale_y_continuous(breaks = seq(0, 1, by = 0.1), expand = c(0, 0)) +
+    ggplot2::coord_cartesian(ylim = c(0, 1.08)) +
+    ggplot2::labs(title = paste0("Cross-validation ", label, " of each model"),
+                  subtitle = paste0("Median across ", n_resamples, " resamples (error bars: +/- MAD). ",
+                                    "Selected model, by ", selected_by, ", in blue: ", selected_model),
+                  caption = paste0("Dashed line: ", chance_label, " (", sprintf("%.2f", chance), ")"),
+                  x = NULL,
+                  y = paste0("Median ", label)) +
+    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"),
+                   plot.title.position = "plot",
+                   plot.subtitle = ggplot2::element_text(colour = "#52514e"),
+                   plot.caption = ggplot2::element_text(colour = "#52514e"),
+                   panel.grid.major.x = ggplot2::element_blank(),
+                   panel.grid.minor = ggplot2::element_blank(),
+                   panel.grid.major.y = ggplot2::element_line(colour = "#e1e0d9", linewidth = 0.3),
+                   axis.text = ggplot2::element_text(colour = "#52514e"),
+                   axis.text.x = ggplot2::element_text(size = 11))
+}
+
 #' @title Internal: Calculate AUROC from Resample Predictions
 #'
 #' @description
 #' Computes the Area Under the ROC Curve (AUROC) for a single cross-validation resample.
 #' This function assumes binary classification with the positive class labeled `"yes"`.
+#' Samples with the same predicted probability enter the curve together, so the result does not depend on
+#' the order of the samples.
 #'
 #' @param obs Vector of observed class labels (`"yes"` / `"no"`).
 #' @param pred Numeric vector of predicted probabilities for the positive class `"yes"`.
 #'
-#' @return Numeric value of AUROC.
+#' @return Numeric value of AUROC. \code{NA} (with a warning) if the resample has samples of a single class.
 #'
 #' @keywords internal
 calculate_auc_roc_resample = function(obs, pred){
+
+  if (length(unique(obs)) < 2) {
+    warning("AUROC cannot be calculated in a resample with samples of a single class: NA returned.")
+    return(NA_real_)
+  }
 
   prob_obs = data.frame("yes" = pred, "obs" = obs)
 
@@ -1663,6 +1808,8 @@ calculate_auc_roc_resample = function(obs, pred){
     dplyr::mutate(is_yes = (obs == "yes"),
             tp = cumsum(is_yes), #true positive above the threshold - cumulative sum to refer to the threshold
             fp = cumsum(!is_yes), #false positive above the threshold - cumulative sum to refer to the threshold
+            tp = stats::ave(tp, yes, FUN = max), #samples with the same probability enter the curve together (if not, the result depends on the order of the rows)
+            fp = stats::ave(fp, yes, FUN = max),
             fpr = fp/sum(obs == 'no'),
             tpr = tp/sum(obs == 'yes'))
 
@@ -1676,14 +1823,21 @@ calculate_auc_roc_resample = function(obs, pred){
 #' @description
 #' Computes the Area Under the Precision-Recall Curve (AUPRC) for a single cross-validation resample.
 #' Assumes binary classification with positive class `"yes"`.
+#' Samples with the same predicted probability enter the curve together, so the result does not depend on
+#' the order of the samples.
 #'
 #' @param obs Vector of observed class labels (`"yes"` / `"no"`).
 #' @param pred Numeric vector of predicted probabilities for the positive class `"yes"`.
 #'
-#' @return Numeric value of AUPRC.
+#' @return Numeric value of AUPRC. \code{NA} (with a warning) if the resample has samples of a single class.
 #'
 #' @keywords internal
 calculate_auc_prc_resample = function(obs, pred) {
+
+  if (length(unique(obs)) < 2) {
+    warning("AUPRC cannot be calculated in a resample with samples of a single class: NA returned.")
+    return(NA_real_)
+  }
 
   prob_obs = data.frame("yes" = pred, "obs" = obs)
 
@@ -1692,6 +1846,8 @@ calculate_auc_prc_resample = function(obs, pred) {
     dplyr::mutate(is_yes = (obs == "yes"),
                   tp = cumsum(is_yes), # True positives
                   fp = cumsum(!is_yes), # False positives
+                  tp = stats::ave(tp, yes, FUN = max), # Samples with the same probability enter the curve together (if not, the result depends on the order of the rows)
+                  fp = stats::ave(fp, yes, FUN = max),
                   fn = sum(obs == "yes") - tp, # False negatives
                   precision = tp / (tp + fp), # Precision
                   recall = tp / (tp + fn)) # Recall
@@ -1746,10 +1902,11 @@ calculate_accuracy_kappa_resample <- function(obs, pred) {
 #' The F1 score is the harmonic mean of precision and recall, and is used to evaluate the balance between the two metrics.
 #' It is particularly useful when the class distribution is imbalanced.
 #'
-#' @param metrics A vector of predicted class labels or probabilities.
-#' @param target A vector of true class labels.
+#' @param metrics A data frame with metrics obtained using `get_sensitivity_specificity()`, containing
+#'   at least two columns: "Sensitivity" and "Specificity" (one row per probability threshold).
+#' @param target A vector of true class labels (`"yes"` / `"no"`).
 #'
-#' @return The F1 score, a numeric value between 0 and 1.
+#' @return A numeric vector with the F1 score (between 0 and 1) at each probability threshold.
 #' @keywords internal
 #'
 calculate_f1 = function(metrics, target) {
@@ -1772,10 +1929,11 @@ calculate_f1 = function(metrics, target) {
 #' The Matthews correlation coefficient (MCC) is a metric used for binary classification problems.
 #' It takes into account true and false positives and negatives, and is considered a balanced metric.
 #'
-#' @param metrics A vector of predicted class labels or probabilities.
-#' @param target A vector of true class labels.
+#' @param metrics A data frame with metrics obtained using `get_sensitivity_specificity()`, containing
+#'   at least two columns: "Sensitivity" and "Specificity" (one row per probability threshold).
+#' @param target A vector of true class labels (`"yes"` / `"no"`).
 #'
-#' @return The MCC score, a numeric value between -1 and 1.
+#' @return A numeric vector with the MCC score (between -1 and 1) at each probability threshold.
 #' @keywords internal
 #'
 calculate_mcc = function(metrics, target) {
@@ -1797,13 +1955,15 @@ calculate_mcc = function(metrics, target) {
 #' Calculate Sensitivity and Specificity Values
 #'
 #' This function calculates sensitivity (recall), specificity, and other related metrics (accuracy, precision, recall, F1 score, MCC)
-#' from predicted and true class labels.
+#' at each probability threshold, from the predicted probabilities and the true class labels.
 #'
-#' @param predictions A vector of predicted class labels or probabilities.
-#' @param observed A vector of true class labels.
-#' @param ml.model The trained machine learning model used to generate predictions.
+#' @param predictions A data frame with a column `yes`: the predicted probability of the positive class of each sample.
+#' @param observed A vector of true class labels (`"yes"` / `"no"`), in the same order as the rows of `predictions`.
+#' @param ml.model Character. Name of the model, stored in the column `model` of the output.
 #'
-#' @return A data frame containing sensitivity, specificity, precision, recall, F1 score, MCC, and other metrics.
+#' @return A data frame with one row per sample, sorted by decreasing predicted probability. Each row gives the metrics
+#'   obtained when that sample and all the samples above it are predicted as positive: `yes` (the probability used as
+#'   threshold), `model`, `Sensitivity`, `Specificity`, `fpr`, `Accuracy`, `Precision`, `Recall`, `F1` and `MCC`.
 #' @keywords internal
 #'
 get_sensitivity_specificity = function(predictions, observed, ml.model){
@@ -1814,6 +1974,8 @@ get_sensitivity_specificity = function(predictions, observed, ml.model){
     dplyr::mutate(is_yes = (observed == "yes"),
                   tp = cumsum(is_yes), #true positive above the threshold - cumulative sum to refer to the threshold
                   fp = cumsum(!is_yes), #false positive above the threshold - cumulative sum to refer to the threshold
+                  tp = stats::ave(tp, yes, FUN = max), #samples with the same probability enter the curve together (if not, the result depends on the order of the rows)
+                  fp = stats::ave(fp, yes, FUN = max),
                   Sensitivity = tp/sum(observed == 'yes'),
                   fpr = fp/sum(observed == 'no'),
                   Specificity = 1 - fpr) %>%
@@ -1836,6 +1998,7 @@ get_sensitivity_specificity = function(predictions, observed, ml.model){
 #'
 #' This function calculates the Area Under the Receiver Operating Characteristic (ROC) curve.
 #' It uses the trapezoidal rule to compute the AUC from the false positive rate (FPR) and sensitivity (true positive rate).
+#' The curve is started at the point (0, 0).
 #'
 #' @param fpr A numeric vector of false positive rates from the ROC curve.
 #' @param sensitivity A numeric vector of sensitivities (true positive rates) from the ROC curve.
@@ -1851,6 +2014,10 @@ calculate_auroc <- function(fpr, sensitivity) {
   fpr <- fpr[ordered]
   sensitivity <- sensitivity[ordered]
 
+  # The curve starts at (0, 0): needed when the samples with the highest probability are tied
+  fpr <- c(0, fpr)
+  sensitivity <- c(0, sensitivity)
+
   auc <- 0
   for (i in 1:(length(fpr) - 1)) { #-1 to avoid NA cause last terms are TPR = 1 and FPR = 1
     # Trapezoidal rule: (TPR_i + TPR_{i+1}) / 2 * (FPR_{i+1} - FPR_i)
@@ -1864,6 +2031,7 @@ calculate_auroc <- function(fpr, sensitivity) {
 #'
 #' This function calculates the Area Under the Precision-Recall Curve (AUPRC).
 #' It uses the trapezoidal rule to compute the AUPRC from the recall and precision values.
+#' The curve is started at recall 0, with the precision of its first point.
 #'
 #' @param recall A numeric vector of recall values (sensitivity) from the precision-recall curve.
 #' @param precision A numeric vector of precision values from the precision-recall curve.
@@ -1876,6 +2044,10 @@ calculate_auprc <- function(recall, precision) {
   ordered <- order(recall)
   recall <- recall[ordered]
   precision <- precision[ordered]
+
+  # The curve starts at recall 0, with the precision of its first point
+  recall <- c(0, recall)
+  precision <- c(precision[1], precision)
 
   auprc <- 0
   for (i in 1:(length(recall) - 1)) { # -1 to avoid NA from the last terms
@@ -1893,23 +2065,31 @@ calculate_auprc <- function(recall, precision) {
 #'
 #' @param model The trained model returned as \code{$Model} by \code{compute_features.training.ML()}
 #'   (e.g. \code{res$Model}).
-#' @param test_data A data frame or matrix of predictor variables for the test set.
-#' @param target_var Vector of true labels for the test set (classification only).
+#' @param test_data A data frame of predictor variables for the test set (for classification, a matrix is also
+#'   accepted). It must contain all the features of the model; other columns are ignored for classification.
+#' @param target_var Vector of true labels for the test set, in the order of the rows of \code{test_data}
+#'   (classification only).
 #' @param trait.positive Value in \code{target_var} representing the positive class (classification only).
 #' @param task_type Character. Either \code{"classification"} or \code{"survival"}.
-#' @param time_var Column or vector of survival/follow-up times (required for survival tasks).
-#' @param event_var Column or vector of event indicators (1 = event, 0 = censored; required for survival tasks).
+#' @param time_var Numeric vector of survival/follow-up times of the test samples, in the order of the rows of
+#'   \code{test_data} (required for survival tasks).
+#' @param event_var Numeric vector of event indicators of the test samples (1 = event, 0 = censored; required for
+#'   survival tasks).
 #' @param file.name Character. File name prefix of the plots saved in \code{Results/}.
 #' @param return Logical. Whether to save the plots in \code{Results/} (ROC and precision-recall curves for
 #'   classification, Kaplan-Meier curves by predicted risk group for survival). Default = FALSE.
+#' @param n_groups Integer. Number of risk groups of the Kaplan-Meier plot (survival only, used with
+#'   \code{return = TRUE}). Default = 2. See \code{plot_survival_performance()}.
 #'
 #' @return For classification, a list containing:
 #' \describe{
 #'   \item{\code{Metrics}}{Data frame of performance metrics (Accuracy, Sensitivity, Specificity,
-#'                         Precision, Recall, F1 score, MCC) for each threshold.}
+#'                         Precision, Recall, F1 score, MCC) for each threshold: one row per test sample,
+#'                         sorted by decreasing predicted probability.}
 #'   \item{\code{AUC}}{List with \code{AUROC} and \code{AUPRC}, each a list with the \code{estimate} on the
 #'     test set and the \code{lower} and \code{upper} bounds of its 95% bootstrap confidence interval.}
-#'   \item{\code{Predictions}}{Data frame of predicted probabilities for each class.}
+#'   \item{\code{Predictions}}{Data frame of predicted probabilities for each class (columns \code{no} and
+#'     \code{yes}), in the order of the rows of \code{test_data}.}
 #'   \item{\code{Curve_bands}}{List with \code{ROC} (columns \code{fpr}, \code{lower}, \code{upper}) and
 #'     \code{PRC} (columns \code{recall}, \code{lower}, \code{upper}): pointwise 95% bootstrap bands
 #'     around the ROC and precision-recall curves.}
@@ -1922,10 +2102,14 @@ calculate_auprc <- function(recall, precision) {
 #' }
 #'
 #' @details
-#' Confidence intervals of AUROC and AUPRC come from 1000 bootstrap resamples of the test samples.
+#' Confidence intervals of AUROC and AUPRC come from 1000 bootstrap resamples of the test samples, stratified by
+#' class (positives and negatives resampled separately, so every resample has both), and the confidence interval
+#' of the C-index from 1000 bootstrap resamples stratified by event. Both use the fixed seed 123 only inside the
+#' bootstrap: the state of the random number generator of the session is not changed.
 #'
-#' Survival models can predict a risk score, a survival time or a survival probability. The last two are
-#' reversed, so that higher predictions always mean higher risk.
+#' Survival models can predict a linear predictor, a survival time or a survival probability. The modelling
+#' library returns all three so that higher values mean longer survival (also the linear predictor of Cox
+#' models); they are reversed, so that higher predictions always mean higher risk.
 #'
 #' @seealso \code{\link{get_curves}}, \code{\link{plot_survival_performance}}
 #'
@@ -1958,7 +2142,22 @@ calculate_auprc <- function(recall, precision) {
 #' @import reshape2
 #' @import grDevices
 #' @export
-compute_prediction = function(model, test_data, target_var = NULL, trait.positive = NULL, task_type = "classification", time_var = NULL, event_var = NULL, file.name = NULL, return = FALSE){
+compute_prediction = function(model, test_data, target_var = NULL, trait.positive = NULL, task_type = "classification", time_var = NULL, event_var = NULL, file.name = NULL, return = FALSE, n_groups = 2){
+
+  if (length(task_type) != 1 || !task_type %in% c("classification", "survival")) {
+    stop("`task_type` must be either 'classification' or 'survival'.\n")
+  }
+
+  # The model returned as $Model by compute_features.training.ML(): a caret train object (classification) or a
+  # list with the fitted model in $Model_object (survival)
+  if (task_type == "classification" && !inherits(model, "train")) {
+    stop("For classification, `model` must be the caret train object returned as `$Model` by ",
+         "compute_features.training.ML() (e.g. res$Model).\n")
+  }
+  if (task_type == "survival" && (!is.list(model) || is.null(model[["Model_object"]]))) {
+    stop("For survival, `model` must be the model returned as `$Model` by compute_features.training.ML() ",
+         "(e.g. res$Model), with the fitted model in `$Model_object`.\n")
+  }
 
   # Sanitize test_data column names to match caret's internal make.names() conversion applied during training
   colnames(test_data) <- make.names(colnames(test_data))
@@ -1968,12 +2167,19 @@ compute_prediction = function(model, test_data, target_var = NULL, trait.positiv
   # --------------------------------------
   if(task_type == "classification"){
     if(is.null(target_var) | is.null(trait.positive)) stop("target_var and trait.positive must be provided for classification")
+    if (anyNA(target_var)) {
+      stop("`target_var` contains missing values (NA). Remove those samples from `test_data` and `target_var`.\n")
+    }
+    if (!trait.positive %in% target_var || all(target_var == trait.positive)) {
+      stop("`target_var` must contain test samples with and without `trait.positive` ('", trait.positive,
+           "') to calculate AUROC and AUPRC. Values found: ", paste(unique(target_var), collapse = ", "), ".\n")
+    }
     target = as.factor(ifelse(target_var == trait.positive, 'yes', 'no'))
     target <- factor(target, levels = c("no", "yes"))  # Order (just in case) to ensure positive class is not well defined
 
     cat("Predicting target variable using provided ML model.................................................\n")
 
-    test_data = test_data[,colnames(test_data)%in%model[["coefnames"]]] #Only use features defined in the model
+    test_data = test_data[,colnames(test_data)%in%model[["coefnames"]], drop = FALSE] #Only use features defined in the model
     features <- colnames(test_data)
     method = model$method
     are_equal = dplyr::setequal(model[["coefnames"]], features)
@@ -2050,10 +2256,8 @@ compute_prediction = function(model, test_data, target_var = NULL, trait.positiv
 
     # Kaplan-Meier plot
     if(return == TRUE){
-      plot_survival_performance(df_test = test_data, prediction = prediction, n_groups = 2, file_name = file.name) ## Add customization of n_groups
+      plot_survival_performance(df_test = test_data, prediction = prediction, n_groups = n_groups, file_name = file.name)
     }
-
-    test_data$.pred = as.numeric(unlist(prediction$preds))
 
     cat("\nPrediction finished!.................................................\n")
 
@@ -2177,13 +2381,16 @@ calculate_recall <- function(metrics, target) {
 #' and Precision-Recall curve based on the provided metrics. It also includes the AUC values
 #' for both curves in the plot legends.
 #'
-#' @param data A data frame containing the prediction metrics.
+#' @param data A data frame containing the prediction metrics at each threshold, as returned in
+#'   \code{compute_prediction()$Metrics} (sorted by decreasing predicted probability within each curve).
 #' @param spec The name of the column containing the specificity values.
 #' @param sens The name of the column containing the sensitivity values.
 #' @param reca The name of the column containing the recall values.
 #' @param prec The name of the column containing the precision values.
-#' @param color The name of the column containing the cohort names. Each cohort will have a
-#'        corresponding color in the plot. Multiple cohorts will result in different curves.
+#' @param color The name of the column that identifies each curve (e.g. \code{"model"} for the output of
+#'        \code{compute_prediction()}, or the column with the cohort names). Each value will have a
+#'        corresponding color in the plot. Several curves (several values in this column) are only supported
+#'        with \code{LODO = TRUE}.
 #' @param auc_roc A list with elements \code{estimate}, \code{lower} and \code{upper}
 #'   giving the AUROC and its confidence interval, as returned in
 #'   \code{compute_prediction()$AUC$AUROC}. When \code{LODO = TRUE}, each element is a
@@ -2191,20 +2398,26 @@ calculate_recall <- function(metrics, target) {
 #' @param auc_prc Same structure as \code{auc_roc}, for the AUPRC
 #'   (\code{compute_prediction()$AUC$AUPRC}).
 #' @param LODO Logical. If TRUE, the function assumes the data contains stacked predictions from
-#'   multiple cohorts and assigns AUROC/AUPRC per cohort (default = FALSE).
+#'   multiple cohorts and assigns AUROC/AUPRC per cohort (default = FALSE). \code{auc_roc} and \code{auc_prc}
+#'   must then hold named vectors, with the names of the cohorts.
 #' @param roc_band Optional data frame with columns \code{fpr}, \code{lower}, \code{upper}
 #'   (as in \code{compute_prediction()$Curve_bands$ROC}). If supplied and \code{LODO = FALSE},
 #'   it is drawn as a shaded pointwise confidence band around the ROC curve.
 #' @param prc_band Optional data frame with columns \code{recall}, \code{lower}, \code{upper}
 #'   (as in \code{compute_prediction()$Curve_bands$PRC}), drawn around the precision-recall
 #'   curve in the same way.
-#' @param file.name A character string used as the file name prefix for saving the plots.
+#' @param file.name Optional character string added to the names of the saved plots.
 #' @param width A numeric value for the width of plot
 #' @param height A numeric value for the height of plot
 #'
 #'
-#' @return Saves two PDF plots: one for the ROC curve and one for the Precision-Recall curve
-#'         in the "Results/" directory.
+#' @return No return value. Saves two PDF plots in the "Results/" directory: \code{ROC_curve_<file.name>.pdf}
+#'         for the ROC curve and \code{PRC_curve_<file.name>.pdf} for the Precision-Recall curve
+#'         (\code{ROC_curve.pdf} and \code{PRC_curve.pdf} if \code{file.name} is \code{NULL}).
+#'
+#' @details
+#' The ROC curve is drawn from the point (0, 0), and the precision-recall curve from recall 0 with the precision of
+#' its first point, which are the starting points used to calculate AUROC and AUPRC.
 #'
 #' @examples
 #' \dontrun{
@@ -2219,8 +2432,30 @@ calculate_recall <- function(metrics, target) {
 #' }
 #' @export
 #'
-get_curves = function(data, spec = "Specificity", sens = "Sensitivity", reca = "Recall", prec = "Precision", color, auc_roc, auc_prc, LODO = FALSE, file.name, width = 6, height = 6,
+get_curves = function(data, spec = "Specificity", sens = "Sensitivity", reca = "Recall", prec = "Precision", color, auc_roc, auc_prc, LODO = FALSE, file.name = NULL, width = 6, height = 6,
                       roc_band = NULL, prc_band = NULL){
+
+  data <- as.data.frame(data) # a tibble returns a table, not a vector, with data[, column]
+
+  curves <- unique(as.character(data[,color]))
+  if (LODO) {
+    if (!all(curves %in% names(auc_roc$estimate)) || !all(curves %in% names(auc_prc$estimate))) {
+      stop("With `LODO = TRUE`, the elements of `auc_roc` and `auc_prc` must be vectors named with the values of the column '",
+           color, "' (", paste(curves, collapse = ", "), ").\n")
+    }
+  } else if (length(curves) > 1) {
+    stop("`data` contains several curves (", length(curves), " values in the column '", color, "'). Use `LODO = TRUE` and give ",
+         "`auc_roc` and `auc_prc` as vectors named with these values.\n")
+  }
+
+  # Colors: the "Set1" palette has 9 colors
+  if (length(curves) <= 9) {
+    color_scale <- scale_color_brewer(palette = "Set1")
+    fill_scale <- scale_fill_brewer(palette = "Set1")
+  } else {
+    color_scale <- scale_color_manual(values = grDevices::hcl.colors(length(curves), "Dark 3"))
+    fill_scale <- scale_fill_manual(values = grDevices::hcl.colors(length(curves), "Dark 3"))
+  }
 
   data = data %>%
     dplyr::mutate(specificity = data[,spec],
@@ -2270,7 +2505,12 @@ get_curves = function(data, spec = "Specificity", sens = "Sensitivity", reca = "
                              "\n(AUC-ROC = ", round(data$auc_mean, 2),
                              " [", round(data$auc_lower, 2), "-", round(data$auc_upper, 2), "])")
 
-  roc <- ggplot(data, aes(x = 1 - specificity, y = sensitivity, color = color_label_roc))
+  # Each curve starts at (0, 0), as in calculate_auroc()
+  roc_start <- data[!duplicated(data$color), , drop = FALSE]
+  roc_start$specificity <- 1
+  roc_start$sensitivity <- 0
+
+  roc <- ggplot(rbind(roc_start, data), aes(x = 1 - specificity, y = sensitivity, color = color_label_roc))
 
   if(!LODO && !is.null(roc_band)){ ## Pointwise CI band, drawn under the curve
     roc_band$color_label_roc <- data$color_label_roc[1]
@@ -2281,11 +2521,13 @@ get_curves = function(data, spec = "Specificity", sens = "Sensitivity", reca = "
   }
 
   roc <- roc +
-    geom_line(size = 1.2) +
+    geom_line(linewidth = 1.2) +
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey") +
-    scale_color_brewer(palette = "Set1") +
-    scale_fill_brewer(palette = "Set1") +
+    color_scale +
+    fill_scale +
     labs(title = "ROC Curve", x = "1 - Specificity", y = "Sensitivity") +
+    coord_cartesian(xlim = c(0, 1), ylim = c(0, 1)) +
+    guides(color = guide_legend(ncol = min(length(curves), 3))) + # at most 3 legend entries per row, so they fit in the page
     theme_minimal(base_size = 14) +
     theme(legend.title = element_blank(),
           legend.position = "bottom",
@@ -2296,7 +2538,11 @@ get_curves = function(data, spec = "Specificity", sens = "Sensitivity", reca = "
                                  "\n(AUC-PRC = ", round(data$auprc_mean, 2),
                                  " [", round(data$auprc_lower, 2), "-", round(data$auprc_upper, 2), "])")
 
-  prc <- ggplot(data, aes(x = recall, y = precision, color = color_label_prc))
+  # Each curve starts at recall 0, with the precision of its first point, as in calculate_auprc()
+  prc_start <- data[!duplicated(data$color), , drop = FALSE]
+  prc_start$recall <- 0
+
+  prc <- ggplot(rbind(prc_start, data), aes(x = recall, y = precision, color = color_label_prc))
 
   if(!LODO && !is.null(prc_band)){ ## Pointwise CI band, drawn under the curve
     prc_band$color_label_prc <- data$color_label_prc[1]
@@ -2307,22 +2553,23 @@ get_curves = function(data, spec = "Specificity", sens = "Sensitivity", reca = "
   }
 
   prc <- prc +
-    geom_line(size = 1.2) +
-    scale_color_brewer(palette = "Set1") +
-    scale_fill_brewer(palette = "Set1") +
+    geom_line(linewidth = 1.2) +
+    color_scale +
+    fill_scale +
     labs(title = "Precision-Recall Curve", x = "Recall", y = "Precision") +
     ylim(0,1) +
+    guides(color = guide_legend(ncol = min(length(curves), 3))) +
     theme_minimal(base_size = 14) +
     theme(legend.title = element_blank(),
           legend.position = "bottom",
           axis.title = element_text(face = "bold"))
 
   ## ---- Save PDFs ----
-  grDevices::pdf(paste0("Results/ROC_curve_", file.name, ".pdf"), width = width, height = height)
+  grDevices::pdf(paste0("Results/ROC_curve", if (!is.null(file.name)) paste0("_", file.name), ".pdf"), width = width, height = height)
   print(roc)
   grDevices::dev.off()
 
-  grDevices::pdf(paste0("Results/PRC_curve_", file.name, ".pdf"), width = width, height = height)
+  grDevices::pdf(paste0("Results/PRC_curve", if (!is.null(file.name)) paste0("_", file.name), ".pdf"), width = width, height = height)
   print(prc)
   grDevices::dev.off()
 
@@ -2339,11 +2586,13 @@ get_curves = function(data, spec = "Specificity", sens = "Sensitivity", reca = "
 #' @param k_folds Number of folds for cross-validation.
 #' @param n_rep Number of repeated cross-validation runs.
 #'
-#' @return A named list of fold indices suitable for use in training and evaluation.
+#' @return A named list with the row indices of the training samples of each fold, named
+#'   \code{Fold<i>.Rep<j>} (\code{k_folds} x \code{n_rep} elements).
 #'
 #' @details
-#' Each fold preserves the class distribution within each cohort. Useful for Leave-One-Dataset-Out (LODO)
-#' strategies or repeated stratified k-fold cross-validation.
+#' Each cohort is split into \code{k_folds} folds stratified by the target, and the folds of all cohorts are
+#' merged, so every fold preserves the class distribution within each cohort. Stops with an error if a cohort
+#' has fewer samples than \code{k_folds}.
 #'
 #' @keywords internal
 construct_stratified_cohort_folds = function(train_data, batch_id, target_id, k_folds, n_rep){
@@ -2352,6 +2601,14 @@ construct_stratified_cohort_folds = function(train_data, batch_id, target_id, k_
   train_data = train_data %>%
     dplyr::mutate(dataset = as.factor(train_data[,batch_id]),
                   target = as.factor(train_data[,target_id]))
+
+  # Each cohort is split into k folds: it needs at least k samples
+  cohort_sizes <- table(train_data$dataset)
+  if (any(cohort_sizes < k_folds)) {
+    stop("Cohort(s) with fewer samples than `k_folds` (", k_folds, "): ",
+         paste0(names(cohort_sizes)[cohort_sizes < k_folds], " (", cohort_sizes[cohort_sizes < k_folds], ")", collapse = ", "),
+         ". Reduce `k_folds`, or remove these cohorts or merge them with another one.\n")
+  }
 
   # Create stratified folds across different repeats
   folds_list <- purrr::map(1:n_rep, ~{
@@ -2398,15 +2655,19 @@ construct_stratified_cohort_folds = function(train_data, batch_id, target_id, k_
 #' including AUROC, AUPRC, Accuracy, and other threshold-based metrics derived from out-of-fold predictions.
 #' It also handles hyperparameter tuning by selecting the optimal parameter set based on a specified metric.
 #'
-#' @param ml_model A trained machine learning model object containing `Prediction_folds` and `Resample_matrix`.
+#' @param ml_model A trained machine learning model object containing `Prediction_folds` (out-of-fold predictions),
+#'   `Results_folds` and `Resample_matrix`.
 #' @param metric Character string specifying the metric to optimize when selecting hyperparameters. Either `"AUROC"` or `"AUPRC"`.
-#' @param hyperparameters Optional character vector of hyperparameter column names to evaluate. If `NULL`, no hyperparameter tuning is performed.
+#' @param hyperparameters Character vector of hyperparameter column names of `Prediction_folds` to evaluate. For a model
+#'   without hyperparameters (treebag), `"parameter"` is used: the column that holds `"none"`. With `NULL`, no
+#'   hyperparameter tuning is performed and all resamples get the same aggregated value.
 #'
 #' @return A list containing:
 #' \describe{
-#'   \item{\code{Prediction_folds}}{Data frame of out-of-fold predictions with computed metrics for each resample and hyperparameter combination.}
+#'   \item{\code{Prediction_folds}}{Data frame of out-of-fold predictions with computed metrics for each resample and hyperparameter combination,
+#'     sorted by resample, hyperparameters and decreasing predicted probability.}
 #'   \item{\code{Resample_matrix}}{Data frame of per-resample performance metrics (AUROC, AUPRC, Accuracy) for the tuned model.}
-#'   \item{\code{Results_folds}}{Aggregated performance metrics across hyperparameter combinations or resamples.}
+#'   \item{\code{Results_folds}}{Median AUROC, AUPRC and Accuracy of each hyperparameter combination.}
 #'   \item{\code{bestTune}}{Optimal hyperparameter configuration based on the selected metric. Set to `"none"` if no hyperparameters are provided.}
 #' }
 #'
@@ -2457,6 +2718,7 @@ calculate_cv_metrics = function(ml_model, metric, hyperparameters = NULL){
                   AUPRC = calculate_auc_prc_resample(obs, yes) # Calculate AUC-PRC if metric is "AUPRC"
     ) %>%
     dplyr::ungroup() %>%
+    dplyr::arrange(dplyr::across(dplyr::all_of(group_vars)), dplyr::desc(yes)) %>% # same row order as `metrics` below
     data.frame()
 
   # -------------------------------------------------------------------------
@@ -2688,7 +2950,7 @@ compute_shap_values <- function(model_trained, task_type = "classification", see
     X$.outcome <- NULL
 
     pred_fun <- function(object, newdata) {
-      predict(object, newdata, type = "prob")[, "yes"]
+      stats::predict(object, newdata, type = "prob")[, "yes"]
     }
 
   } else if (task_type == "survival") {
@@ -2773,35 +3035,6 @@ ensure_censored <- function() {
   if (!requireNamespace("censored", quietly = TRUE)) {
     stop("Package 'censored' is required for survival tasks. Install it with install.packages('censored').",
          call. = FALSE)
-  }
-  invisible(TRUE)
-}
-
-#' Check the survival features built by a custom fold construction function
-#'
-#' Internal helper. The fold construction function receives the survival outcome in the \code{time} and
-#' \code{event} columns of \code{data}; the features it returns must keep these two columns and must not
-#' contain a copy of them (e.g. because the outcome was not removed before building the features).
-#'
-#' @param df Data frame of features plus \code{time} and \code{event} (training data of a fold, or final
-#'   training set).
-#' @param where Character. Where \code{df} comes from, used in the error message.
-#' @return Invisibly \code{TRUE}; stops with an informative error otherwise.
-#' @keywords internal
-check_survival_fold_features <- function(df, where) {
-  if (!all(c("time", "event") %in% colnames(df))) {
-    stop(where, ": the data returned by fold_construction_fun must contain the 'time' and 'event' columns")
-  }
-  features <- setdiff(colnames(df), c("time", "event"))
-  is_copy <- vapply(features, function(f) {
-    is.numeric(df[[f]]) &&
-      (isTRUE(all.equal(df[[f]], as.numeric(df$time), check.attributes = FALSE)) ||
-         isTRUE(all.equal(df[[f]], as.numeric(df$event), check.attributes = FALSE)))
-  }, logical(1))
-  if (any(is_copy)) {
-    stop(where, ": feature(s) ", paste(features[is_copy], collapse = ", "), " are identical to the survival ",
-         "time or event. fold_construction_fun receives 'time' and 'event' in data: remove them before building ",
-         "the features and add them back to the returned data.")
   }
   invisible(TRUE)
 }
@@ -2919,34 +3152,26 @@ caret_train <- function(..., method) {
 
 #' Preprocess Features for Machine Learning
 #'
-#' This function preprocesses a dataset by removing features with
-#' near-zero variance, highly correlated features, and features that are
-#' constant within any class of the target variable. It ensures that the
-#' resulting feature set is more suitable for machine learning models.
+#' This function preprocesses a set of features by removing features with
+#' near-zero variance and highly correlated features. It ensures that the
+#' resulting feature set is more suitable for machine learning models. It receives the features only:
+#' the callers set the outcome columns aside and add them back, so the outcome is not used.
 #'
-#' @param data A data frame containing predictor features and the target variable.
-#' @param target_col A character string specifying the name of the target column
-#'   in \code{data}. Default is \code{"target"}.
+#' @param data A data frame with the numeric features only (no outcome column).
 #' @param cor_thresh A numeric value between 0 and 1 specifying the correlation
 #'   threshold for removing highly correlated features. Default is \code{0.9}.
-#' @param time_var A character string specifying the name of the time-to-event
-#'   column in \code{data}. Used only for survival analysis.
-#' @param event_var A character string specifying the name of the event indicator
-#'   column in \code{data} (e.g., 0/1). Used only for survival analysis.
 #'
 #' @details
 #' The preprocessing steps include:
 #' \enumerate{
 #'   \item Removing near-zero variance features (using \code{caret::nearZeroVar}).
-#'   \item Removing highly correlated features above the specified threshold
-#'         (using \code{caret::findCorrelation}).
-#'   \item Removing features that are constant within any class of the target
-#'         variable (i.e., provide no discriminatory power across classes).
+#'   \item Removing highly correlated features: for each pair with an absolute correlation above
+#'         the threshold, one of the two is removed (using \code{caret::findCorrelation}).
 #' }
 #'
-#' After preprocessing, the target column is re-attached to the dataset.
+#' The function stops if a feature is not numeric, or if no feature is left after preprocessing.
 #'
-#' @return A data frame with the preprocessed features and the target column.
+#' @return A data frame with the features that are kept (same rows).
 #'
 #' @examples
 #' \dontrun{
@@ -2957,37 +3182,22 @@ caret_train <- function(..., method) {
 #' df <- data.frame(
 #'   feature1 = c(1, 1, 1, 1, 1),             # constant
 #'   feature2 = c(1, 2, 3, 4, 5),             # numeric
-#'   feature3 = c(1, 2, 3, 4, 5) * 2,         # highly correlated with feature2
-#'   target   = c("A", "A", "B", "B", "B")
+#'   feature3 = c(1, 2, 3, 4, 5) * 2          # highly correlated with feature2
 #' )
 #'
-#' clean_df <- preprocess_features(df, target_col = "target", cor_thresh = 0.9)
+#' clean_df <- preprocess_features(df, cor_thresh = 0.9)
 #' }
 #'
 #' @importFrom dplyr select all_of
 #' @importFrom caret nearZeroVar findCorrelation
 #'
 #' @keywords internal
-preprocess_features <- function(data,
-                                target_col = NULL,
-                                time_var = NULL,
-                                event_var = NULL,
-                                cor_thresh = 0.9) {
-  # ---- Detect outcome type ----
-  if (!is.null(target_col) && target_col %in% names(data)) {
-    target <- data[[target_col]]
-    outcome_type <- "classification"
-    data <- data %>% dplyr::select(-dplyr::all_of(target_col))
-  } else if (!is.null(time_var) && !is.null(event_var)) {
-    if (!time_var %in% names(data) || !event_var %in% names(data)) {
-      stop("time_var and event_var must be column names in 'data'.")
-    }
-    time_col <- data[[time_var]]
-    event_col <- data[[event_var]]
-    outcome_type <- "survival"
-    data <- data %>% dplyr::select(-dplyr::all_of(c(time_var, event_var)))
-  } else {
-    stop("You must provide either 'target_col' or both 'time_var' and 'event_var'.")
+preprocess_features <- function(data, cor_thresh = 0.9) {
+
+  non_numeric <- names(data)[!vapply(data, is.numeric, logical(1))]
+  if (length(non_numeric) > 0) {
+    stop("All features must be numeric. Non-numeric features: ", paste(utils::head(non_numeric, 10), collapse = ", "),
+         if (length(non_numeric) > 10) paste0(" ... (", length(non_numeric), " in total)"))
   }
 
   # ---- Step 1: Remove near-zero variance features ----
@@ -3005,147 +3215,126 @@ preprocess_features <- function(data,
     }
   }
 
-  # ---- Step 3: Remove features constant within classes (if classification) ----
-  if (outcome_type == "classification" && ncol(data) > 0) {
-    constant_features <- c()
-    for (i in seq_along(colnames(data))) {
-      col_values <- data[[i]]
-      for (cl in unique(target)) {
-        class_vals <- col_values[target == cl]
-        nzv_info <- caret::nearZeroVar(as.data.frame(class_vals), saveMetrics = TRUE)
-        if (nzv_info$nzv) {
-          constant_features <- c(constant_features, colnames(data)[i])
-          break
-        }
-      }
-    }
-    if (length(constant_features) > 0) {
-      data <- data[, !colnames(data) %in% constant_features, drop = FALSE]
-    }
-  }
-
-  # ---- Step 4: Add back outcome columns ----
-  if (outcome_type == "classification") {
-    data[[target_col]] <- target
-  } else if (outcome_type == "survival") {
-    data[[time_var]] <- time_col
-    data[[event_var]] <- event_col
+  if (ncol(data) == 0) {
+    stop("No feature is left after preprocessing: all the features have near-zero variance or are highly correlated.")
   }
 
   return(data)
 }
 
-#' Train model with optimized hyperparameters for classification tasks
-#'
-#' This function wraps cross-validation, hyperparameter optimization,
-#' and final training into a single workflow. It identifies the best
-#' hyperparameters using a custom cross-validation function, reconstructs
-#' the training set, preprocesses features, and retrains the model on the
-#' complete training data with the selected hyperparameters.
-#'
-#' @param train_data A data frame containing the full training dataset,
-#'   including predictors and the target variable.
-#' @param optimized An object returned by \code{compute_custom_k_fold_CV}
-#'   containing the optimized hyperparameters and cross-validation results.
-#' @param ml_method A character string specifying the machine learning method
-#'   to be passed to \code{caret::train}.
-#' @param fold_construction_fun A function used to (re)construct training
-#'   data partitions given the best hyperparameters.
-#' @param fold_construction_args_fixed A named list of additional fixed arguments
-#'   to pass to \code{fold_construction_fun}.
-#'
-#' @details
-#' The workflow proceeds in the following steps:
-#' \enumerate{
-#'   \item Runs cross-validation using \code{compute_custom_k_fold_CV} to
-#'         identify the best hyperparameter set.
-#'   \item Reconstructs the training set using \code{fold_construction_fun} and
-#'         the selected hyperparameters.
-#'   \item Preprocesses the training features by removing near-zero variance,
-#'         highly correlated, and constant-within-class features
-#'         (via \code{\link{preprocess_features}}).
-#'   \item Retrains the model on the complete training data with the optimized
-#'         hyperparameters.
-#' }
-#'
-#' The returned object mimics a \code{caret} model object but includes
-#' additional elements derived from the custom cross-validation.
-#'
-#' @return A list with the following components:
-#' \describe{
-#'   \item{\code{Model}}{A trained \code{caret} model object with
-#'         results, predictions, and resampling info attached.}
-#'   \item{\code{training_set}}{The final preprocessed training dataset.}
-#'   \item{\code{custom_output}}{Additional output from \code{fold_construction_fun}.}
-#' }
-#'
-#' @examples
-#' \dontrun{
-#' library(caret)
-#'
-#' # Example placeholders
-#' train_data <- your_training_data
-#' fold_data  <- your_prepared_folds
-#'
-#' result <- wrapper_train_best_hyperparams_classification(
-#'   train_data = train_data,
-#'   fold_data  = fold_data,
-#'   ml_method  = "rf",
-#'   fold_construction_fun = your_fold_fun,
-#'   fold_construction_args_fixed = list(arg1 = "value"),
-#'   tuneGrid = expand.grid(mtry = 2:4),
-#'   ncores = 4
-#' )
-#'
-#' result$Model
-#' }
-#'
-#' @seealso \code{\link{compute_custom_k_fold_CV}},
-#'   \code{\link{preprocess_features}}
-#' @keywords internal
-#' @importFrom caret train trainControl
-wrapper_train_best_hyperparams_classification <- function(train_data, optimized, ml_method, fold_construction_fun, fold_construction_args_fixed) {
+# Not used: the final classification model of the custom-fold path (with tunable arguments) is built in
+# compute_k_fold_CV() with the bestTune selected by `metric`. This function built it a first time with the bestTune
+# selected by Accuracy, and all its outputs were then replaced (see CLAUDE.md, Feature Preprocessing). Kept for reference.
 
-  # Extract optimized hyperparams
-  besttune <- optimized$bestTune
-
-  # Create complete training set using tuned hyperparams from custom function
-  training_all <- do.call(fold_construction_fun,
-                          c(list(data = train_data, bestune = optimized$bestTune), fold_construction_args_fixed))
-
-  # Preprocess features
-  training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9, target_col = "target")
-
-  # Wrap correct model type for lasso and ridge
-  if(ml_method == "lasso"){
-    ml_method = "glmnet"
-  }else if(ml_method == "ridge"){
-    ml_method = "glmnet"
-  }
-
-  # Retrain ML model with tuned ML hyperparams
-  fit <- caret_train(
-    target ~ .,
-    data = training_set,
-    method = ml_method,
-    trControl = caret::trainControl(method = "none", allowParallel = F, classProbs = TRUE),
-    tuneGrid = besttune %>% select(-colnames(training_all[[3]]))
-  )
-
-  # Return caret-like object
-  fit$Results_folds  <- optimized$Results_folds
-  fit$Prediction_folds     <- optimized$Prediction_folds
-  fit$Resample_matrix <- optimized$Resample_matrix ## Resample matrix contains the performance per resample with tuned param conf
-
-  ##### training_all[[2]] needs to be filter to return only features from training_set (not possible because we need to generalize custom_fold function so sometimes the structure will be different)
-
-  return(list(Model = fit, training_set = training_set, custom_output = c(training_all[[2]], list("Parameters" = training_all[[3]]))))
-}
+# #' Train model with optimized hyperparameters for classification tasks
+# #'
+# #' Used with a custom fold construction function that has tunable arguments.
+# #' Given the cross-validation results of one model, this function rebuilds
+# #' the features on all training samples with the selected feature parameters,
+# #' preprocesses them, and trains the model on the complete training data with
+# #' the selected hyperparameters. It does not run the cross-validation itself.
+# #'
+# #' @param train_data A data frame containing the full training dataset,
+# #'   including predictors and the target variable.
+# #' @param optimized The cross-validation results of one model: one element of the
+# #'   list returned by \code{aggregate_results()}, with \code{bestTune} (selected model
+# #'   hyperparameters and feature parameters), \code{Results_folds},
+# #'   \code{Prediction_folds} and \code{Resample_matrix}.
+# #' @param ml_method A character string specifying the machine learning method
+# #'   to be passed to \code{caret::train} (\code{"lasso"} and \code{"ridge"} are trained as \code{"glmnet"}).
+# #' @param fold_construction_fun The custom fold construction function, called with
+# #'   \code{bestune} to build the features of all training samples.
+# #' @param fold_construction_args_fixed A named list of additional fixed arguments
+# #'   to pass to \code{fold_construction_fun}.
+# #' @param preprocess Logical. If \code{TRUE} (default), the training features are preprocessed with
+# #'   \code{preprocess_features()}.
+# #'
+# #' @details
+# #' The workflow proceeds in the following steps:
+# #' \enumerate{
+# #'   \item Takes the selected hyperparameters from \code{optimized$bestTune}.
+# #'   \item Reconstructs the training set using \code{fold_construction_fun} and
+# #'         the selected feature parameters.
+# #'   \item Preprocesses the training features by removing near-zero variance
+# #'         and highly correlated features
+# #'         (via \code{\link{preprocess_features}}), if \code{preprocess = TRUE}.
+# #'   \item Retrains the model on the complete training data with the selected
+# #'         model hyperparameters (\code{bestTune} without the feature parameters).
+# #' }
+# #'
+# #' The returned model is a \code{caret} model object that includes
+# #' additional elements derived from the custom cross-validation.
+# #'
+# #' @return A list with the following components:
+# #' \describe{
+# #'   \item{\code{Model}}{A trained \code{caret} model object with the cross-validation
+# #'         results attached in \code{Results_folds}, \code{Prediction_folds} and \code{Resample_matrix}.}
+# #'   \item{\code{training_set}}{The final preprocessed training dataset.}
+# #'   \item{\code{custom_output}}{Custom output from \code{fold_construction_fun}, plus the
+# #'         selected feature parameters in \code{Parameters}.}
+# #' }
+# #'
+# #' @examples
+# #' \dontrun{
+# #' # agg: output of aggregate_results() (one element per model); the second one is "rf"
+# #' result <- wrapper_train_best_hyperparams_classification(
+# #'   train_data = train_data,
+# #'   optimized  = agg[[2]],
+# #'   ml_method  = "rf",
+# #'   fold_construction_fun = your_fold_fun,
+# #'   fold_construction_args_fixed = list(arg1 = "value")
+# #' )
+# #'
+# #' result$Model
+# #' }
+# #'
+# #' @seealso \code{\link{compute_custom_k_fold_CV}},
+# #'   \code{\link{preprocess_features}}
+# #' @keywords internal
+# #' @importFrom caret train trainControl
+# wrapper_train_best_hyperparams_classification <- function(train_data, optimized, ml_method, fold_construction_fun, fold_construction_args_fixed, preprocess = TRUE) {
+# 
+#   # Extract optimized hyperparams
+#   besttune <- optimized$bestTune
+# 
+#   # Create complete training set using tuned hyperparams from custom function
+#   training_all <- do.call(fold_construction_fun,
+#                           c(list(data = train_data, bestune = optimized$bestTune), fold_construction_args_fixed))
+# 
+#   # Preprocess features
+#   training_set <- if (preprocess) preprocess_features(training_all[[1]], cor_thresh = 0.9, target_col = "target") else training_all[[1]]
+# 
+#   # Wrap correct model type for lasso and ridge
+#   if(ml_method == "lasso"){
+#     ml_method = "glmnet"
+#   }else if(ml_method == "ridge"){
+#     ml_method = "glmnet"
+#   }
+# 
+#   # Retrain ML model with tuned ML hyperparams
+#   fit <- caret_train(
+#     target ~ .,
+#     data = training_set,
+#     method = ml_method,
+#     trControl = caret::trainControl(method = "none", allowParallel = F, classProbs = TRUE),
+#     tuneGrid = besttune %>% select(-colnames(training_all[[3]]))
+#   )
+# 
+#   # Return caret-like object
+#   fit$Results_folds  <- optimized$Results_folds
+#   fit$Prediction_folds     <- optimized$Prediction_folds
+#   fit$Resample_matrix <- optimized$Resample_matrix ## Resample matrix contains the performance per resample with tuned param conf
+# 
+#   ##### training_all[[2]] needs to be filter to return only features from training_set (not possible because we need to generalize custom_fold function so sometimes the structure will be different)
+# 
+#   return(list(Model = fit, training_set = training_set, custom_output = c(training_all[[2]], list("Parameters" = training_all[[3]]))))
+# }
 
 #' Train the Best Survival Model Using Optimized Hyperparameters
 #'
 #' Fits a survival model on the full training data using the optimal
-#' hyperparameters obtained from nested cross-validation.
+#' hyperparameters obtained from cross-validation. Used with a custom fold
+#' construction function.
 #' This wrapper ensures consistent retraining for different survival
 #' model types (Cox, penalized Cox, AFT, tree-based, or ensemble models),
 #' and supports preprocessing pipelines such as CellTFusion through a
@@ -3154,9 +3343,10 @@ wrapper_train_best_hyperparams_classification <- function(train_data, optimized,
 #' @param train_data A data frame containing the original training data
 #'   used for cross-validation (features plus \code{time} and \code{event}), passed to
 #'   \code{fold_construction_fun} as \code{data}.
-#' @param optimized A list output from [`aggregate_results()`] or
-#'   [`compute_k_fold_CV_survival()`], containing the best-tuned parameters
-#'   (`bestTune`) and model performance summaries.
+#' @param optimized The cross-validation results of one model (one element of the output of
+#'   [`aggregate_results()`]): `Results_folds`, `Prediction_folds`, `Resample_matrix` and `bestTune`.
+#'   With tunable arguments, `bestTune` is a data frame with the selected feature parameters and model
+#'   hyperparameters; without them, a list with the model hyperparameters and `fold_construction_args_fixed`.
 #' @param ml_method Character string specifying the survival model to train.
 #'   Must be one of:
 #'   \itemize{
@@ -3169,15 +3359,20 @@ wrapper_train_best_hyperparams_classification <- function(train_data, optimized,
 #'     \item `"bag_tree_rpart"` - Bagged CART-based survival trees.
 #'     \item `"boost_tree_mboost"` - Gradient boosting for censored data.
 #'   }
+#'   `"rand_forest_partykit"` and `"boost_tree_mboost"` are supported here but are not run by default
+#'   (they are commented out of `model_list` in [`compute_k_fold_CV_survival()`]).
 #' @param fold_construction_fun A custom function used to construct folds and
 #'   preprocessed data (e.g., `prepare_CellTFusion_folds()`).
-#'   Must accept arguments `data` and optionally `bestune`.
+#'   Must accept the arguments `data` and `bestune`. Called with `bestune`, it returns a list with the features
+#'   built on all training samples plus `time` and `event`, its custom output, and the selected parameters.
 #' @param fold_construction_args_fixed A named list of fixed arguments to pass
 #'   to `fold_construction_fun()` (e.g., paths, deconvolution matrices, etc.).
 #' @param outcome_col Character string naming the survival time column
 #'   (default = `"time"`).
 #' @param event_col Character string naming the event indicator column
 #'   (default = `"event"`).
+#' @param preprocess Logical. If `TRUE` (default), the training features are preprocessed with
+#'   `preprocess_features()`.
 #'
 #' @details
 #' This function performs the following steps:
@@ -3186,21 +3381,26 @@ wrapper_train_best_hyperparams_classification <- function(train_data, optimized,
 #'   \item Reconstructs the training dataset using the provided
 #'         `fold_construction_fun()`, including any custom preprocessing
 #'         or feature generation.
-#'   \item Applies the optimal hyperparameters to the model specification.
-#'   \item Fits the final model using the full training data.
+#'   \item Preprocesses the features (`preprocess_features()`), if `preprocess = TRUE`.
+#'   \item Applies the optimal model hyperparameters to the model specification (the feature parameters
+#'         are only used by `fold_construction_fun`).
+#'   \item Fits the final model using the full training data. If the fit fails, a warning is given and
+#'         `NULL` is returned, so the model is excluded.
 #' }
 #'
 #' If the selected model type has no tunable hyperparameters,
 #' the function automatically detects this and proceeds with
 #' the default model configuration.
 #'
-#' @return A named list containing:
+#' @return `NULL` if the final fit fails. Otherwise a named list containing:
 #' \describe{
-#'   \item{`Model`}{A list containing the fitted parsnip model object,
-#'   resampling results, and tuning information.}
-#'   \item{`training_set`}{The final preprocessed training dataset used for fitting.}
+#'   \item{`Model`}{A list containing the model name (`model`), the fitted workflow (`fitted`),
+#'   the cross-validation results (`Results_folds`, `Prediction_folds`, `Resample_matrix`)
+#'   and the selected model hyperparameters (`bestTune`; the feature parameters are in
+#'   `custom_output$Parameters`).}
+#'   \item{`training_set`}{The final training set used for fitting (preprocessed if `preprocess = TRUE`).}
 #'   \item{`custom_output`}{Additional data returned by the custom fold construction
-#'   function (e.g., CellTFusion outputs or parameter tables).}
+#'   function (e.g., CellTFusion outputs), plus its third element in `Parameters`.}
 #' }
 #'
 #' @keywords internal
@@ -3211,7 +3411,8 @@ wrapper_train_best_hyperparams_survival <- function(train_data,
                                                     fold_construction_fun,
                                                     fold_construction_args_fixed,
                                                     outcome_col = "time",
-                                                    event_col = "event") {
+                                                    event_col = "event",
+                                                    preprocess = TRUE) {
   ensure_censored()
 
 
@@ -3228,11 +3429,10 @@ wrapper_train_best_hyperparams_survival <- function(train_data,
   # training_all[[2]]: custom CellTFusion output, etc.
   # training_all[[3]]: parameter table
 
-  check_survival_fold_features(training_all[[1]], "final training set")
-
-  # Preprocess features
-  training_set <- preprocess_features(training_all[[1]], cor_thresh = 0.9,
-                                      time_var = "time", event_var = "event")
+  # Preprocess features (the outcome columns are set aside and added back)
+  training_set <- training_all[[1]]
+  if (preprocess) training_set <- cbind(preprocess_features(training_set[setdiff(names(training_set), c("time", "event"))]),
+                                        training_set[c("time", "event")])
 
   # Define the model specification based on ml_method
   model <- ml_method
@@ -3282,6 +3482,13 @@ wrapper_train_best_hyperparams_survival <- function(train_data,
     stop("`besttune` must be either a data.frame or a list.")
   }
 
+  # Bagged trees: the number of bags is an engine argument (nbagg), as in compute_ml_survival()
+  if (model == "bag_tree_rpart" && !is.null(model_hyperparams$trees)) {
+    n_bags <- as.integer(model_hyperparams$trees)
+    model_spec <- parsnip::set_engine(model_spec, "rpart", nbagg = !!n_bags)
+    model_hyperparams$trees <- NULL
+  }
+
   # If ML model doesnt have hyperparams
   if (is.null(model_hyperparams) || (is.data.frame(model_hyperparams) && ncol(model_hyperparams) == 0) || (is.list(model_hyperparams) && length(model_hyperparams) == 0)){
     model_hyperparams <- NULL
@@ -3293,14 +3500,19 @@ wrapper_train_best_hyperparams_survival <- function(train_data,
   }
 
   # Build survival formula
-  formula_model <- as.formula(paste0("survival::Surv(", outcome_col, ", ", event_col, ") ~ ."))
+  formula_model <- stats::as.formula(paste0("survival::Surv(", outcome_col, ", ", event_col, ") ~ ."))
 
   wf <- workflows::workflow() %>%
     workflows::add_model(model_spec) %>%
     workflows::add_formula(formula_model)
 
-  # Fit on full training set
-  fitted <- parsnip::fit(wf, data = training_set)
+  # Fit on full training set. A failed fit excludes this model (warning and NULL), as in cross-validation
+  fitted <- tryCatch(parsnip::fit(wf, data = training_set), error = function(e) e)
+  if (inherits(fitted, "error")) {
+    warning("Model ", model, " could not be fitted on all training samples and is excluded: ", conditionMessage(fitted),
+            call. = FALSE)
+    return(NULL)
+  }
 
   # Create a caret-like output
   fit <- list()
@@ -3309,9 +3521,10 @@ wrapper_train_best_hyperparams_survival <- function(train_data,
   fit$Results_folds <- optimized$Results_folds
   fit$Prediction_folds <- optimized$Prediction_folds
   fit$Resample_matrix <- optimized$Resample_matrix
-  fit$bestTune <- besttune
+  # Model hyperparameters only (as in classification): the selected feature parameters are in custom_output$Parameters
+  fit$bestTune <- if (is.data.frame(besttune)) besttune %>% dplyr::select(-dplyr::all_of(colnames(training_all[[3]]))) else besttune
 
-  # Return everything consistent with the classification wrapper
+  # Return the same structure as the classification custom path
   return(list(
     Model = fit,
     training_set = training_set,
@@ -3319,55 +3532,69 @@ wrapper_train_best_hyperparams_survival <- function(train_data,
   ))
 }
 
-#' Aggregate Nested Cross-Validation Results for Classification or Survival Tasks
+#' Aggregate Cross-Validation Results for Classification or Survival Tasks
 #'
-#' Aggregates performance metrics from nested cross-validation experiments for
+#' Aggregates performance metrics from cross-validation experiments for
 #' either **classification** or **survival** models.
-#' This function reads the resampled predictions (often saved per fold and
+#' This function takes the resampled predictions (per fold and
 #' hyperparameter combination) and computes overall performance summaries,
 #' identifies the best hyperparameter configuration, and collates
 #' per-resample metrics for detailed inspection.
 #'
 #' @param all_loaded A nested list containing the results of cross-validation runs.
-#'   Each element typically corresponds to a fold and may include one or more
-#'   hyperparameter configurations and model predictions:
+#'   Each element corresponds to a fold (resample) and holds the results of every model:
 #'   \itemize{
-#'     \item For classification: `all_loaded[[fold]][[param]][[model]][[1]]`
-#'       contains predictions, and `[[2]]` the corresponding hyperparameters.
-#'     \item For survival: `all_loaded[[fold]][[param]][[model]]` contains
-#'       the C-index and hyperparameter columns.
+#'     \item For classification (output of `compute_custom_k_fold_CV()`): `all_loaded[[fold]][[param]][[model]][[1]]`
+#'       is a data frame with one row per test sample and hyperparameter configuration (`rowIndex`, `Resample`,
+#'       `obs`, `pred`, the class probabilities, the hyperparameter values and, with tunable arguments, the
+#'       feature parameters), and `[[2]]` the **names** of the model hyperparameters.
+#'     \item For survival: `all_loaded[[fold]][[param]][[model]]` is a data frame with one row per test sample
+#'       and hyperparameter configuration: `predictions`, the C-index of the fold repeated on each row
+#'       (`c_index`), `Resample`, `model`, the hyperparameter values and, with tunable arguments, the feature
+#'       parameters. A failed fit gives a single row with its error message in `fit_error`.
 #'   }
+#'   The `[[param]]` level only exists when the custom fold construction function has tunable
+#'   arguments; otherwise the structure is `all_loaded[[fold]][[model]]`.
 #' @param task Character string specifying the task type.
 #'   Must be one of: `"classification"` or `"survival"`.
 #'
 #' @details
-#' The function automatically detects whether the input structure includes
-#' tunable hyperparameters (`has_params`) by inspecting the nested list depth.
+#' The function detects from the nesting of `all_loaded` whether the custom fold construction function had
+#' tunable arguments (`has_params`). The model hyperparameters are always there; the feature parameters
+#' (tunable arguments) are then handled as extra hyperparameter columns.
 #'
 #' For **classification** tasks:
 #' \itemize{
-#'   \item Aggregates fold-level predictions and computes Accuracy and Kappa.
-#'   \item Computes the median and MAD (robust SD) across resamples.
-#'   \item Selects the hyperparameter set with the highest median Accuracy.
+#'   \item Binds the predictions of all folds and computes Accuracy and Kappa per resample and configuration.
+#'   \item Computes their median and MAD (scaled, robust SD) across resamples.
+#'   \item Selects the configuration with the highest median Accuracy. This `bestTune` is only provisional:
+#'     `compute_k_fold_CV()` selects it again by AUROC or AUPRC with `calculate_cv_metrics()`.
 #' }
 #'
 #' For **survival** tasks:
 #' \itemize{
-#'   \item Aggregates per-fold C-index values across hyperparameter configurations.
-#'   \item Computes the median and MAD of the C-index per configuration.
-#'   \item Identifies and returns the best-performing parameter combination.
+#'   \item Binds the C-index rows of all folds and configurations.
+#'   \item Reports the fits that failed, and the resamples where the C-index could not be computed (`NA`, e.g. a
+#'     held-out fold without events), and excludes every configuration with a failed fit or an `NA` C-index in
+#'     at least one resample, so all configurations are compared over the same resamples. A model without any
+#'     configuration left is `NULL`.
+#'   \item Computes the median and MAD (scaled, robust SD, as for classification) of the C-index per configuration.
+#'   \item Selects the configuration with the highest median C-index.
 #' }
 #'
 #' The function is compatible with results produced by
 #' [`compute_k_fold_CV_survival()`] and analogous classification CV pipelines.
 #'
 #' @return A list of length equal to the number of models evaluated.
-#' Each element contains:
+#' Each element (`NULL` for a survival model without any configuration left) contains:
 #' \describe{
-#'   \item{`Prediction_folds`}{All predictions or C-index values per fold.}
-#'   \item{`Results_folds`}{Aggregated performance summaries across folds.}
-#'   \item{`bestTune`}{Best-performing hyperparameter combination.}
-#'   \item{`Resample_matrix`}{Fold-level metrics for the best configuration.}
+#'   \item{`Prediction_folds`}{The rows of all folds and configurations bound together (see `all_loaded`).}
+#'   \item{`Results_folds`}{One row per configuration: classification `Accuracy`, `Kappa`, `AccuracySD`,
+#'     `KappaSD` (median and MAD across resamples); survival `c_index_median` and `c_index_mad`.}
+#'   \item{`bestTune`}{The selected configuration: model hyperparameters plus, with tunable arguments, the feature
+#'     parameters.}
+#'   \item{`Resample_matrix`}{Results of the selected configuration: classification, `Accuracy` and `Kappa` per
+#'     resample; survival, its rows of `Prediction_folds` (one per test sample, with the C-index of the fold).}
 #' }
 #'
 #'
@@ -3523,8 +3750,15 @@ aggregate_results <- function(all_loaded, task = c("classification", "survival")
 
       rownames(all_preds) <- NULL
 
-      # Failed fits (compute_ml_survival() returned an error): report them, and exclude every configuration that
-      # failed in at least one resample, since its C-index would be summarized over fewer resamples
+      # A C-index that could not be computed (NA, e.g. no event in the held-out fold) is handled as a failed fit
+      if (!is.null(all_preds) && nrow(all_preds) > 0) {
+        if (!"fit_error" %in% names(all_preds)) all_preds$fit_error <- NA_character_
+        all_preds$fit_error[is.na(all_preds$fit_error) & is.na(all_preds$c_index)] <-
+          "C-index is NA (e.g. no event in the held-out fold)"
+      }
+
+      # Failed fits (compute_ml_survival() returned an error, or NA C-index): report them, and exclude every
+      # configuration that failed in at least one resample, since its C-index would be summarized over fewer resamples
       if (!is.null(all_preds) && "fit_error" %in% names(all_preds)) {
         failed <- all_preds[!is.na(all_preds$fit_error), , drop = FALSE]
         if (nrow(failed) > 0) {
@@ -3535,8 +3769,9 @@ aggregate_results <- function(all_loaded, task = c("classification", "survival")
             failed_configs <- failed[1, , drop = FALSE]
             all_preds <- all_preds[0, , drop = FALSE]
           }
+          n_failed <- nrow(dplyr::distinct(failed, Resample, dplyr::across(dplyr::all_of(hp_cols_all)))) # fits, not rows
           message(sprintf("Model %s: %d fit(s) failed; %d hyperparameter configuration(s) excluded%s. Error: %s",
-                          failed$model[1], nrow(failed), nrow(failed_configs),
+                          failed$model[1], n_failed, nrow(failed_configs),
                           if (nrow(all_preds) == 0) " (no configuration left: model excluded)" else "",
                           paste(utils::head(unique(failed$fit_error), 3), collapse = " | ")))
         }
@@ -3549,7 +3784,7 @@ aggregate_results <- function(all_loaded, task = c("classification", "survival")
           dplyr::group_by(dplyr::across(dplyr::all_of(hp_cols_all))) %>%
           dplyr::summarise(
             c_index_median = stats::median(c_index, na.rm = TRUE),
-            c_index_mad    = stats::mad(c_index, constant = 1, na.rm = TRUE),
+            c_index_mad    = stats::mad(c_index, na.rm = TRUE), # scaled MAD, as in classification
             .groups = "drop" ## keep only c_index and mad
           ) %>%
           dplyr::arrange(dplyr::desc(c_index_median))
@@ -3589,25 +3824,33 @@ aggregate_results <- function(all_loaded, task = c("classification", "survival")
 
 #' Get Hyperparameter Grid for a Classification Method
 #'
-#' Internal helper that returns the fixed hyperparameter grid evaluated for each
-#' classification method during custom-fold cross-validation
-#' (\code{compute_custom_k_fold_CV()}). The grids are deliberately small so that
-#' the full grid can be evaluated in every fold.
+#' Internal helper that returns the hyperparameter grid evaluated for each
+#' classification method during custom-fold cross-validation: \code{compute_k_fold_CV()} passes it to
+#' \code{compute_custom_k_fold_CV()}, which trains every row in every fold. The grids are deliberately small so
+#' that the full grid can be evaluated in every fold. The standard path (no fold construction function) does not
+#' use these grids: it uses caret's default grids, except for lasso and ridge, which use the same \code{lambda}
+#' values as here.
 #'
 #' @param method Character. One of \code{"glmnet"}, \code{"lasso"}, \code{"ridge"},
 #'   \code{"rf"}, \code{"svmRadial"}, \code{"treebag"}, \code{"C5.0"}, \code{"knn"},
 #'   \code{"rpart"}, \code{"svmLinear"}, or \code{"xgbTree"}.
-#' @param train_data Data frame of training data including the \code{target} column.
-#'   Only used by \code{"rf"}, to scale \code{mtry} to the number of features.
+#' @param train_data Data frame with the training features and the \code{target} column (the only non-feature
+#'   column). Only used by \code{"rf"}, to scale \code{mtry} to the number of features (\code{ncol - 1}), and by
+#'   \code{"svmRadial"}, to estimate \code{sigma}. \code{compute_k_fold_CV()} passes the fold training data
+#'   with the fewest features after preprocessing, the same in all folds, so that the grid is the same in all folds.
 #'
 #' @return A data frame with one row per hyperparameter combination, suitable as
 #'   the \code{tuneGrid} argument of \code{caret::train()}:
 #' \describe{
-#'   \item{glmnet}{\code{alpha} of 0 or 1, times 20 \code{lambda} values from 0.001 to 1 (40 rows).}
-#'   \item{lasso}{\code{alpha = 1}, with 20 \code{lambda} values from 0.001 to 1.}
-#'   \item{ridge}{\code{alpha = 0}, with 20 \code{lambda} values from 0.001 to 1.}
-#'   \item{rf}{Up to 3 \code{mtry} values spanning 20-90 percent of the number of features.}
-#'   \item{svmRadial}{\code{sigma} of 0.01, 0.05 or 0.1, times \code{C} of 0.5, 1 or 2.}
+#'   \item{glmnet}{\code{alpha} of 0 or 1, times 20 \code{lambda} values from 0.001 to 1, evenly spaced on
+#'     the log scale (40 rows).}
+#'   \item{lasso}{\code{alpha = 1}, with the same 20 \code{lambda} values.}
+#'   \item{ridge}{\code{alpha = 0}, with the same 20 \code{lambda} values.}
+#'   \item{rf}{Up to 3 \code{mtry} values spanning 20-90 percent of the number of features (with 1 or 2
+#'     features, the values include 0, which randomForest resets to 1).}
+#'   \item{svmRadial}{Up to 3 \code{sigma} values estimated from the features (the 90, 50 and 10 percent
+#'     quantiles of \eqn{1/\|x - x'\|^2} over all pairs of samples, on scaled features, as
+#'     \code{kernlab::sigest()} does on a random subset), times \code{C} of 0.5, 1 or 2.}
 #'   \item{treebag}{A single placeholder row (\code{parameter = "none"}); no tunable parameters.}
 #'   \item{C5.0}{\code{trials} of 1, 5 or 10, times \code{winnow} TRUE or FALSE, with \code{model = "tree"}.}
 #'   \item{knn}{\code{k} of 3, 5, 7, 9 or 11 (odd values avoid ties).}
@@ -3618,7 +3861,8 @@ aggregate_results <- function(all_loaded, task = c("classification", "survival")
 #'     \code{min_child_weight = 1} and \code{subsample = 0.8} fixed (27 rows).}
 #' }
 #'
-#' @details The grids are deterministic. An error is raised for unsupported methods.
+#' @details The grids are deterministic (no random numbers are used): the same \code{train_data} always gives
+#'   the same grid. An error is raised for unsupported methods.
 #'
 #' @seealso \code{\link{compute_custom_k_fold_CV}}, \code{\link{get_default_hyperparams}}
 #'   for the survival-model equivalent.
@@ -3627,22 +3871,28 @@ get_tune_grid = function(method, train_data){
   # TODO: revisit how many values are evaluated per hyperparameter
 
   if(method == "glmnet"){
-    return(expand.grid(alpha = c(0,1), lambda = seq(0.001, 1, length = 20)))
+    return(expand.grid(alpha = c(0,1), lambda = 10^seq(-3, 0, length = 20)))
   }
   if(method == "lasso"){
-    return(expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 20)))
+    return(expand.grid(alpha = 1, lambda = 10^seq(-3, 0, length = 20)))
   }
   if(method == "ridge"){
-    return(expand.grid(alpha = 0, lambda = seq(0.001, 1, length = 20)))
+    return(expand.grid(alpha = 0, lambda = 10^seq(-3, 0, length = 20)))
   }
   if(method == "rf"){
     n_features <- ncol(train_data) - 1
     return(data.frame(mtry = unique(round(seq(n_features * 0.2, n_features * 0.9, length.out = 3)))))
   }
   if(method == "svmRadial"){
-    # Typical small-to-moderate RBF widths + modest C range
+    # sigma from the features, as kernlab::sigest() (used by caret's default grid) but over all pairs of samples,
+    # so the grid is the same in every fold: the 90%, 50% and 10% quantiles of 1 / |x - x'|^2 on the scaled
+    # features. Fixed values do not suit every number of features (the right sigma shrinks as features are added)
+    x <- as.matrix(train_data[setdiff(names(train_data), "target")])
+    x <- scale(x[, apply(x, 2, stats::sd) > 0, drop = FALSE])
+    d <- as.vector(stats::dist(x))^2
+    sigma <- unique(signif(1 / stats::quantile(d[d > 0], c(0.9, 0.5, 0.1), names = FALSE), 3))
     return(expand.grid(
-      sigma = c(0.01, 0.05, 0.1),
+      sigma = sigma,
       C     = c(0.5, 1, 2)
     ))
   }
@@ -3686,12 +3936,14 @@ get_tune_grid = function(method, train_data){
 #'
 #' This function generates default hyperparameter grids for various survival models
 #' compatible with the tidymodels framework. It uses the default parameter ranges
-#' from the \pkg{dials} package and produces a sequence of evenly spaced values
-#' within those ranges for each tunable hyperparameter.
+#' from the \pkg{dials} package and produces \code{levels} evenly spaced values
+#' within those ranges for each tunable hyperparameter (on the log scale for \code{penalty}). Only arguments that
+#' parsnip passes to the engine are tuned. \code{min_n} is capped so that a node of the training part of a fold
+#' can still be split, and \code{mtry} at the number of features; values made equal by these caps are kept once.
 #'
 #' The function supports models such as Cox proportional hazards (regular and penalized),
 #' parametric survival regression, decision trees, bagging, random forests, and gradient boosting.
-#' For models without tunable parameters (e.g., classic Cox or AFT models),
+#' For models without tunable parameters (Cox proportional hazards and the AFT model),
 #' the function returns \code{NULL}.
 #'
 #' @param model_name Character string specifying the model name.
@@ -3706,17 +3958,27 @@ get_tune_grid = function(method, train_data){
 #'     \item \code{"rand_forest_aorsf"} - Oblique random survival forest
 #'     \item \code{"boost_tree_mboost"} - Gradient boosting for survival
 #'   }
-#' @param train_x Optional data frame or matrix of training predictors.
-#'   This is required for parameters that depend on the number of features,
-#'   such as \code{mtry}, which determines the number of variables randomly
-#'   sampled at each split in tree-based models.
+#' @param train_x Optional data frame or matrix of training predictors (features only).
+#'   Its number of columns gives the range of \code{mtry} (number of features sampled at each split of the
+#'   forests): without \code{train_x}, the forest grids have no \code{mtry} and the engine's default is used.
+#'   Its number of rows, with \code{v}, caps \code{min_n} of the tree and the forests; without it, \code{min_n} is
+#'   not capped.
 #' @param levels Integer specifying how many values to generate per hyperparameter.
 #'   Defaults to \code{5}. Must be at least 2.
-#' @param v Integer. Number of folds for K-fold cross-validation (default = 5).
+#' @param v Integer. Number of folds for K-fold cross-validation (default = 5), used to cap \code{min_n}
+#'   to the size of the training part of a fold.
 #'
-#' @return A named list of hyperparameter grids.
-#'   Each element is a numeric vector of sampled values for that parameter.
-#'   Returns \code{NULL} for models without tunable hyperparameters.
+#' @return A named list with one numeric vector of values per tuned argument (the grid is all their
+#'   combinations), or \code{NULL} for models without tunable hyperparameters:
+#'   \itemize{
+#'     \item \code{"proportional_hazards_glmnet"}: \code{penalty}, \code{mixture}.
+#'     \item \code{"decision_tree_partykit"}: \code{tree_depth}, \code{min_n}.
+#'     \item \code{"bag_tree_rpart"}: \code{trees}, the number of bagged trees (25 to 100). It is passed to the
+#'       engine as \code{nbagg} (\code{ipred::bagging()}) by \code{compute_ml_survival()} and
+#'       \code{wrapper_train_best_hyperparams_survival()}.
+#'     \item \code{"rand_forest_aorsf"}, \code{"rand_forest_partykit"}: \code{trees}, \code{min_n}, \code{mtry}.
+#'     \item \code{"boost_tree_mboost"}: \code{trees}, \code{min_n}, \code{tree_depth}.
+#'   }
 #'
 #' @details
 #' The helper function \code{vs()} internally calls \code{dials::value_seq()}
@@ -3748,8 +4010,9 @@ get_default_hyperparams <- function(model_name, train_x = NULL, levels = 5, v = 
     return(NULL)
 
   } else if (model_name == "decision_tree_partykit") {
+    # No cost_complexity: parsnip passes only tree_depth (maxdepth) and min_n (minsplit) to partykit, so its
+    # values gave identical trees
     vals <- list(
-      cost_complexity = vs(dials::cost_complexity()),
       tree_depth      = vs(dials::tree_depth()),
       min_n           = vs(dials::min_n())
     )
@@ -3759,8 +4022,10 @@ get_default_hyperparams <- function(model_name, train_x = NULL, levels = 5, v = 
     return(vals)
 
   } else if (model_name == "bag_tree_rpart") {
+    # Number of bagged trees, from 25 (ipred::bagging() default) to 100. compute_ml_survival() passes it to the
+    # engine as nbagg: bag_tree() has no argument for it
     return(list(
-      trees = vs(dials::trees())
+      trees = vs(dials::trees(range = c(25L, 100L)))
     ))
 
   } else if (model_name %in% c("rand_forest_partykit", "rand_forest_aorsf")) {
@@ -3768,26 +4033,23 @@ get_default_hyperparams <- function(model_name, train_x = NULL, levels = 5, v = 
     # Cap at fold maximum
     if (!is.na(max_leaf)) min_n_vals <- unique(pmin(min_n_vals, max_leaf)) # unique: capping can create duplicates
 
-    # mtry sequence
-    if (!is.na(p)) mtry_vals <- as.numeric(vs(dials::finalize(dials::mtry(), train_x)))
-    if (!is.na(p)) mtry_vals <- unique(pmin(mtry_vals, p))
-
     vals <- list(
       trees = as.numeric(vs(dials::trees())),
-      min_n = min_n_vals,
-      mtry = mtry_vals
+      min_n = min_n_vals
     )
+
+    # mtry sequence: its range depends on the number of features, so it needs train_x (without it, the engine's
+    # default mtry is used)
+    if (!is.na(p)) vals$mtry <- unique(pmin(as.numeric(vs(dials::finalize(dials::mtry(), train_x))), p))
     return(vals)
 
   } else if (model_name == "boost_tree_mboost") {
+    # Only the arguments that reach mboost (blackboost): learn_rate, sample_size and stop_iter are dropped by
+    # parsnip, and loss_reduction becomes mincriterion, which must be between 0 and 1 (dials' range goes up to 31.6)
     return(list(
       trees          = vs(dials::trees()),
       min_n          = vs(dials::min_n()),
-      tree_depth     = vs(dials::tree_depth()),
-      learn_rate     = vs(dials::learn_rate()),
-      loss_reduction = vs(dials::loss_reduction()),
-      sample_size    = vs(dials::sample_size(range = c(0, 1))),
-      stop_iter      = vs(dials::stop_iter())
+      tree_depth     = vs(dials::tree_depth())
     ))
 
   } else {
@@ -3821,8 +4083,8 @@ get_default_hyperparams <- function(model_name, train_x = NULL, levels = 5, v = 
 #'     \item `"bag_tree_rpart"` - Bagged survival trees
 #'     \item `"boost_tree_mboost"` - Gradient boosting for survival data
 #'   }
-#' @param models_hyperparameters Optional list of hyperparameter values to apply.
-#'   Example: `list(list(trees = 500, min_n = 10))`. Defaults to `NULL` (use engine defaults).
+#' @param models_hyperparameters List with one element: the hyperparameter values to apply.
+#'   Example: `list(list(trees = 500, min_n = 10))`. Use `list(NULL)` for the engine defaults.
 #' @param return_model Logical. If `TRUE`, returns the fitted model along with predictions.
 #'   Default is `FALSE`.
 #'
@@ -3832,6 +4094,8 @@ get_default_hyperparams <- function(model_name, train_x = NULL, levels = 5, v = 
 #'     - `Model` - fitted tidymodels workflow
 #'     - `Metrics` - tibble with `predictions` and `c_index`.
 #' If `df_test` is `NULL`, the function returns only the fitted model object.
+#' If the model cannot be fitted, an object of class `"pipeML_fit_error"` (a list with the model name and the
+#' error message) is returned instead.
 #'
 #' @details
 #' The function uses the **parsnip** interface to define and fit survival models.
@@ -3839,7 +4103,7 @@ get_default_hyperparams <- function(model_name, train_x = NULL, levels = 5, v = 
 #' \enumerate{
 #'   \item Create model specification (`parsnip::model_spec`) based on `model` type.
 #'   \item Apply optional hyperparameters via `parsnip::set_args()`.
-#'   \item Construct survival formula: `Surv(time, event) ~ .`.
+#'   \item Construct survival formula: `survival::Surv(time, event) ~ .`.
 #'   \item Fit model using `parsnip::fit()` on `df_train`.
 #'   \item Evaluate performance using `predict_and_evaluate_survival()` (C-index).
 #' }
@@ -3942,6 +4206,14 @@ compute_ml_survival <- function(df_train, df_test = NULL,
   #
   # Models without hyperparameters (cox_ph_survival, survreg_flexsurv) have an empty bestTune:
   # set_args() fails when called with no arguments, so it is only called when there is something to set
+  # Bagged trees: the number of bags is ipred::bagging()'s nbagg, an engine argument (bag_tree() has no argument
+  # for it, and set_args(trees = ) is silently ignored)
+  if (model == "bag_tree_rpart" && !is.null(models_hyperparameters) && !is.null(models_hyperparameters[[1]]$trees)) {
+    n_bags <- as.integer(models_hyperparameters[[1]]$trees)
+    model_spec <- parsnip::set_engine(model_spec, "rpart", nbagg = !!n_bags)
+    models_hyperparameters[[1]]$trees <- NULL
+  }
+
   if (!is.null(models_hyperparameters) && length(models_hyperparameters[[1]]) > 0) {
     model_spec <- do.call(
       parsnip::set_args,
@@ -3982,7 +4254,7 @@ compute_ml_survival <- function(df_train, df_test = NULL,
   # which measures the model's ability to correctly rank survival outcomes.
   #
   if(!is.null(df_test)){ ## Return train model + predictions
-    prediction = predict_and_evaluate_survival(fitted, df_test, outcome_col, event_col)
+    prediction = predict_and_evaluate_survival(fitted, df_test, outcome_col, event_col, ci = FALSE) # only the C-index is used
     preds = as.numeric(unlist(prediction$preds))
     metric_val = prediction$c_index
     if(return_model){
@@ -3999,11 +4271,11 @@ compute_ml_survival <- function(df_train, df_test = NULL,
 }
 
 
-#' Nested Cross-Validation for Survival Models (Internal)
+#' Repeated K-fold Cross-Validation for Survival Models (Internal)
 #'
-#' Performs nested cross-validation for survival models using the **tidymodels**
-#' ecosystem. Supports both standard event-stratified K-fold CV and
-#' Leave-One-Domain-Out (LODO) setups. Hyperparameter grids are automatically
+#' Performs repeated k-fold cross-validation with hyperparameter tuning for survival
+#' models using the **tidymodels** ecosystem. Supports both standard event-stratified
+#' K-fold CV and Leave-One-Dataset-Out (LODO) setups. Hyperparameter grids are automatically
 #' generated for each model type.
 #'
 #' The function can:
@@ -4011,34 +4283,53 @@ compute_ml_survival <- function(df_train, df_test = NULL,
 #'   \item Build folds internally or accept a custom fold construction function.
 #'   \item Train multiple survival models with optional hyperparameter tuning.
 #'   \item Compute and aggregate the Concordance Index (C-index) across folds.
-#'   \item Retrain the top-performing model using its optimal hyperparameters.
+#'   \item Train the selected model (best median C-index) on all training samples with its tuned
+#'     hyperparameters. With `fold_construction_fun`, every model is trained on the features rebuilt on all
+#'     training samples, and the best one is kept; without it, only the selected model is retrained.
 #' }
 #'
-#' @param df_features Data frame of predictor variables (features).
+#' @param df_features Data frame of predictor variables (features). With `LODO = TRUE`, it also contains the
+#'   cohort column named by `batch_id`.
 #' @param df_outcome Data frame of survival outcomes (time and event columns).
-#' @param outcome_col Character. Name of the survival time column.
-#' @param event_col Character. Name of the event indicator column (`0 = censored`, `1 = event`).
-#' @param k_folds Integer. Number of folds for K-fold CV (default = 5).
-#' @param n_rep Integer. Number of repeated CV iterations (default = 1).
-#' @param ncores Integer. Number of CPU cores for parallelization.
-#' @param return Logical. Whether to return the generated plots.
-#' @param LODO Logical. If `TRUE`, performs Leave-One-Domain-Out CV using `batch_id`.
-#' @param batch_id Character. Name of column representing cohort/batch. Required if `LODO = TRUE`.
+#' @param outcome_col Character. Name of the survival time column. Must be `"time"`: the custom fold path, the final
+#'   fit and the prediction functions use the columns `time` and `event` directly, so other names are not supported.
+#' @param event_col Character. Name of the event indicator column (`0 = censored`, `1 = event`). Must be
+#'   `"event"` (see `outcome_col`).
+#' @param k_folds Integer. Number of folds for K-fold CV.
+#' @param n_rep Integer. Number of repeated CV iterations.
+#' @param ncores Integer. Number of CPU cores. Without `fold_construction_fun`, the folds run in parallel; with
+#'   it and tunable arguments, the parameter combinations of each fold run in parallel. `NULL` or 1: sequential.
+#' @param return Logical. Whether to save the plot of the cross-validation C-index in `"Results/"`.
+#' @param LODO Logical. If `TRUE`, the folds are stratified by cohort (`batch_id`) and event.
+#' @param batch_id Character. Name of the column of `df_features` with the cohort/batch. Required if `LODO = TRUE`.
+#'   The column is removed after the folds are built, so the cohort is not a predictor.
 #' @param file_name Optional string. Suffix for generated C-index summary PDF saved in `"Results/"`.
-#' @param fold_construction_fun Optional custom function to construct data folds.
+#' @param fold_construction_fun Optional custom function that builds the features of each fold (fold-aware
+#'   features). It receives `data` (the features plus the `time` and `event` columns), `folds` and `bestune`:
+#'   with `bestune = NULL` it saves each fold in `Results/fold_<fold name>.rds`; with `bestune` it returns
+#'   the features built on all training samples (plus `time` and `event`), its custom output and the selected
+#'   parameters. See the `fold_construction_fun` argument of [compute_features.training.ML()] for the full contract.
 #' @param fold_construction_args_fixed Optional list of fixed arguments passed to `fold_construction_fun`.
 #' @param fold_construction_args_tunable Optional list of tunable arguments passed to `fold_construction_fun` during hyperparameter tuning.
 #' @param seed Integer. Random seed set before the folds are drawn, so fold assignment and model fitting are
 #'   reproducible. In the parallel custom-fold branch, each worker iteration is seeded from `seed`, the fold
 #'   and the parameter configuration, so results do not depend on worker scheduling. `NULL` leaves the random
 #'   number generator untouched.
+#' @param preprocess Logical. If `TRUE` (default), near-zero variance and highly correlated features are
+#'   removed with `preprocess_features()`: once on all training samples before the cross-validation, or,
+#'   with `fold_construction_fun`, on the training part of each fold and on the final training set.
 #'
 #' @return A named list containing:
 #' \describe{
-#'   \item{`Model`}{The best-performing survival model retrained on the full dataset.}
-#'   \item{`ML_Models`}{All evaluated survival models with aggregated C-index results.}
-#'   \item{`C_index_median`}{Median C-index of the top-performing model.}
-#'   \item{`Custom_output`}{Optional outputs from the custom fold construction function.}
+#'   \item{`Model`}{The selected model: a list with the cross-validation results (`Results_folds`,
+#'     `Prediction_folds`, `Resample_matrix`), the selected hyperparameters (`bestTune`), the workflow fitted on
+#'     all training samples (`Model_object`) and its training data (`trainingData`: features plus `time` and
+#'     `event`).}
+#'   \item{`ML_Models`}{All survival models with their cross-validation results (`NULL` for a model excluded
+#'     because no configuration could be fitted and evaluated).}
+#'   \item{`C_index_median`}{Median cross-validation C-index of the selected model.}
+#'   \item{`Custom_output`}{Only with `fold_construction_fun`: the custom output of the selected model, plus the
+#'     selected feature parameters in `Parameters`.}
 #' }
 #'
 #' @details
@@ -4046,14 +4337,24 @@ compute_ml_survival <- function(df_train, df_test = NULL,
 #' \itemize{
 #'   \item Merges predictors and outcomes.
 #'   \item Creates stratified folds using **rsample**, either by event or by cohort x event (LODO).
+#'   \item Preprocesses the features (`preprocess = TRUE`): once before the cross-validation, or, with
+#'     `fold_construction_fun`, on each fold's training table and on the final training set.
+#'   \item Builds the hyperparameter grids with [get_default_hyperparams()]. With `fold_construction_fun`,
+#'     the `mtry` of the forests is sized from the features built by the function (the fold with the fewest
+#'     features), not from the input columns.
 #'   \item Evaluates predefined survival models: Cox PH, penalized Cox (glmnet), AFT (flexsurv),
 #'     decision trees, bagged trees, and random forests.
-#'   \item Aggregates the median and MAD of C-index across resamples.
-#'   \item Retrains the top-performing model on the full dataset.
+#'   \item Aggregates the median and MAD of C-index across resamples with [aggregate_results()], which excludes
+#'     every configuration with a failed fit or an `NA` C-index in a resample (a model without any configuration
+#'     left is excluded).
+#'   \item Trains the selected model on all training samples (see above). The function stops with a clear message
+#'     if no model is left.
 #' }
 #'
-#' If `fold_construction_fun` is provided, the function handles folds in parallel
-#' and returns additional outputs for advanced integration.
+#' Without `fold_construction_fun`, the folds run in parallel when `ncores > 1`. With
+#' `fold_construction_fun`, the folds are processed one after the other; if it has tunable
+#' arguments, the parameter combinations of each fold run in parallel. Additional outputs of
+#' the custom function are returned in `Custom_output`.
 #'
 #' @seealso [compute_ml_survival()], [get_default_hyperparams()], [aggregate_results()]
 #' @keywords internal
@@ -4061,7 +4362,7 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
                                        LODO = FALSE, batch_id = NULL, file_name = NULL, fold_construction_fun = NULL,
                                        fold_construction_args_fixed = NULL,
                                        fold_construction_args_tunable = NULL,
-                                       seed = 123){
+                                       seed = 123, preprocess = TRUE){
   ensure_censored()
 
   if (!is.null(seed)) set.seed(seed)
@@ -4137,6 +4438,13 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
     df_features <- df_features[, setdiff(colnames(df_features), batch_id), drop = FALSE]
   }
 
+  # Standard path: preprocessing features (remove collinear variables and no-variance) on all training samples,
+  # before the CV
+  if (is.null(fold_construction_fun) && preprocess) {
+    df_features <- preprocess_features(df_features)
+    df_all <- df_all[, c(colnames(df_features), outcome_col, event_col), drop = FALSE]
+  }
+
   # ---------------------------------------------------------------------------
   # Step 5: Define candidate survival models
   # ---------------------------------------------------------------------------
@@ -4190,8 +4498,8 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
       train_idx <- multifolds[[fold_i]]
       test_idx <- setdiff(seq_len(nrow(df_all)), train_idx)
 
-      # No feature preprocessing on the standard path (as in classification): the features are fixed before
-      # training, so the CV folds and the final model (Model_object) use the same features
+      # Standard path: the features are preprocessed once before the CV (see above), so the CV folds and the
+      # final model (Model_object) use the same features
       train_data <- df_all[train_idx, , drop = FALSE]
       test_data <- df_all[test_idx, , drop = FALSE]
 
@@ -4279,6 +4587,9 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
     custom_outputs = NULL
 
   }else{
+    # Fold files left in Results/ by an interrupted run would be read below as extra resamples: remove them first
+    invisible(file.remove(list.files("Results", pattern = "^fold_.*\\.rds$", full.names = TRUE)))
+
     # Custom fold construction (is running in parallel)
     # The fold function receives the features with the outcome ("time" and "event" columns), as classification
     # receives the "target" column; it must remove them before building features
@@ -4287,13 +4598,37 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
     ### Extract the file names of the folds
     result_files <- list.files("Results", pattern = "^fold_.*\\.rds$", full.names = TRUE)
 
+    # Fold with the fewest features built by the custom function (after preprocessing, as the models are trained on
+    # the preprocessed features): the mtry grid of the forests is sized from it (as the rf grid in classification),
+    # not from the input columns, so the grid is the same in all folds and valid in all of them
+    grid_data <- NULL
+    for (f in result_files) {
+      result <- readRDS(f)
+      for (r in if (!is.null(result$train_data)) list(result) else result) {
+        if (preprocess) r[["train_data"]] <- cbind(preprocess_features(r[["train_data"]][setdiff(names(r[["train_data"]]), c("time", "event"))]),
+                                                   r[["train_data"]][c("time", "event")])
+        if (is.null(grid_data) || ncol(r[["train_data"]]) < ncol(grid_data)) grid_data <- r[["train_data"]]
+      }
+    }
+    grid_data <- grid_data[, setdiff(colnames(grid_data), c(outcome_col, event_col)), drop = FALSE]
+    for (m in intersect(c("rand_forest_partykit", "rand_forest_aorsf"), model_list)) {
+      model_grids[[m]]$mtry <- get_default_hyperparams(m, train_x = grid_data, v = k_folds)$mtry
+    }
+
+    # With tunable arguments, the parameter combinations of each fold run in parallel when ncores > 1 (sequentially
+    # otherwise, as in the standard path). The cluster is created once for all folds and released also on error
+    use_parallel <- !is.null(fold_construction_args_tunable) && !is.null(ncores) && ncores > 1
+    if (use_parallel) {
+      cl <- parallel::makeCluster(ncores)
+      doParallel::registerDoParallel(cl)
+      on.exit({try(parallel::stopCluster(cl), silent = TRUE); unregister_dopar()})
+    }
+    `%run_params%` <- if (use_parallel) foreach::`%dopar%` else foreach::`%do%`
+
     # Iterate across folds and inside each subfold corresponding to each param combination (if exist)
     for (fold_i in seq_along(result_files)) { ### number of folds (k_fold x n_rep)
 
       result = readRDS(result_files[[fold_i]]) ## per resample
-      for (fold_part in if (!is.null(result$train_data)) list(result) else result) {
-        check_survival_fold_features(fold_part$train_data, basename(result_files[[fold_i]]))
-      }
 
       # Fold name from the file written by fold_construction_fun ("Results/fold_<name>.rds").
       # list.files() sorts alphabetically, so fold_i is not the position in multifolds.
@@ -4303,12 +4638,9 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
       if (!is.null(fold_construction_args_tunable)) {
         models_all_params <- vector("list", length(result))
 
-        cl <- parallel::makeCluster(ncores)
-        doParallel::registerDoParallel(cl)
-
         foreach_pkgs <- c("dplyr", "caret", "pipeML", "censored")
         models_all_params <- foreach::foreach(parameter_i = seq_along(result),
-                                              .packages = foreach_pkgs) %dopar% {
+                                              .packages = foreach_pkgs) %run_params% {
 
                                                 # Workers do not share the main session's RNG: seed each iteration
                                                 if (!is.null(seed)) set.seed(seed + 1000L * fold_i + parameter_i)
@@ -4317,8 +4649,8 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
                                                 test_data_i  <- result[[parameter_i]][["test_data"]]
 
                                                 # Preprocessing features (remove collinear variables and no-variance)
-                                                train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9,
-                                                                                    time_var = "time", event_var = "event")
+                                                if (preprocess) train_data_i <- cbind(preprocess_features(train_data_i[setdiff(names(train_data_i), c("time", "event"))]),
+                                                                                      train_data_i[c("time", "event")])
 
                                                 # Replace in original train/test datasets
                                                 result[[parameter_i]][["train_data"]] <- train_data_i
@@ -4385,9 +4717,6 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
                                                 models
                                               }
 
-        parallel::stopCluster(cl)  # stop the cluster after parallel execution
-        unregister_dopar() #Stop Dopar from running in the background
-
         # Store all parameter results for this fold
         models_all_folds[[fold_i]] <- models_all_params
 
@@ -4396,12 +4725,12 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
         test_data_i <- result[["test_data"]]
 
         # Preprocessing
-        train_data_i <- preprocess_features(train_data_i, cor_thresh = 0.9,
-                                            time_var = "time", event_var = "event")
+        if (preprocess) train_data_i <- cbind(preprocess_features(train_data_i[setdiff(names(train_data_i), c("time", "event"))]),
+                                              train_data_i[c("time", "event")])
 
         # Replace
         result[["train_data"]] = train_data_i
-        result[["test_data"]] = test_data_i[, setdiff(colnames(train_data_i), "target")]
+        result[["test_data"]] = test_data_i[, setdiff(colnames(train_data_i), "target"), drop = FALSE]
 
         # Run all ML methods for this parameter configuration
         models <- lapply(
@@ -4457,6 +4786,11 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
       }
     }
 
+    if (use_parallel) {
+      parallel::stopCluster(cl)  # stop the cluster after parallel execution
+      unregister_dopar() #Stop Dopar from running in the background
+    }
+
     # Delete the fold files after using them (as in classification), otherwise the next custom-fold run
     # would read them again together with its own folds
     file.remove(result_files)
@@ -4488,6 +4822,10 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
     }
   }
 
+  # Seed the final training (random models: forests, bagged trees). Without ncores, the per-fold set.seed() calls
+  # above run in this session, with ncores in the workers: without this, the final model depended on ncores
+  if (!is.null(seed)) set.seed(seed)
+
   if(!is.null(fold_construction_fun)){
     if (!is.null(fold_construction_args_tunable)){
 
@@ -4501,7 +4839,8 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
           optimized = models[[i]],
           ml_method = model_list[i],
           fold_construction_fun,
-          fold_construction_args_fixed
+          fold_construction_args_fixed,
+          preprocess = preprocess
         )
       })
 
@@ -4528,8 +4867,11 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
             optimized = models[[i]],
             ml_method = model_list[i],
             fold_construction_fun,
-            fold_construction_args_fixed
+            fold_construction_args_fixed,
+            preprocess = preprocess
           )
+
+        if (is.null(p)) return(NULL) # final fit failed: model excluded (see the warning)
 
         # Keep bestTune as the original data frame in the returned model: c() above turned it into a plain
         # list (needed by the wrapper), which breaks later steps that expect a table (pruning, SHAP)
@@ -4557,6 +4899,9 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
   # using wrapper_train_best_hyperparams_survival().
 
   #Top model with best accuracy or AUC
+  if (all(vapply(models, is.null, logical(1)))) {
+    stop("No survival model could be fitted and evaluated (see the messages and warnings above).")
+  }
   metrics <- compute_cv_CINDEX(models, plot_results = return, file_name = file_name)
 
   top_model = metrics[["Top_model"]]
@@ -4617,27 +4962,36 @@ compute_k_fold_CV_survival <- function(df_features, df_outcome, outcome_col, eve
 #' (median absolute deviation) per model, identifies the top-performing model,
 #' and optionally generates a bar plot summarizing performance.
 #'
-#' @param models Named list of survival model objects. Each element must contain
-#'   a `Resample_matrix` data frame with columns:
+#' @param models Named list of survival model objects (from [aggregate_results()]). Each element contains
+#'   a `Resample_matrix` data frame with one row per test sample of each resample (for the selected
+#'   configuration), with columns:
 #'   \describe{
-#'     \item{`c_index`}{Numeric C-index per fold/resample.}
-#'     \item{`Resample`}{Fold or resample identifier (e.g., "Fold1").}
+#'     \item{`c_index`}{C-index of the resample, repeated on each of its rows.}
+#'     \item{`Resample`}{Resample identifier (e.g., "Fold1.Rep1").}
 #'   }
+#'   Excluded models are `NULL` and are ignored.
 #' @param file_name Optional character string to name the output PDF saved under
-#'   `"Results/CINDEX_CV_methods_<file_name>.pdf"`. If `NULL`, the file uses
-#'   a default naming convention.
-#' @param plot_results Logical (default = TRUE). If `TRUE`, generates a PDF bar plot
-#'   showing median C-index +/- MAD per model.
+#'   `"Results/CINDEX_CV_methods_<file_name>.pdf"`. If `NULL`, the file is
+#'   `"Results/CINDEX_CV_methods_.pdf"`.
+#' @param plot_results Logical (default = TRUE). If `TRUE`, saves a bar plot of the median C-index +/- MAD
+#'   of each model, with the same layout as the classification AUROC/AUPRC plots ([plot_cv_metric()]): models
+#'   sorted from best to worst, selected model in blue, values above the bars and a dashed line at 0.5 (random
+#'   prediction).
 #'
 #' @details
-#' - Median C-index represents typical discrimination performance across folds.
-#' - MAD provides robust variability estimation of C-index values.
-#' - The optional plot displays model performance with error bars +/- MAD.
+#' - The median and MAD are computed over the rows of `Resample_matrix`, i.e. each resample counts in proportion
+#'   to its number of test samples (the same as per resample when the folds have the same size).
+#' - The MAD is scaled (`stats::mad()` default, comparable to a standard deviation), as for the classification
+#'   AUROC and AUPRC.
+#' - Models without cross-validation results (excluded because they could not be fitted) are ignored.
+#' - The optional plot displays model performance with error bars +/- MAD (see `plot_results`).
 #'
 #' @return A list with:
 #' \describe{
-#'   \item{`CINDEX_summary`}{Tibble summarizing median and MAD per model.}
-#'   \item{`All_folds`}{Tibble of raw C-index values for all models and folds.}
+#'   \item{`CINDEX_summary`}{Tibble with one row per model (`model`, `Median_CINDEX`, `MAD_CINDEX`), sorted from
+#'     best to worst.}
+#'   \item{`All_folds`}{Tibble with the rows of all models (`model`, `c_index`, `Resample`): one row per test sample
+#'     of each resample.}
 #'   \item{`Top_model`}{Character string of the model with highest median C-index.}
 #' }
 #'
@@ -4673,7 +5027,7 @@ compute_cv_CINDEX <- function(models, file_name = NULL, plot_results = TRUE){
     dplyr::group_by(model) %>%
     dplyr::summarise(
       Median_CINDEX = stats::median(c_index, na.rm = TRUE),
-      MAD_CINDEX = stats::mad(c_index, constant = 1, na.rm = TRUE),
+      MAD_CINDEX = stats::mad(c_index, na.rm = TRUE), # scaled MAD, as in classification
       .groups = "drop"
     ) %>%
     dplyr::arrange(dplyr::desc(Median_CINDEX))
@@ -4683,40 +5037,11 @@ compute_cv_CINDEX <- function(models, file_name = NULL, plot_results = TRUE){
   # ---------------------------------------------------------------------------
   if (plot_results) {
 
+    # Same plot as the classification AUROC/AUPRC plots (plot_cv_metric()); a random prediction has a C-index of 0.5
     grDevices::pdf(paste0("Results/CINDEX_CV_methods_", file_name, ".pdf"), width = 10)
-
-    print(
-      ggplot2::ggplot(summary_cindex,
-                      ggplot2::aes(x = model, y = Median_CINDEX)) +
-        ggplot2::geom_bar(
-          stat = "identity",
-          width = 0.9,
-          fill = "#1f78b4"
-        ) +
-        ggplot2::geom_errorbar(
-          ggplot2::aes(
-            ymin = Median_CINDEX - MAD_CINDEX,
-            ymax = Median_CINDEX + MAD_CINDEX
-          ),
-          width = 0.15
-        ) +
-        ggplot2::labs(
-          title = "Cross-Validation performance (C-index)",
-          x = "ML Model",
-          y = "Median C-index \u00b1 MAD"
-        ) +
-        ggplot2::scale_x_discrete(expand = ggplot2::expansion(mult = c(0, 0))) +
-        ggplot2::scale_y_continuous(breaks = seq(0, 1, by = 0.05)) +
-        ggplot2::theme_minimal(base_size = 16) +
-        ggplot2::theme(
-          legend.position = "none",
-          axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 14),
-          axis.text.y = ggplot2::element_text(size = 14),
-          axis.title = ggplot2::element_text(size = 16),
-          plot.title = ggplot2::element_text(size = 18, face = "bold")
-        )
-    )
-
+    plot(plot_cv_metric(summary_cindex, "CINDEX", chance = 0.5, selected_model = summary_cindex$model[1],
+                        selected_by = "C-index", n_resamples = length(unique(res_cindex$Resample)),
+                        label = "C-index", wrap_names = TRUE, chance_label = "random prediction"))
     grDevices::dev.off()
   }
 
@@ -4738,16 +5063,18 @@ compute_cv_CINDEX <- function(models, file_name = NULL, plot_results = TRUE){
 #' Stratifies individuals into risk groups based on predicted risk scores from
 #' a fitted survival model, plots Kaplan-Meier survival curves per risk group,
 #' performs a log-rank test, and displays the concordance index (C-index) with
-#' confidence interval. Optionally saves the plot as a PDF in "Results/".
+#' confidence interval. The plot is saved as a PDF in "Results/".
 #'
 #' @param df_test Data frame with the observed outcome of the test samples, in columns \code{time} and
 #'   \code{event} (1 = event, 0 = censored), in the order of the predictions.
 #' @param prediction The output of \code{compute_prediction()} with \code{task_type = "survival"} (risk scores
 #'   in \code{$preds}, C-index and its confidence interval in \code{$c_index}, \code{$c_index_lower} and
 #'   \code{$c_index_upper}).
-#' @param n_groups Integer. Number of risk groups for stratification (default = 3).
-#' @param file_name Optional character. If provided, saves the Kaplan-Meier plot
-#'   to "Results/Survival_KM_<file_name>.pdf".
+#' @param n_groups Integer. Number of risk groups for stratification (default = 2, as in \code{compute_prediction()}).
+#'   It must be at least 2 and not larger than the number of samples. Groups are labelled
+#'   Low/High risk (2 groups), Low/Medium/High risk (3 groups) or Group 1 (lowest risk) to Group n (highest risk).
+#' @param file_name Optional character. The Kaplan-Meier plot is saved
+#'   to "Results/Survival_KM_<file_name>.pdf" ("Results/Survival_KM.pdf" if \code{NULL}).
 #'
 #' @details
 #' Risk groups are defined by quantiles of the predicted risk scores. Kaplan-Meier
@@ -4755,7 +5082,15 @@ compute_cv_CINDEX <- function(models, file_name = NULL, plot_results = TRUE){
 #' differences. The C-index and its 95% confidence interval are displayed in the
 #' plot subtitle.
 #'
-#' @return Invisibly returns the \code{ggsurvplot} object for further customization.
+#' When the predictions take few distinct values (e.g. tree-based models) and some quantiles are equal, samples
+#' with the same prediction are kept in the same group. Fewer groups than \code{n_groups} can then be formed
+#' (with a message); the function stops if all predictions are equal.
+#'
+#' \code{df_test} must have one row per prediction, in the same order. Samples without a prediction (\code{NA}) are
+#' left out of the plot, with a message.
+#'
+#' @return Invisibly returns the \code{ggsurvplot} object for further customization. The plot (curves and
+#'   number-at-risk table) is saved as a PDF.
 #'
 #' @examples
 #' \dontrun{
@@ -4775,13 +5110,17 @@ compute_cv_CINDEX <- function(models, file_name = NULL, plot_results = TRUE){
 #' @export
 plot_survival_performance <- function(df_test,
                                       prediction,
-                                      n_groups = 3,
+                                      n_groups = 2,
                                       file_name = NULL) {
 
   # ---------------------------------------------------------------------------
   # Add predictions to test data
   # ---------------------------------------------------------------------------
 
+  if (nrow(df_test) != nrow(prediction$preds)) {
+    stop("df_test must have one row per prediction (in the same order): ", nrow(df_test), " rows for ",
+         nrow(prediction$preds), " predictions.\n")
+  }
   df_test$.pred <- prediction$preds$.pred
 
   c_index <- prediction$c_index
@@ -4798,6 +5137,47 @@ plot_survival_performance <- function(df_test,
     stop("df_test must include columns: time, event, and .pred")
   }
 
+  if (n_groups < 2) {
+    stop("`n_groups` must be at least 2.\n")
+  }
+
+  # Samples without a prediction cannot be assigned to a risk group
+  if (anyNA(df_test$.pred)) {
+    message(sum(is.na(df_test$.pred)), " sample(s) without a prediction are left out of the Kaplan-Meier plot.")
+    df_test <- df_test[!is.na(df_test$.pred), , drop = FALSE]
+  }
+
+  if (n_groups > nrow(df_test)) {
+    stop("`n_groups` (", n_groups, ") must not be larger than the number of samples with a prediction (",
+         nrow(df_test), ").\n")
+  }
+
+  # ---------------------------------------------------------------------------
+  # Create risk groups
+  # ---------------------------------------------------------------------------
+
+  breaks <- stats::quantile(
+    df_test$.pred,
+    probs = seq(0, 1, length.out = n_groups + 1),
+    na.rm = TRUE
+  )
+
+  if (anyDuplicated(breaks)) {
+    # Few distinct predictions (e.g. tree models): some quantiles are equal. Samples with the same prediction are
+    # kept in the same group, which can give fewer groups than requested
+    group <- ceiling(n_groups * rank(df_test$.pred, ties.method = "average") / nrow(df_test))
+    group <- match(group, sort(unique(group)))
+    if (max(group) < 2) {
+      stop("Risk groups cannot be formed: the model predicts the same risk for all samples.\n")
+    }
+    if (max(group) < n_groups) {
+      message("Only ", max(group), " risk groups can be formed: the predictions take few distinct values.")
+      n_groups <- max(group)
+    }
+  } else {
+    group <- cut(df_test$.pred, breaks = breaks, include.lowest = TRUE, labels = FALSE)
+  }
+
   # ---------------------------------------------------------------------------
   # Risk group labels
   # ---------------------------------------------------------------------------
@@ -4807,26 +5187,10 @@ plot_survival_performance <- function(df_test,
   } else if (n_groups == 3) {
     c("Low risk", "Medium risk", "High risk")
   } else {
-    paste0("Group ", seq_len(n_groups))
+    paste0("Group ", seq_len(n_groups), c(" (lowest risk)", rep("", n_groups - 2), " (highest risk)"))
   }
 
-  # ---------------------------------------------------------------------------
-  # Create risk groups
-  # ---------------------------------------------------------------------------
-
-  df_test <- df_test %>%
-    dplyr::mutate(
-      risk_group = cut(
-        .pred,
-        breaks = stats::quantile(
-          .pred,
-          probs = seq(0, 1, length.out = n_groups + 1),
-          na.rm = TRUE
-        ),
-        include.lowest = TRUE,
-        labels = labels
-      )
-    )
+  df_test$risk_group <- factor(group, levels = seq_len(n_groups), labels = labels)
 
   # ---------------------------------------------------------------------------
   # Kaplan-Meier model
@@ -4858,8 +5222,8 @@ plot_survival_performance <- function(df_test,
     " (95% CI ",
     round(c_low, 3), "-",
     round(c_high, 3), ")",
-    " | Log-rank p = ",
-    format.pval(p_val, digits = 3, eps = .001)
+    " | Log-rank p ",
+    if (p_val < 0.001) "< 0.001" else paste0("= ", signif(p_val, 3))
   )
 
   # ---------------------------------------------------------------------------
@@ -4874,10 +5238,10 @@ plot_survival_performance <- function(df_test,
     conf.int = TRUE,
     pval = FALSE,
     ggtheme = ggplot2::theme_minimal(),
-    palette = c("#1B9E77", "#7570B3", "#D95F02")[1:n_groups],
+    palette = if (n_groups <= 3) c("#1B9E77", "#7570B3", "#D95F02")[1:n_groups] else grDevices::hcl.colors(n_groups, "Dark 3"),
     legend.title = "Risk Group",
     legend.labs = levels(df_test$risk_group),
-    title = paste0("Test-set Survival Performance_", file_name),
+    title = paste0("Test-set Survival Performance", if (!is.null(file_name)) paste0(" - ", file_name)),
     subtitle = subtitle_text,
     risk.table.height = 0.25,
     tables.theme = ggplot2::theme_minimal(),
@@ -4885,9 +5249,11 @@ plot_survival_performance <- function(df_test,
   )
 
   # For a single plot, no need to use arrange_ggsurvplots()
-  grDevices::pdf(paste0("Results/Survival_KM_", file_name, ".pdf"), width = 8, height = 6)
-  print(plot_obj)   # prints main plot + risk table together
+  grDevices::pdf(paste0("Results/Survival_KM", if (!is.null(file_name)) paste0("_", file_name), ".pdf"), width = 8, height = 6)
+  print(plot_obj, newpage = FALSE)   # prints main plot + risk table together (newpage = FALSE: no blank first page)
   grDevices::dev.off()
+
+  invisible(plot_obj)
 
 }
 
@@ -4899,37 +5265,49 @@ plot_survival_performance <- function(df_test,
 #' predictions into a comparable numeric format.
 #'
 #' @param model_fit A fitted survival model object (typically from `parsnip` or `workflow`).
-#' @param data Data frame containing predictors and survival outcome variables.
-#' @param outcome_col Character string specifying the survival time column (default = `"time"`).
-#' @param event_col Character string specifying the event indicator column (default = `"event"`).
+#' @param data Data frame with the predictors and, to compute the C-index, the survival outcome columns.
+#' @param outcome_col Character string specifying the survival time column of `data`. Default `NULL`.
+#' @param event_col Character string specifying the event indicator column of `data`. Default `NULL`. If
+#'   `outcome_col` or `event_col` is `NULL`, the C-index is not computed (`NA`): only predictions are returned.
+#' @param ci Logical. If `TRUE` (default), the 95% confidence interval of the C-index is computed with
+#'   [compute_cindex_ci()] (1000 bootstrap resamples). `FALSE` computes the C-index only, as cross-validation does
+#'   ([compute_ml_survival()]), since its confidence interval is not used there.
 #'
 #' @details
 #' The function attempts predictions using multiple types depending on model support:
 #' \itemize{
-#'   \item `"linear_pred"` - Linear predictor/log hazard (higher = higher risk).
+#'   \item `"linear_pred"` - Linear predictor. `parsnip` returns it so that higher = longer survival (for Cox
+#'     models, the log hazard with the sign changed); reversed internally.
 #'   \item `"time"` - Expected survival time (higher = longer survival, reversed internally).
-#'   \item `"survival"` - Survival probability at a median evaluation time (higher = better survival, reversed internally).
+#'   \item `"survival"` - Survival probability at the median observed time of `data` (higher = better survival,
+#'     reversed internally). Only tried when `outcome_col` and `event_col` are given; none of the default models
+#'     needs it.
 #' }
+#' The C-index is computed before the predictions are reversed, since it expects higher = longer survival. The
+#' returned predictions are risk scores: higher = higher risk.
 #'
 #' Standardizes output into a tibble with a single numeric `.pred` column.
-#' Computes C-index using `compute_cindex_ci()` if outcome/event columns are provided.
+#' Computes the C-index if outcome/event columns are provided, with its 95% confidence interval if `ci = TRUE`
+#' (`compute_cindex_ci()`: percentile interval over 1000 bootstrap resamples of the samples, stratified by event,
+#' seed 123, without
+#' changing the random number state of the session).
 #'
 #' @return A list containing:
 #' \describe{
-#'   \item{`preds`}{Tibble with standardized numeric predictions `.pred`.}
-#'   \item{`c_index`}{Numeric value of the computed C-index.}
-#'   \item{`c_index_lower`}{Lower bound of 95% CI for the C-index.}
-#'   \item{`c_index_upper`}{Upper bound of 95% CI for the C-index.}
+#'   \item{`preds`}{Tibble with the risk scores in `.pred` (higher = higher risk), one row per sample of `data`.}
+#'   \item{`c_index`}{The C-index (`NA` without outcome columns, `NaN` if `data` has no event).}
+#'   \item{`c_index_lower`}{Lower bound of the 95% CI of the C-index (`NA` without outcome columns or with
+#'     `ci = FALSE`).}
+#'   \item{`c_index_upper`}{Upper bound of the 95% CI of the C-index (same).}
 #' }
 #'
 #' @keywords internal
 predict_and_evaluate_survival <- function(model_fit,
                                           data,
                                           outcome_col = NULL,
-                                          event_col = NULL) {
+                                          event_col = NULL,
+                                          ci = TRUE) {
   ensure_censored()
-
-
 
   # ---------------------------------------------------------------------------
   # Generate predictions on test data
@@ -4937,8 +5315,8 @@ predict_and_evaluate_survival <- function(model_fit,
   # The code tries different prediction "types" depending on what the fitted model supports.
   #
   # 1. "linear_pred"  -> Risk score or log hazard (e.g., Cox model)
-  #      - Higher values = higher risk (shorter survival)
-  #      - Direction: higher = worse outcome
+  #      - parsnip returns it with the sign changed for Cox models: higher values = longer survival
+  #      - Direction: higher = better outcome (will be reversed later)
   #
   # 2. "time"         -> Expected survival time (e.g., parametric AFT models)
   #      - Higher values = longer expected lifetime
@@ -4957,20 +5335,20 @@ predict_and_evaluate_survival <- function(model_fit,
 
   preds <- tryCatch({
     pred_type = "linear_pred"
-    predict(model_fit, new_data = data, type = "linear_pred")
+    stats::predict(model_fit, new_data = data, type = "linear_pred")
   }, error = function(e1) {
     tryCatch({
       pred_type = "time"
-      predict(model_fit, new_data = data, type = "time")
+      stats::predict(model_fit, new_data = data, type = "time")
     }, error = function(e2) {
       # Only try "survival" prediction if outcome/event columns exist
       if (!is.null(outcome_col) && !is.null(event_col)) {
         eval_time <- stats::median(data[[outcome_col]], na.rm = TRUE)
         pred_type <- "survival"
-        predict(model_fit, new_data = data, type = "survival", eval_time = eval_time)
+        stats::predict(model_fit, new_data = data, type = "survival", eval_time = eval_time)
       } else {
-        message("Outcome or event column is NULL; skipping survival-type prediction")
-        return(NULL)
+        stop("This model predicts neither a linear predictor nor a survival time, and survival probabilities need ",
+             "the observed times (outcome_col and event_col) to choose the evaluation time.")
       }
     })
   })
@@ -4989,20 +5367,14 @@ predict_and_evaluate_survival <- function(model_fit,
   #
   if ("matrix" %in% class(preds[[1]])) {
     preds <- tibble::tibble(.pred = apply(as.data.frame(preds[[1]]), 1, median, na.rm = TRUE))
+  } else if (is.list(preds[[1]])) {
+    # type = "survival": one small tibble per sample (.eval_time, .pred_survival) in a list column
+    preds <- tibble::tibble(.pred = vapply(preds[[1]], function(x) x$.pred_survival[1], numeric(1)))
   } else if (!is.numeric(preds[[1]])) {
     preds <- tibble::tibble(.pred = apply(as.matrix(preds), 1, median, na.rm = TRUE))
   } else {
     pred_col <- names(preds)[1]
     preds <- preds %>% dplyr::rename(.pred = dplyr::all_of(pred_col))
-  }
-
-  # ---------------------------------------------------------------------------
-  # Ensure direction consistency (higher = higher risk)
-  # ---------------------------------------------------------------------------
-
-  # Reverse predictions if type implies "more = better survival"
-  if (pred_type %in% c("time", "survival")) {
-    preds$.pred <- -preds$.pred
   }
 
   # ---------------------------------------------------------------------------
@@ -5012,11 +5384,21 @@ predict_and_evaluate_survival <- function(model_fit,
   # true outcomes (i.e., discrimination ability). It ranges from 0.5 (random)
   # to 1 (perfect discrimination).
   #
-  # The function `censored::concordance_survival_vec()` computes the metric.
-  # If the computation fails, the value is safely returned as NA.
+  # yardstick::concordance_survival_vec() computes it (in compute_cindex_ci() when a confidence interval is
+  # requested). It is NaN when data has no event (no comparable pair).
   #
 
-  if (!is.null(outcome_col) && !is.null(event_col)) {
+  if (!is.null(outcome_col) && !is.null(event_col) && !ci) {
+
+    # C-index only (cross-validation): no bootstrap
+    metric_val <- yardstick::concordance_survival_vec(
+      truth = survival::Surv(data[[outcome_col]], data[[event_col]]),
+      estimate = preds$.pred
+    )
+    ci_lower <- NA_real_
+    ci_upper <- NA_real_
+
+  } else if (!is.null(outcome_col) && !is.null(event_col)) {
 
     df_eval <- data
     df_eval$.pred <- preds$.pred
@@ -5040,6 +5422,13 @@ predict_and_evaluate_survival <- function(model_fit,
 
   }
 
+  # ---------------------------------------------------------------------------
+  # Ensure direction consistency (higher = higher risk)
+  # ---------------------------------------------------------------------------
+
+  # Reverse predictions: every type is returned as "more = better survival" (parsnip also returns linear_pred
+  # that way). Done after the C-index, which is computed with "more = better survival"
+  preds$.pred <- -preds$.pred
 
   # ---------------------------------------------------------------------------
   # Return the model name and computed C-index
@@ -5054,8 +5443,11 @@ predict_and_evaluate_survival <- function(model_fit,
 
 #' Evaluate an ROC Curve on a Fixed False-Positive-Rate Grid (Internal)
 #'
-#' Treats the ROC curve as a step function and returns, for each grid value,
-#' the highest sensitivity reached at a false positive rate at or below it.
+#' Returns, for each grid value, the sensitivity of the ROC curve at that false positive rate, with straight
+#' lines between consecutive points: the curve as \code{get_curves()} draws it (\code{geom_line()}) and as
+#' \code{calculate_auroc()} integrates it (trapezoids). At a vertical step (several points with the same false
+#' positive rate), the highest sensitivity is used. Tied probabilities of both classes give diagonal segments,
+#' which a step function would place below the drawn curve.
 #'
 #' @param fpr Numeric vector of false positive rates, non-decreasing (as produced
 #'   by \code{get_sensitivity_specificity()}).
@@ -5069,13 +5461,19 @@ roc_at_grid <- function(fpr, sensitivity, grid) {
   if (all(is.na(fpr)) || all(is.na(sensitivity))) return(rep(NA_real_, length(grid)))
   fpr <- c(0, fpr)
   sensitivity <- c(0, cummax(sensitivity))
-  sensitivity[findInterval(grid, fpr)]
+  k <- findInterval(grid, fpr)     # last point at or before the grid value (top of a vertical step)
+  nxt <- pmin(k + 1, length(fpr))  # next point of the curve
+  w <- ifelse(fpr[nxt] > fpr[k], (grid - fpr[k]) / (fpr[nxt] - fpr[k]), 0)
+  sensitivity[k] + w * (sensitivity[nxt] - sensitivity[k])  # straight line between the two points
 }
 
 #' Evaluate a Precision-Recall Curve on a Fixed Recall Grid (Internal)
 #'
-#' For each grid value, returns the precision at the first threshold whose recall
-#' reaches that value.
+#' Returns, for each grid value, the precision of the precision-recall curve at that recall, with straight lines
+#' between consecutive points: the curve as \code{get_curves()} draws it (\code{geom_line()}) and as
+#' \code{calculate_auprc()} integrates it, starting at recall 0 with the precision of the first point. At a
+#' grid value equal to the recall of a point, it is the precision at the first threshold reaching that recall
+#' (so the final drop to the prevalence at recall 1 is not in the band).
 #'
 #' @param recall Numeric vector of recall values, non-decreasing (as produced by
 #'   \code{get_sensitivity_specificity()}).
@@ -5087,9 +5485,13 @@ roc_at_grid <- function(fpr, sensitivity, grid) {
 #' @keywords internal
 prc_at_grid <- function(recall, precision, grid) {
   if (all(is.na(recall))) return(rep(NA_real_, length(grid)))
-  i <- findInterval(grid, recall, left.open = TRUE) + 1
-  i[i > length(recall)] <- NA
-  precision[i]
+  recall <- c(0, recall)                     # the curve starts at recall 0, as in calculate_auprc()
+  precision <- c(precision[1], precision)
+  nxt <- findInterval(grid, recall, left.open = TRUE) + 1  # first point reaching the grid value
+  nxt[nxt > length(recall)] <- NA
+  k <- pmax(nxt - 1, 1)                      # previous point
+  w <- ifelse(recall[nxt] > recall[k], (grid - recall[k]) / (recall[nxt] - recall[k]), 1)
+  precision[k] + w * (precision[nxt] - precision[k])  # straight line between the two points
 }
 
 #' Bootstrap-based AUROC and AUPRC Estimation (Internal)
@@ -5098,13 +5500,17 @@ prc_at_grid <- function(recall, precision, grid) {
 #' and AUPRC (Area Under the Precision-Recall Curve) for a set of predictions.
 #' This function resamples the data with replacement and computes the metrics
 #' for each bootstrap iteration, returning the mean, 95% confidence interval,
-#' and all bootstrap values.
+#' and all bootstrap values. The bootstrap is stratified: the positive and negative samples are resampled
+#' separately, keeping their numbers, so every resample contains both classes (as pROC does for AUC intervals).
+#' The intervals and bands are the 2.5% and 97.5% percentiles of the resamples.
 #'
-#' @param predict Numeric vector or matrix of predicted values (scores).
-#' @param target Numeric or factor vector of observed binary outcomes.
+#' @param predict Data frame of predicted class probabilities, with a column `yes` (probability of the
+#'   positive class), one row per sample.
+#' @param target Vector of observed outcomes (`"yes"` / `"no"`), in the order of the rows of `predict`.
 #' @param method Character string specifying the ML model or method name.
 #' @param B Integer. Number of bootstrap iterations (default = 1000).
-#' @param seed Integer. Random seed for reproducibility (default = 123).
+#' @param seed Integer. Random seed of the bootstrap resamples (default = 123). It is only used inside the function:
+#'   the random number state of the session is restored afterwards.
 #'
 #' @param n_grid Integer. Number of evenly spaced points in \[0, 1\] at which the
 #'   pointwise curve bands are evaluated (default = 101).
@@ -5122,9 +5528,17 @@ prc_at_grid <- function(recall, precision, grid) {
 #' @keywords internal
 bootstrap_auc <- function(predict, target, method, B = 1000, seed = 123, n_grid = 101){
 
+  # Seed only for the bootstrap: the random number state of the session is saved here and restored when the
+  # function ends (set.seed() alone would reset it). withr::local_seed() is not used: in withr 3.0.2 it does not
+  # restore the state
+  withr::local_preserve_seed()
   set.seed(seed)
-  n <- length(target)
   grid <- seq(0, 1, length.out = n_grid)
+
+  # Stratified bootstrap: positives and negatives are resampled separately, keeping their numbers, so every
+  # resample has both classes (AUROC and AUPRC need both; a resample of one class gave NaN and stopped quantile())
+  pos <- which(target == "yes")
+  neg <- which(target != "yes")
 
   auroc_vals <- numeric(B)
   auprc_vals <- numeric(B)
@@ -5133,7 +5547,7 @@ bootstrap_auc <- function(predict, target, method, B = 1000, seed = 123, n_grid 
 
   for(b in seq_len(B)){
 
-    idx <- sample(seq_len(n), replace = TRUE)
+    idx <- c(pos[sample.int(length(pos), replace = TRUE)], neg[sample.int(length(neg), replace = TRUE)])
 
     predict_b <- predict[idx, , drop = FALSE]
     target_b  <- target[idx]
@@ -5186,14 +5600,17 @@ bootstrap_auc <- function(predict, target, method, B = 1000, seed = 123, n_grid 
 #' Compute Concordance Index with Bootstrap Confidence Interval (Internal)
 #'
 #' Computes the C-index (concordance index) for survival predictions and
-#' estimates a 95% confidence interval via bootstrap resampling.
+#' estimates a 95% confidence interval via bootstrap resampling (percentile interval of the C-index over
+#' \code{n_boot} resamples of the rows). The bootstrap is stratified by event: samples with an event and censored
+#' samples are resampled separately, keeping their numbers, so every resample contains events. The predictions must be in the direction "higher = longer survival".
 #'
 #' @param data Data frame containing survival outcomes and predictions.
 #' @param time_col Character. Name of the survival time column (default = `"time"`).
 #' @param event_col Character. Name of the event indicator column (default = `"event"`).
 #' @param pred_col Character. Name of the prediction column (default = `".pred"`).
 #' @param n_boot Integer. Number of bootstrap iterations for CI estimation (default = 1000).
-#' @param seed Integer. Random seed for reproducibility (default = 123).
+#' @param seed Integer. Random seed of the bootstrap resamples (default = 123). It is only used inside the function:
+#'   the random number state of the session is restored afterwards.
 #'
 #' @return A tibble with:
 #' \describe{
@@ -5206,9 +5623,16 @@ bootstrap_auc <- function(predict, target, method, B = 1000, seed = 123, n_grid 
 compute_cindex_ci <- function(data, time_col = "time", event_col = "event",
                               pred_col = ".pred", n_boot = 1000, seed = 123){
 
+  # Seed only for the bootstrap: the random number state of the session is saved here and restored when the
+  # function ends (set.seed() alone would reset it). withr::local_seed() is not used: in withr 3.0.2 it does not
+  # restore the state
+  withr::local_preserve_seed()
   set.seed(seed)
 
-  n <- nrow(data)
+  # Stratified bootstrap: samples with an event and censored samples are resampled separately, keeping their
+  # numbers, so every resample has events (without events the C-index is NaN, and those resamples were dropped)
+  ev <- which(data[[event_col]] == 1)
+  cens <- which(data[[event_col]] != 1)
 
   # Observed C-index
   c_index_obs <- yardstick::concordance_survival_vec(
@@ -5219,7 +5643,7 @@ compute_cindex_ci <- function(data, time_col = "time", event_col = "event",
   # Bootstrap distribution
   cindex_boot <- replicate(n_boot, {
 
-    idx <- sample(seq_len(n), replace = TRUE)
+    idx <- c(ev[sample.int(length(ev), replace = TRUE)], cens[sample.int(length(cens), replace = TRUE)])
 
     boot_data <- data[idx, ]
 

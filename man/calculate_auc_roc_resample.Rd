@@ -12,10 +12,12 @@ calculate_auc_roc_resample(obs, pred)
 \item{pred}{Numeric vector of predicted probabilities for the positive class \code{"yes"}.}
 }
 \value{
-Numeric value of AUROC.
+Numeric value of AUROC. \code{NA} (with a warning) if the resample has samples of a single class.
 }
 \description{
 Computes the Area Under the ROC Curve (AUROC) for a single cross-validation resample.
 This function assumes binary classification with the positive class labeled \code{"yes"}.
+Samples with the same predicted probability enter the curve together, so the result does not depend on
+the order of the samples.
 }
 \keyword{internal}

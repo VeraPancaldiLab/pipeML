@@ -23,7 +23,7 @@ library(dplyr)
 
 When samples come from several cohorts, a model should be evaluated on a cohort it has never seen. In a **Leave-One-Dataset-Out (LODO)** analysis, each cohort is left out in turn: the models are trained on the other cohorts and tested on the left-out one.
 
-Inside the training cohorts, set `LODO = TRUE` and give the cohort of each sample in `batch_var`: the cross-validation folds are then stratified by cohort and outcome, so every fold contains samples of every training cohort in the same proportions. The cohort is only used to build the folds; it is not used as a predictor.
+Inside the training cohorts, set `LODO = TRUE` and give the cohort of each sample in `batch_var` (in the order of the rows of the features): the cross-validation folds are then stratified by cohort and outcome, so every fold contains samples of every training cohort in the same proportions. The cohort is only used to build the folds; it is not used as a predictor. For classification, each training cohort needs at least `k_folds` samples.
 
 ## **Classification**
 

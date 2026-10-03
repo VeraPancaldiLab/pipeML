@@ -7,17 +7,19 @@
 get_sensitivity_specificity(predictions, observed, ml.model)
 }
 \arguments{
-\item{predictions}{A vector of predicted class labels or probabilities.}
+\item{predictions}{A data frame with a column \code{yes}: the predicted probability of the positive class of each sample.}
 
-\item{observed}{A vector of true class labels.}
+\item{observed}{A vector of true class labels (\code{"yes"} / \code{"no"}), in the same order as the rows of \code{predictions}.}
 
-\item{ml.model}{The trained machine learning model used to generate predictions.}
+\item{ml.model}{Character. Name of the model, stored in the column \code{model} of the output.}
 }
 \value{
-A data frame containing sensitivity, specificity, precision, recall, F1 score, MCC, and other metrics.
+A data frame with one row per sample, sorted by decreasing predicted probability. Each row gives the metrics
+obtained when that sample and all the samples above it are predicted as positive: \code{yes} (the probability used as
+threshold), \code{model}, \code{Sensitivity}, \code{Specificity}, \code{fpr}, \code{Accuracy}, \code{Precision}, \code{Recall}, \code{F1} and \code{MCC}.
 }
 \description{
 This function calculates sensitivity (recall), specificity, and other related metrics (accuracy, precision, recall, F1 score, MCC)
-from predicted and true class labels.
+at each probability threshold, from the predicted probabilities and the true class labels.
 }
 \keyword{internal}

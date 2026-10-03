@@ -7,15 +7,17 @@
 bootstrap_auc(predict, target, method, B = 1000, seed = 123, n_grid = 101)
 }
 \arguments{
-\item{predict}{Numeric vector or matrix of predicted values (scores).}
+\item{predict}{Data frame of predicted class probabilities, with a column \code{yes} (probability of the
+positive class), one row per sample.}
 
-\item{target}{Numeric or factor vector of observed binary outcomes.}
+\item{target}{Vector of observed outcomes (\code{"yes"} / \code{"no"}), in the order of the rows of \code{predict}.}
 
 \item{method}{Character string specifying the ML model or method name.}
 
 \item{B}{Integer. Number of bootstrap iterations (default = 1000).}
 
-\item{seed}{Integer. Random seed for reproducibility (default = 123).}
+\item{seed}{Integer. Random seed of the bootstrap resamples (default = 123). It is only used inside the function:
+the random number state of the session is restored afterwards.}
 
 \item{n_grid}{Integer. Number of evenly spaced points in [0, 1] at which the
 pointwise curve bands are evaluated (default = 101).}
@@ -36,6 +38,8 @@ Computes the bootstrap distribution of AUROC (Area Under the ROC Curve)
 and AUPRC (Area Under the Precision-Recall Curve) for a set of predictions.
 This function resamples the data with replacement and computes the metrics
 for each bootstrap iteration, returning the mean, 95\% confidence interval,
-and all bootstrap values.
+and all bootstrap values. The bootstrap is stratified: the positive and negative samples are resampled
+separately, keeping their numbers, so every resample contains both classes (as pROC does for AUC intervals).
+The intervals and bands are the 2.5\% and 97.5\% percentiles of the resamples.
 }
 \keyword{internal}

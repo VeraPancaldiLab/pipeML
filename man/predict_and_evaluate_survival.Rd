@@ -8,25 +8,32 @@ predict_and_evaluate_survival(
   model_fit,
   data,
   outcome_col = NULL,
-  event_col = NULL
+  event_col = NULL,
+  ci = TRUE
 )
 }
 \arguments{
 \item{model_fit}{A fitted survival model object (typically from \code{parsnip} or \code{workflow}).}
 
-\item{data}{Data frame containing predictors and survival outcome variables.}
+\item{data}{Data frame with the predictors and, to compute the C-index, the survival outcome columns.}
 
-\item{outcome_col}{Character string specifying the survival time column (default = \code{"time"}).}
+\item{outcome_col}{Character string specifying the survival time column of \code{data}. Default \code{NULL}.}
 
-\item{event_col}{Character string specifying the event indicator column (default = \code{"event"}).}
+\item{event_col}{Character string specifying the event indicator column of \code{data}. Default \code{NULL}. If
+\code{outcome_col} or \code{event_col} is \code{NULL}, the C-index is not computed (\code{NA}): only predictions are returned.}
+
+\item{ci}{Logical. If \code{TRUE} (default), the 95\% confidence interval of the C-index is computed with
+\code{\link[=compute_cindex_ci]{compute_cindex_ci()}} (1000 bootstrap resamples). \code{FALSE} computes the C-index only, as cross-validation does
+(\code{\link[=compute_ml_survival]{compute_ml_survival()}}), since its confidence interval is not used there.}
 }
 \value{
 A list containing:
 \describe{
-\item{\code{preds}}{Tibble with standardized numeric predictions \code{.pred}.}
-\item{\code{c_index}}{Numeric value of the computed C-index.}
-\item{\code{c_index_lower}}{Lower bound of 95\% CI for the C-index.}
-\item{\code{c_index_upper}}{Upper bound of 95\% CI for the C-index.}
+\item{\code{preds}}{Tibble with the risk scores in \code{.pred} (higher = higher risk), one row per sample of \code{data}.}
+\item{\code{c_index}}{The C-index (\code{NA} without outcome columns, \code{NaN} if \code{data} has no event).}
+\item{\code{c_index_lower}}{Lower bound of the 95\% CI of the C-index (\code{NA} without outcome columns or with
+\code{ci = FALSE}).}
+\item{\code{c_index_upper}}{Upper bound of the 95\% CI of the C-index (same).}
 }
 }
 \description{
@@ -38,12 +45,20 @@ predictions into a comparable numeric format.
 \details{
 The function attempts predictions using multiple types depending on model support:
 \itemize{
-\item \code{"linear_pred"} - Linear predictor/log hazard (higher = higher risk).
+\item \code{"linear_pred"} - Linear predictor. \code{parsnip} returns it so that higher = longer survival (for Cox
+models, the log hazard with the sign changed); reversed internally.
 \item \code{"time"} - Expected survival time (higher = longer survival, reversed internally).
-\item \code{"survival"} - Survival probability at a median evaluation time (higher = better survival, reversed internally).
+\item \code{"survival"} - Survival probability at the median observed time of \code{data} (higher = better survival,
+reversed internally). Only tried when \code{outcome_col} and \code{event_col} are given; none of the default models
+needs it.
 }
+The C-index is computed before the predictions are reversed, since it expects higher = longer survival. The
+returned predictions are risk scores: higher = higher risk.
 
 Standardizes output into a tibble with a single numeric \code{.pred} column.
-Computes C-index using \code{compute_cindex_ci()} if outcome/event columns are provided.
+Computes the C-index if outcome/event columns are provided, with its 95\% confidence interval if \code{ci = TRUE}
+(\code{compute_cindex_ci()}: percentile interval over 1000 bootstrap resamples of the samples, stratified by event,
+seed 123, without
+changing the random number state of the session).
 }
 \keyword{internal}

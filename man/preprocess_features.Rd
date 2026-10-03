@@ -4,49 +4,32 @@
 \alias{preprocess_features}
 \title{Preprocess Features for Machine Learning}
 \usage{
-preprocess_features(
-  data,
-  target_col = NULL,
-  time_var = NULL,
-  event_var = NULL,
-  cor_thresh = 0.9
-)
+preprocess_features(data, cor_thresh = 0.9)
 }
 \arguments{
-\item{data}{A data frame containing predictor features and the target variable.}
-
-\item{target_col}{A character string specifying the name of the target column
-in \code{data}. Default is \code{"target"}.}
-
-\item{time_var}{A character string specifying the name of the time-to-event
-column in \code{data}. Used only for survival analysis.}
-
-\item{event_var}{A character string specifying the name of the event indicator
-column in \code{data} (e.g., 0/1). Used only for survival analysis.}
+\item{data}{A data frame with the numeric features only (no outcome column).}
 
 \item{cor_thresh}{A numeric value between 0 and 1 specifying the correlation
 threshold for removing highly correlated features. Default is \code{0.9}.}
 }
 \value{
-A data frame with the preprocessed features and the target column.
+A data frame with the features that are kept (same rows).
 }
 \description{
-This function preprocesses a dataset by removing features with
-near-zero variance, highly correlated features, and features that are
-constant within any class of the target variable. It ensures that the
-resulting feature set is more suitable for machine learning models.
+This function preprocesses a set of features by removing features with
+near-zero variance and highly correlated features. It ensures that the
+resulting feature set is more suitable for machine learning models. It receives the features only:
+the callers set the outcome columns aside and add them back, so the outcome is not used.
 }
 \details{
 The preprocessing steps include:
 \enumerate{
 \item Removing near-zero variance features (using \code{caret::nearZeroVar}).
-\item Removing highly correlated features above the specified threshold
-(using \code{caret::findCorrelation}).
-\item Removing features that are constant within any class of the target
-variable (i.e., provide no discriminatory power across classes).
+\item Removing highly correlated features: for each pair with an absolute correlation above
+the threshold, one of the two is removed (using \code{caret::findCorrelation}).
 }
 
-After preprocessing, the target column is re-attached to the dataset.
+The function stops if a feature is not numeric, or if no feature is left after preprocessing.
 }
 \examples{
 \dontrun{
@@ -57,11 +40,10 @@ set.seed(123)
 df <- data.frame(
   feature1 = c(1, 1, 1, 1, 1),             # constant
   feature2 = c(1, 2, 3, 4, 5),             # numeric
-  feature3 = c(1, 2, 3, 4, 5) * 2,         # highly correlated with feature2
-  target   = c("A", "A", "B", "B", "B")
+  feature3 = c(1, 2, 3, 4, 5) * 2          # highly correlated with feature2
 )
 
-clean_df <- preprocess_features(df, target_col = "target", cor_thresh = 0.9)
+clean_df <- preprocess_features(df, cor_thresh = 0.9)
 }
 
 }

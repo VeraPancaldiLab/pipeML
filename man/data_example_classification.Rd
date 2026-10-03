@@ -5,7 +5,9 @@
 \alias{data_example_classification}
 \title{data_example_classification}
 \format{
-A data frame with samples as rows and features as columns (e.g., cell or tissue measurements).
+A data frame with 683 samples as rows and 10 columns: 9 cytological features (\code{Cl.thickness},
+\code{Cell.size}, \code{Cell.shape}, \code{Marg.adhesion}, \code{Epith.c.size}, \code{Bare.nuclei}, \code{Bl.cromatin}, \code{Normal.nucleoli},
+\code{Mitoses}) and the outcome \code{target} (1 = malignant, 0 = benign).
 }
 \source{
 \code{mlbench::BreastCancer} dataset

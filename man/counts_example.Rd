@@ -5,7 +5,9 @@
 \alias{counts_example}
 \title{counts_example}
 \format{
-A numeric matrix with genes as rows and samples as columns.
+A numeric matrix with 5000 genes as rows and 336 samples as columns, with normalized (non-integer)
+expression values. The 73 samples of the Gide cohort are the ones annotated in \code{coldata_example}
+(\code{counts_example[, rownames(coldata_example)]}).
 }
 \source{
 Gide T.N., Quek C., Menzies A.M., Tasker A.T., Shang P., Holst J., Madore J., Lim S.Y., Velickovic R., Wongchenko M., et al. Distinct Immune Cell Populations Define Response to Anti-PD-1 Monotherapy and Anti-PD-1/Anti-CTLA-4 Combined Therapy. Cancer Cell. 2019;35:238–255. doi: 10.1016/j.ccell.2019.01.003.
@@ -14,7 +16,7 @@ Gide T.N., Quek C., Menzies A.M., Tasker A.T., Shang P., Holst J., Madore J., Li
 counts_example
 }
 \description{
-Gene expression matrix from the Gide et al. (2019) metastatic melanoma cohort.
+Gene expression matrix of melanoma samples, including the Gide et al. (2019) metastatic melanoma cohort.
 Rows correspond to genes (HUGO gene symbols) and columns to patient samples.
 This dataset is used to compute features for training machine learning models.
 }

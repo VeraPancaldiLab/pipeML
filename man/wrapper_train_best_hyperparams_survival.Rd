@@ -11,7 +11,8 @@ wrapper_train_best_hyperparams_survival(
   fold_construction_fun,
   fold_construction_args_fixed,
   outcome_col = "time",
-  event_col = "event"
+  event_col = "event",
+  preprocess = TRUE
 )
 }
 \arguments{
@@ -19,9 +20,10 @@ wrapper_train_best_hyperparams_survival(
 used for cross-validation (features plus \code{time} and \code{event}), passed to
 \code{fold_construction_fun} as \code{data}.}
 
-\item{optimized}{A list output from \code{\link[=aggregate_results]{aggregate_results()}} or
-\code{\link[=compute_k_fold_CV_survival]{compute_k_fold_CV_survival()}}, containing the best-tuned parameters
-(\code{bestTune}) and model performance summaries.}
+\item{optimized}{The cross-validation results of one model (one element of the output of
+\code{\link[=aggregate_results]{aggregate_results()}}): \code{Results_folds}, \code{Prediction_folds}, \code{Resample_matrix} and \code{bestTune}.
+With tunable arguments, \code{bestTune} is a data frame with the selected feature parameters and model
+hyperparameters; without them, a list with the model hyperparameters and \code{fold_construction_args_fixed}.}
 
 \item{ml_method}{Character string specifying the survival model to train.
 Must be one of:
@@ -34,11 +36,14 @@ Must be one of:
 \item \code{"decision_tree_partykit"} - Single survival tree.
 \item \code{"bag_tree_rpart"} - Bagged CART-based survival trees.
 \item \code{"boost_tree_mboost"} - Gradient boosting for censored data.
-}}
+}
+\code{"rand_forest_partykit"} and \code{"boost_tree_mboost"} are supported here but are not run by default
+(they are commented out of \code{model_list} in \code{\link[=compute_k_fold_CV_survival]{compute_k_fold_CV_survival()}}).}
 
 \item{fold_construction_fun}{A custom function used to construct folds and
 preprocessed data (e.g., \code{prepare_CellTFusion_folds()}).
-Must accept arguments \code{data} and optionally \code{bestune}.}
+Must accept the arguments \code{data} and \code{bestune}. Called with \code{bestune}, it returns a list with the features
+built on all training samples plus \code{time} and \code{event}, its custom output, and the selected parameters.}
 
 \item{fold_construction_args_fixed}{A named list of fixed arguments to pass
 to \code{fold_construction_fun()} (e.g., paths, deconvolution matrices, etc.).}
@@ -48,20 +53,26 @@ to \code{fold_construction_fun()} (e.g., paths, deconvolution matrices, etc.).}
 
 \item{event_col}{Character string naming the event indicator column
 (default = \code{"event"}).}
+
+\item{preprocess}{Logical. If \code{TRUE} (default), the training features are preprocessed with
+\code{preprocess_features()}.}
 }
 \value{
-A named list containing:
+\code{NULL} if the final fit fails. Otherwise a named list containing:
 \describe{
-\item{\code{Model}}{A list containing the fitted parsnip model object,
-resampling results, and tuning information.}
-\item{\code{training_set}}{The final preprocessed training dataset used for fitting.}
+\item{\code{Model}}{A list containing the model name (\code{model}), the fitted workflow (\code{fitted}),
+the cross-validation results (\code{Results_folds}, \code{Prediction_folds}, \code{Resample_matrix})
+and the selected model hyperparameters (\code{bestTune}; the feature parameters are in
+\code{custom_output$Parameters}).}
+\item{\code{training_set}}{The final training set used for fitting (preprocessed if \code{preprocess = TRUE}).}
 \item{\code{custom_output}}{Additional data returned by the custom fold construction
-function (e.g., CellTFusion outputs or parameter tables).}
+function (e.g., CellTFusion outputs), plus its third element in \code{Parameters}.}
 }
 }
 \description{
 Fits a survival model on the full training data using the optimal
-hyperparameters obtained from nested cross-validation.
+hyperparameters obtained from cross-validation. Used with a custom fold
+construction function.
 This wrapper ensures consistent retraining for different survival
 model types (Cox, penalized Cox, AFT, tree-based, or ensemble models),
 and supports preprocessing pipelines such as CellTFusion through a
@@ -74,8 +85,11 @@ This function performs the following steps:
 \item Reconstructs the training dataset using the provided
 \code{fold_construction_fun()}, including any custom preprocessing
 or feature generation.
-\item Applies the optimal hyperparameters to the model specification.
-\item Fits the final model using the full training data.
+\item Preprocesses the features (\code{preprocess_features()}), if \code{preprocess = TRUE}.
+\item Applies the optimal model hyperparameters to the model specification (the feature parameters
+are only used by \code{fold_construction_fun}).
+\item Fits the final model using the full training data. If the fit fails, a warning is given and
+\code{NULL} is returned, so the model is excluded.
 }
 
 If the selected model type has no tunable hyperparameters,

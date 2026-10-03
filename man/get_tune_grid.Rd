@@ -11,18 +11,24 @@ get_tune_grid(method, train_data)
 \code{"rf"}, \code{"svmRadial"}, \code{"treebag"}, \code{"C5.0"}, \code{"knn"},
 \code{"rpart"}, \code{"svmLinear"}, or \code{"xgbTree"}.}
 
-\item{train_data}{Data frame of training data including the \code{target} column.
-Only used by \code{"rf"}, to scale \code{mtry} to the number of features.}
+\item{train_data}{Data frame with the training features and the \code{target} column (the only non-feature
+column). Only used by \code{"rf"}, to scale \code{mtry} to the number of features (\code{ncol - 1}), and by
+\code{"svmRadial"}, to estimate \code{sigma}. \code{compute_k_fold_CV()} passes the fold training data
+with the fewest features after preprocessing, the same in all folds, so that the grid is the same in all folds.}
 }
 \value{
 A data frame with one row per hyperparameter combination, suitable as
 the \code{tuneGrid} argument of \code{caret::train()}:
 \describe{
-\item{glmnet}{\code{alpha} of 0 or 1, times 20 \code{lambda} values from 0.001 to 1 (40 rows).}
-\item{lasso}{\code{alpha = 1}, with 20 \code{lambda} values from 0.001 to 1.}
-\item{ridge}{\code{alpha = 0}, with 20 \code{lambda} values from 0.001 to 1.}
-\item{rf}{Up to 3 \code{mtry} values spanning 20-90 percent of the number of features.}
-\item{svmRadial}{\code{sigma} of 0.01, 0.05 or 0.1, times \code{C} of 0.5, 1 or 2.}
+\item{glmnet}{\code{alpha} of 0 or 1, times 20 \code{lambda} values from 0.001 to 1, evenly spaced on
+the log scale (40 rows).}
+\item{lasso}{\code{alpha = 1}, with the same 20 \code{lambda} values.}
+\item{ridge}{\code{alpha = 0}, with the same 20 \code{lambda} values.}
+\item{rf}{Up to 3 \code{mtry} values spanning 20-90 percent of the number of features (with 1 or 2
+features, the values include 0, which randomForest resets to 1).}
+\item{svmRadial}{Up to 3 \code{sigma} values estimated from the features (the 90, 50 and 10 percent
+quantiles of \eqn{1/\|x - x'\|^2} over all pairs of samples, on scaled features, as
+\code{kernlab::sigest()} does on a random subset), times \code{C} of 0.5, 1 or 2.}
 \item{treebag}{A single placeholder row (\code{parameter = "none"}); no tunable parameters.}
 \item{C5.0}{\code{trials} of 1, 5 or 10, times \code{winnow} TRUE or FALSE, with \code{model = "tree"}.}
 \item{knn}{\code{k} of 3, 5, 7, 9 or 11 (odd values avoid ties).}
@@ -34,13 +40,16 @@ the \code{tuneGrid} argument of \code{caret::train()}:
 }
 }
 \description{
-Internal helper that returns the fixed hyperparameter grid evaluated for each
-classification method during custom-fold cross-validation
-(\code{compute_custom_k_fold_CV()}). The grids are deliberately small so that
-the full grid can be evaluated in every fold.
+Internal helper that returns the hyperparameter grid evaluated for each
+classification method during custom-fold cross-validation: \code{compute_k_fold_CV()} passes it to
+\code{compute_custom_k_fold_CV()}, which trains every row in every fold. The grids are deliberately small so
+that the full grid can be evaluated in every fold. The standard path (no fold construction function) does not
+use these grids: it uses caret's default grids, except for lasso and ridge, which use the same \code{lambda}
+values as here.
 }
 \details{
-The grids are deterministic. An error is raised for unsupported methods.
+The grids are deterministic (no random numbers are used): the same \code{train_data} always gives
+the same grid. An error is raised for unsupported methods.
 }
 \seealso{
 \code{\link{compute_custom_k_fold_CV}}, \code{\link{get_default_hyperparams}}

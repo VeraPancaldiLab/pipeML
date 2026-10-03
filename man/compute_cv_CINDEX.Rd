@@ -7,25 +7,31 @@
 compute_cv_CINDEX(models, file_name = NULL, plot_results = TRUE)
 }
 \arguments{
-\item{models}{Named list of survival model objects. Each element must contain
-a \code{Resample_matrix} data frame with columns:
+\item{models}{Named list of survival model objects (from \code{\link[=aggregate_results]{aggregate_results()}}). Each element contains
+a \code{Resample_matrix} data frame with one row per test sample of each resample (for the selected
+configuration), with columns:
 \describe{
-\item{\code{c_index}}{Numeric C-index per fold/resample.}
-\item{\code{Resample}}{Fold or resample identifier (e.g., "Fold1").}
-}}
+\item{\code{c_index}}{C-index of the resample, repeated on each of its rows.}
+\item{\code{Resample}}{Resample identifier (e.g., "Fold1.Rep1").}
+}
+Excluded models are \code{NULL} and are ignored.}
 
 \item{file_name}{Optional character string to name the output PDF saved under
-\code{"Results/CINDEX_CV_methods_<file_name>.pdf"}. If \code{NULL}, the file uses
-a default naming convention.}
+\code{"Results/CINDEX_CV_methods_<file_name>.pdf"}. If \code{NULL}, the file is
+\code{"Results/CINDEX_CV_methods_.pdf"}.}
 
-\item{plot_results}{Logical (default = TRUE). If \code{TRUE}, generates a PDF bar plot
-showing median C-index +/- MAD per model.}
+\item{plot_results}{Logical (default = TRUE). If \code{TRUE}, saves a bar plot of the median C-index +/- MAD
+of each model, with the same layout as the classification AUROC/AUPRC plots (\code{\link[=plot_cv_metric]{plot_cv_metric()}}): models
+sorted from best to worst, selected model in blue, values above the bars and a dashed line at 0.5 (random
+prediction).}
 }
 \value{
 A list with:
 \describe{
-\item{\code{CINDEX_summary}}{Tibble summarizing median and MAD per model.}
-\item{\code{All_folds}}{Tibble of raw C-index values for all models and folds.}
+\item{\code{CINDEX_summary}}{Tibble with one row per model (\code{model}, \code{Median_CINDEX}, \code{MAD_CINDEX}), sorted from
+best to worst.}
+\item{\code{All_folds}}{Tibble with the rows of all models (\code{model}, \code{c_index}, \code{Resample}): one row per test sample
+of each resample.}
 \item{\code{Top_model}}{Character string of the model with highest median C-index.}
 }
 }
@@ -37,9 +43,12 @@ and optionally generates a bar plot summarizing performance.
 }
 \details{
 \itemize{
-\item Median C-index represents typical discrimination performance across folds.
-\item MAD provides robust variability estimation of C-index values.
-\item The optional plot displays model performance with error bars +/- MAD.
+\item The median and MAD are computed over the rows of \code{Resample_matrix}, i.e. each resample counts in proportion
+to its number of test samples (the same as per resample when the folds have the same size).
+\item The MAD is scaled (\code{stats::mad()} default, comparable to a standard deviation), as for the classification
+AUROC and AUPRC.
+\item Models without cross-validation results (excluded because they could not be fitted) are ignored.
+\item The optional plot displays model performance with error bars +/- MAD (see \code{plot_results}).
 }
 }
 \seealso{

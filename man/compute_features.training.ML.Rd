@@ -22,7 +22,8 @@ compute_features.training.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  seed = 123
+  seed = 123,
+  preprocess = TRUE
 )
 }
 \arguments{
@@ -30,14 +31,17 @@ compute_features.training.ML(
 
 \item{task_type}{Character. Prediction task type: \code{"classification"} or \code{"survival"}.}
 
-\item{target_var}{Vector. Target variable for classification tasks.}
+\item{target_var}{Vector. Target variable for classification tasks: one value per sample, in the same order
+as the rows of \code{features_train}, without missing values.}
 
-\item{trait.positive}{Value in \code{target_var} representing the positive class.}
+\item{trait.positive}{Value in \code{target_var} representing the positive class. All other values form the
+negative class.}
 
-\item{time_var}{Numeric vector. Survival/follow-up time of each sample (required for survival tasks).}
+\item{time_var}{Numeric vector. Survival/follow-up time of each sample, in the same order as the rows of
+\code{features_train} (required for survival tasks).}
 
-\item{event_var}{Numeric vector. Event indicator of each sample (1 = event occurred, 0 = censored; required for
-survival tasks).}
+\item{event_var}{Vector. Event indicator of each sample (1 = event occurred, 0 = censored), in the same order
+as the rows of \code{features_train} (required for survival tasks).}
 
 \item{metric}{Character. Performance metric for model selection and tuning (classification):
 \itemize{
@@ -54,12 +58,14 @@ Survival models are always selected by the concordance index (C-index); \code{me
 Leave-One-Dataset-Out analyses (train on some cohorts, test on a left-out one). The cohort is not used as
 a predictor.}
 
-\item{batch_var}{Vector. Cohort/batch of each sample. Required if \code{LODO = TRUE}.}
+\item{batch_var}{Vector. Cohort/batch of each sample, in the same order as the rows of \code{features_train}.
+Required if \code{LODO = TRUE}. For classification, each cohort needs at least \code{k_folds} samples.}
 
 \item{file_name}{Character. File name prefix used to save performance plots in \code{"Results/"}.}
 
 \item{ncores}{Integer. Number of CPU cores for parallelization (cross-validation folds are processed in parallel).
-Default: \code{NULL} (sequential).}
+Default: \code{NULL} (sequential). For classification with \code{fold_construction_fun}, the models are
+trained sequentially and \code{ncores} is not used.}
 
 \item{return}{Logical. Whether to save the cross-validation performance plots in \code{"Results/"}.
 Default: \code{FALSE}.}
@@ -69,17 +75,24 @@ Default: \code{FALSE}.}
 classification, \code{time} and \code{event} columns for survival), \code{folds} and \code{bestune}. It must
 remove the outcome columns before building features. Must accept a \code{bestune} argument:
 \itemize{
-\item \code{bestune = NULL} - explore parameter grid across folds (parallelized via \code{foreach}).
+\item \code{bestune = NULL} - build the features of every fold (for every combination of the tunable
+arguments, if any) and save them. The function can run its own parallel workers for this.
 \item \code{bestune provided} - rebuild features on the full dataset using optimized parameters, and
-return a list with the features plus the outcome columns, any custom output, and \code{bestune}.
+return a list with the features plus the outcome columns, any custom output, and \code{bestune}
+(with tunable arguments: a data frame with the selected values of these arguments).
 }
-The function should save individual folds as \code{"Results/fold_*.rds"} with:
+The function should save each fold as \code{"Results/fold_<fold name>.rds"}, a list with:
 \itemize{
 \item \code{train_data} - training features plus the outcome columns
 \item \code{test_data} - test features (plus \code{time} and \code{event} for survival)
-\item \code{obs_test} - observed outcomes (classification)
-\item \code{params} - parameters used (if applicable)
-}}
+\item \code{obs_test} - observed outcomes of the test samples, in the order of the rows of
+\code{test_data} (classification)
+\item \code{rowIndex} - row indices of the test samples in \code{data}
+\item \code{fold_name} - name of the fold
+\item \code{params} - data frame with the values of the tunable arguments used (only with tunable
+arguments)
+}
+With tunable arguments, the file of a fold contains a list with one such element per combination.}
 
 \item{fold_construction_args_fixed}{List of arguments passed to \code{fold_construction_fun} that remain fixed across CV and final training.}
 
@@ -90,26 +103,31 @@ the randomness in model fitting (e.g. random forest, bagging, boosting), includi
 parallel with \code{ncores}. Default: \code{123}. Use \code{NULL} to leave the random number generator
 untouched. Randomness inside a user-supplied \code{fold_construction_fun} that runs its own parallel
 workers is not covered: seed those workers inside that function.}
+
+\item{preprocess}{Logical. If \code{TRUE} (default), near-constant and highly correlated (|r| > 0.9)
+features are removed before training (see Details). The features must then be numeric. Use \code{FALSE}
+to train on the features as given.}
 }
 \value{
-A named list, or \code{NULL} if no model could be trained:
+A named list:
 \describe{
 \item{Model}{The selected model, trained on all training samples. Classification: a caret \code{train}
 object (tuned hyperparameters in \code{$bestTune}, performance per resample in \code{$resample}).
-Survival: a list with the model name (\code{$model}), the fitted workflow (\code{$Model_object}), the
-tuned hyperparameters (\code{$bestTune}), the C-index per resample (\code{$Resample_matrix}) and the
-training data (\code{$trainingData}).}
-\item{ML_Models}{All trained models.}
+Survival: a list with the fitted workflow (\code{$Model_object}), the tuned hyperparameters
+(\code{$bestTune}), the C-index per resample (\code{$Resample_matrix}, with the name of the model in its
+column \code{model}) and the training data (\code{$trainingData}).}
+\item{ML_Models}{All trained models. Classification: models that predict the same value for all training
+samples are excluded.}
 \item{AUROC_median, AUPRC_median}{Classification: median and MAD of the cross-validation AUROC and AUPRC
 of each model.}
 \item{C_index_median}{Survival: median cross-validation C-index of the selected model.}
 \item{Custom_output}{Only with \code{fold_construction_fun}: the custom output returned by that function
-on all training samples, and the selected feature parameters in \code{$Parameters}.}
+on all training samples and, with tunable arguments, the selected feature parameters in \code{$Parameters}.}
 }
 }
 \description{
-This function trains one or more machine learning models using repeated k-fold cross-validation,
-with optional feature selection, and support for both classification and survival tasks.
+This function trains several machine learning models using repeated k-fold cross-validation,
+with hyperparameter tuning, and supports both classification and survival tasks.
 It allows flexible cross-validation schemes, including:
 \itemize{
 \item Standard stratified k-fold cross-validation
@@ -128,10 +146,16 @@ parametric AFT, conditional inference tree, bagged CART, oblique random survival
 selected by the cross-validation \code{metric} (classification) or C-index (survival), and trained on all
 training samples with its tuned hyperparameters.
 
+With \code{preprocess = TRUE}, near-constant features and, for each pair of features with an absolute
+correlation above 0.9, one of the two are removed. The outcome is not used. Without
+\code{fold_construction_fun}, this is done once on all training samples before the cross-validation, so the
+folds and the final model use the same features. The test samples are not involved:
+\code{compute_prediction()} keeps the features of the final model.
+
 When \code{fold_construction_fun} is provided, the features of each fold are built by that function, and
-near-constant, highly correlated (|r| > 0.9) and, for classification, class-constant features are removed
-from the features built on each training part. The final model is trained on the features the function
-builds on all training samples. See \code{vignette("a5_custom_folds", package = "pipeML")}.
+the preprocessing is done inside each fold: on the features built on the training part, keeping the same
+features in the held-out part. The final model is trained on the features the function
+builds on all training samples, preprocessed in the same way. See \code{vignette("a5_custom_folds", package = "pipeML")}.
 }
 \examples{
 \dontrun{
@@ -159,7 +183,7 @@ res_survival <- compute_features.training.ML(features_train = X,
                                              k_folds = 5,
                                              n_rep = 2,
                                              ncores = 2)
-res_survival$Model$model
+unique(res_survival$Model$Resample_matrix$model) # selected model
 res_survival$C_index_median
 }
 

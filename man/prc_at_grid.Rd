@@ -19,7 +19,10 @@ Numeric vector of precisions, one per grid value (\code{NA} if the
 curve is undefined, e.g. a resample without positives).
 }
 \description{
-For each grid value, returns the precision at the first threshold whose recall
-reaches that value.
+Returns, for each grid value, the precision of the precision-recall curve at that recall, with straight lines
+between consecutive points: the curve as \code{get_curves()} draws it (\code{geom_line()}) and as
+\code{calculate_auprc()} integrates it, starting at recall 0 with the precision of the first point. At a
+grid value equal to the recall of a point, it is the precision at the first threshold reaching that recall
+(so the final drop to the prevalence at recall 1 is not in the band).
 }
 \keyword{internal}

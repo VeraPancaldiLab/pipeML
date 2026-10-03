@@ -24,14 +24,16 @@ construct_stratified_cohort_folds(
 \item{n_rep}{Number of repeated cross-validation runs.}
 }
 \value{
-A named list of fold indices suitable for use in training and evaluation.
+A named list with the row indices of the training samples of each fold, named
+\code{Fold<i>.Rep<j>} (\code{k_folds} x \code{n_rep} elements).
 }
 \description{
 Generates stratified k-fold cross-validation indices for multiple datasets while preserving class
 proportions within each dataset. Supports multiple repeats.
 }
 \details{
-Each fold preserves the class distribution within each cohort. Useful for Leave-One-Dataset-Out (LODO)
-strategies or repeated stratified k-fold cross-validation.
+Each cohort is split into \code{k_folds} folds stratified by the target, and the folds of all cohorts are
+merged, so every fold preserves the class distribution within each cohort. Stops with an error if a cohort
+has fewer samples than \code{k_folds}.
 }
 \keyword{internal}

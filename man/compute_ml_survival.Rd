@@ -36,8 +36,8 @@ event indicator, and predictors.}
 \item \code{"boost_tree_mboost"} - Gradient boosting for survival data
 }}
 
-\item{models_hyperparameters}{Optional list of hyperparameter values to apply.
-Example: \code{list(list(trees = 500, min_n = 10))}. Defaults to \code{NULL} (use engine defaults).}
+\item{models_hyperparameters}{List with one element: the hyperparameter values to apply.
+Example: \code{list(list(trees = 500, min_n = 10))}. Use \code{list(NULL)} for the engine defaults.}
 
 \item{return_model}{Logical. If \code{TRUE}, returns the fitted model along with predictions.
 Default is \code{FALSE}.}
@@ -51,6 +51,8 @@ If \code{df_test} is provided:
 \item \code{Model} - fitted tidymodels workflow
 \item \code{Metrics} - tibble with \code{predictions} and \code{c_index}.
 If \code{df_test} is \code{NULL}, the function returns only the fitted model object.
+If the model cannot be fitted, an object of class \code{"pipeML_fit_error"} (a list with the model name and the
+error message) is returned instead.
 }
 }
 }
@@ -69,7 +71,7 @@ Workflow:
 \enumerate{
 \item Create model specification (\code{parsnip::model_spec}) based on \code{model} type.
 \item Apply optional hyperparameters via \code{parsnip::set_args()}.
-\item Construct survival formula: \code{Surv(time, event) ~ .}.
+\item Construct survival formula: \code{survival::Surv(time, event) ~ .}.
 \item Fit model using \code{parsnip::fit()} on \code{df_train}.
 \item Evaluate performance using \code{predict_and_evaluate_survival()} (C-index).
 }

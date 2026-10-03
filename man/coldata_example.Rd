@@ -5,7 +5,9 @@
 \alias{coldata_example}
 \title{coldata_example}
 \format{
-A data frame with samples as rows and a column \code{Response} indicating treatment outcome.
+A data frame with 73 samples as rows (row names: sample identifiers, matching column names of
+\code{counts_example}) and 2 columns: \code{Response}, the treatment outcome (\code{"R"} = responder, \code{"NR"} = non-responder),
+and \code{Cohort} (\code{"Gide"}).
 }
 \source{
 Gide T.N., Quek C., Menzies A.M., Tasker A.T., Shang P., Holst J., Madore J., Lim S.Y., Velickovic R., Wongchenko M., et al. Distinct Immune Cell Populations Define Response to Anti-PD-1 Monotherapy and Anti-PD-1/Anti-CTLA-4 Combined Therapy. Cancer Cell. 2019;35:238–255. doi: 10.1016/j.ccell.2019.01.003.

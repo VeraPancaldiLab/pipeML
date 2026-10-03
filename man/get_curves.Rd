@@ -14,7 +14,7 @@ get_curves(
   auc_roc,
   auc_prc,
   LODO = FALSE,
-  file.name,
+  file.name = NULL,
   width = 6,
   height = 6,
   roc_band = NULL,
@@ -22,7 +22,8 @@ get_curves(
 )
 }
 \arguments{
-\item{data}{A data frame containing the prediction metrics.}
+\item{data}{A data frame containing the prediction metrics at each threshold, as returned in
+\code{compute_prediction()$Metrics} (sorted by decreasing predicted probability within each curve).}
 
 \item{spec}{The name of the column containing the specificity values.}
 
@@ -32,8 +33,10 @@ get_curves(
 
 \item{prec}{The name of the column containing the precision values.}
 
-\item{color}{The name of the column containing the cohort names. Each cohort will have a
-corresponding color in the plot. Multiple cohorts will result in different curves.}
+\item{color}{The name of the column that identifies each curve (e.g. \code{"model"} for the output of
+\code{compute_prediction()}, or the column with the cohort names). Each value will have a
+corresponding color in the plot. Several curves (several values in this column) are only supported
+with \code{LODO = TRUE}.}
 
 \item{auc_roc}{A list with elements \code{estimate}, \code{lower} and \code{upper}
 giving the AUROC and its confidence interval, as returned in
@@ -44,9 +47,10 @@ vector with one value per cohort, named to match the values of the \code{color} 
 (\code{compute_prediction()$AUC$AUPRC}).}
 
 \item{LODO}{Logical. If TRUE, the function assumes the data contains stacked predictions from
-multiple cohorts and assigns AUROC/AUPRC per cohort (default = FALSE).}
+multiple cohorts and assigns AUROC/AUPRC per cohort (default = FALSE). \code{auc_roc} and \code{auc_prc}
+must then hold named vectors, with the names of the cohorts.}
 
-\item{file.name}{A character string used as the file name prefix for saving the plots.}
+\item{file.name}{Optional character string added to the names of the saved plots.}
 
 \item{width}{A numeric value for the width of plot}
 
@@ -61,13 +65,18 @@ it is drawn as a shaded pointwise confidence band around the ROC curve.}
 curve in the same way.}
 }
 \value{
-Saves two PDF plots: one for the ROC curve and one for the Precision-Recall curve
-in the "Results/" directory.
+No return value. Saves two PDF plots in the "Results/" directory: \code{ROC_curve_<file.name>.pdf}
+for the ROC curve and \code{PRC_curve_<file.name>.pdf} for the Precision-Recall curve
+(\code{ROC_curve.pdf} and \code{PRC_curve.pdf} if \code{file.name} is \code{NULL}).
 }
 \description{
 This function generates and saves the Receiver Operating Characteristic (ROC) curve
 and Precision-Recall curve based on the provided metrics. It also includes the AUC values
 for both curves in the plot legends.
+}
+\details{
+The ROC curve is drawn from the point (0, 0), and the precision-recall curve from recall 0 with the precision of
+its first point, which are the starting points used to calculate AUROC and AUPRC.
 }
 \examples{
 \dontrun{

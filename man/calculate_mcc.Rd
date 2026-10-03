@@ -7,12 +7,13 @@
 calculate_mcc(metrics, target)
 }
 \arguments{
-\item{metrics}{A vector of predicted class labels or probabilities.}
+\item{metrics}{A data frame with metrics obtained using \code{get_sensitivity_specificity()}, containing
+at least two columns: "Sensitivity" and "Specificity" (one row per probability threshold).}
 
-\item{target}{A vector of true class labels.}
+\item{target}{A vector of true class labels (\code{"yes"} / \code{"no"}).}
 }
 \value{
-The MCC score, a numeric value between -1 and 1.
+A numeric vector with the MCC score (between -1 and 1) at each probability threshold.
 }
 \description{
 The Matthews correlation coefficient (MCC) is a metric used for binary classification problems.

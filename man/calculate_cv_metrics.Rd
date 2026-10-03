@@ -7,18 +7,22 @@
 calculate_cv_metrics(ml_model, metric, hyperparameters = NULL)
 }
 \arguments{
-\item{ml_model}{A trained machine learning model object containing \code{Prediction_folds} and \code{Resample_matrix}.}
+\item{ml_model}{A trained machine learning model object containing \code{Prediction_folds} (out-of-fold predictions),
+\code{Results_folds} and \code{Resample_matrix}.}
 
 \item{metric}{Character string specifying the metric to optimize when selecting hyperparameters. Either \code{"AUROC"} or \code{"AUPRC"}.}
 
-\item{hyperparameters}{Optional character vector of hyperparameter column names to evaluate. If \code{NULL}, no hyperparameter tuning is performed.}
+\item{hyperparameters}{Character vector of hyperparameter column names of \code{Prediction_folds} to evaluate. For a model
+without hyperparameters (treebag), \code{"parameter"} is used: the column that holds \code{"none"}. With \code{NULL}, no
+hyperparameter tuning is performed and all resamples get the same aggregated value.}
 }
 \value{
 A list containing:
 \describe{
-\item{\code{Prediction_folds}}{Data frame of out-of-fold predictions with computed metrics for each resample and hyperparameter combination.}
+\item{\code{Prediction_folds}}{Data frame of out-of-fold predictions with computed metrics for each resample and hyperparameter combination,
+sorted by resample, hyperparameters and decreasing predicted probability.}
 \item{\code{Resample_matrix}}{Data frame of per-resample performance metrics (AUROC, AUPRC, Accuracy) for the tuned model.}
-\item{\code{Results_folds}}{Aggregated performance metrics across hyperparameter combinations or resamples.}
+\item{\code{Results_folds}}{Median AUROC, AUPRC and Accuracy of each hyperparameter combination.}
 \item{\code{bestTune}}{Optimal hyperparameter configuration based on the selected metric. Set to \code{"none"} if no hyperparameters are provided.}
 }
 }

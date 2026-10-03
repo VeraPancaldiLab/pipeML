@@ -16,18 +16,17 @@ compute_k_fold_CV(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  seed = 123
+  seed = 123,
+  preprocess = TRUE
 )
 }
 \arguments{
 \item{train_data}{A data frame containing predictor variables and a column
 named \code{target} corresponding to the response variable.}
 
-\item{k_folds}{Integer. Number of folds used for k-fold cross-validation.
-Default is 5.}
+\item{k_folds}{Integer. Number of folds used for k-fold cross-validation.}
 
-\item{n_rep}{Integer. Number of repetitions of the k-fold cross-validation.
-Default is 100.}
+\item{n_rep}{Integer. Number of repetitions of the k-fold cross-validation.}
 
 \item{metric}{Character. Performance metric used for hyperparameter tuning
 and model selection: \code{"AUROC"} (default) or \code{"AUPRC"}.}
@@ -35,13 +34,16 @@ and model selection: \code{"AUROC"} (default) or \code{"AUPRC"}.}
 \item{file_name}{Character. File name used when saving output plots in the
 \code{Results/} directory.}
 
-\item{LODO}{Logical. If \code{TRUE}, performs Leave-One-Dataset-Out (LODO)
-cross-validation by stratifying folds based on cohort membership.}
+\item{LODO}{Logical. If \code{TRUE}, the folds are stratified by cohort and by \code{target}
+(for Leave-One-Dataset-Out analyses). \code{train_data} must then contain a column named
+\code{dataset} with the cohort of each sample; it is removed before training.}
 
 \item{ncores}{Integer. Number of cores used for parallel computation.
-If \code{NULL}, \code{parallel::detectCores() - 1} will be used.}
+If \code{NULL} (default), the computation is sequential. Not used when
+\code{fold_construction_fun} is provided (the models are trained sequentially).}
 
-\item{return}{Logical. Whether to return the results and generated plots.}
+\item{return}{Logical. Whether to save the cross-validation performance plots
+in the \code{Results/} directory.}
 
 \item{fold_construction_fun}{Function used to construct cross-validation folds.
 The function must accept a \code{bestune} argument, which is used internally
@@ -60,19 +62,25 @@ cross-validation. Each element should contain candidate values.}
 
 \item{seed}{Integer. Random seed set before the folds are drawn, so fold assignment and model
 fitting are reproducible. \code{NULL} leaves the random number generator untouched.}
+
+\item{preprocess}{Logical. If \code{TRUE} (default), near-zero variance and highly correlated features are
+removed with \code{preprocess_features()}: once on all training samples before the cross-validation, or,
+with \code{fold_construction_fun}, on the training part of each fold and on the final training set.}
 }
 \value{
 A list containing:
 \itemize{
-\item Features used during training
-\item The selected machine learning model
-\item All trained machine learning models
+\item \code{Model}: the selected machine learning model, trained on all training samples
+\item \code{ML_Models}: all trained machine learning models (models that predict the same value for all
+training samples are excluded)
+\item \code{AUROC_median}, \code{AUPRC_median}: median and MAD of the cross-validation AUROC and AUPRC of each model
+\item \code{Custom_output}: output of \code{fold_construction_fun} for the selected model (only with a custom function)
 }
 }
 \description{
 Internal function that performs repeated stratified k-fold cross-validation
 to train and tune hyperparameters across multiple machine learning models.
-Model performance is evaluated using user-specified metrics such as Accuracy,
-AUROC, or AUPRC.
+Hyperparameters are tuned and the best model is selected with the
+user-specified metric (AUROC or AUPRC).
 }
 \keyword{internal}

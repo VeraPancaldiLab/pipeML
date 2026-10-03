@@ -76,8 +76,10 @@ pipeline. </i>
 
 ### Feature filtering
 
-- Near-constant and highly correlated features built by custom fold
-  functions are removed inside each fold
+- Near-constant and highly correlated features are removed from the
+  training features (`preprocess = TRUE`, the default): once before the
+  cross-validation, or inside each fold for features built by custom
+  fold functions
 
 ### Hyperparameter tuning
 

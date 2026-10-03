@@ -19,7 +19,10 @@ Numeric vector of sensitivities, one per grid value (\code{NA} if the
 curve is undefined, e.g. a resample without positives).
 }
 \description{
-Treats the ROC curve as a step function and returns, for each grid value,
-the highest sensitivity reached at a false positive rate at or below it.
+Returns, for each grid value, the sensitivity of the ROC curve at that false positive rate, with straight
+lines between consecutive points: the curve as \code{get_curves()} draws it (\code{geom_line()}) and as
+\code{calculate_auroc()} integrates it (trapezoids). At a vertical step (several points with the same false
+positive rate), the highest sensitivity is used. Tied probabilities of both classes give diagonal segments,
+which a step function would place below the drawn curve.
 }
 \keyword{internal}

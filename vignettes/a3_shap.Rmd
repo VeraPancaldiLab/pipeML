@@ -171,5 +171,12 @@ shap_survival <- compute_shap_values(model_trained = res_survival$Model,
 X_survival <- res_survival$Model$trainingData[rownames(shap_survival), colnames(shap_survival)]
 sv_survival <- shapviz::shapviz(as.matrix(shap_survival), X = X_survival,
                                 baseline = attr(shap_survival, "baseline"))
-shapviz::sv_importance(sv_survival, kind = "beeswarm")
+shapviz::sv_importance(sv_survival, kind = "beeswarm") +
+  ggplot2::ggtitle("SHAP values across samples (survival, risk score)")
 ```
+
+```{r fig6, echo = FALSE, fig.cap="Figure 6. SHAP values of a survival model. Positive values push the prediction towards a higher risk.", fig.align='center', out.width='70%'}
+knitr::include_graphics("figures/SHAP_survival_beeswarm.png")
+```
+
+The plot is read as for classification, in terms of risk: samples on the right have a feature value that raises their predicted risk. Here, for example, a high ECOG score (`ph.ecog`, a worse performance status) and a low Karnofsky score rated by the patient (`pat.karno`) push the prediction towards a higher risk.

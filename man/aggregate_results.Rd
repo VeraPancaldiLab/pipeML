@@ -2,58 +2,72 @@
 % Please edit documentation in R/machine_learning.R
 \name{aggregate_results}
 \alias{aggregate_results}
-\title{Aggregate Nested Cross-Validation Results for Classification or Survival Tasks}
+\title{Aggregate Cross-Validation Results for Classification or Survival Tasks}
 \usage{
 aggregate_results(all_loaded, task = c("classification", "survival"))
 }
 \arguments{
 \item{all_loaded}{A nested list containing the results of cross-validation runs.
-Each element typically corresponds to a fold and may include one or more
-hyperparameter configurations and model predictions:
+Each element corresponds to a fold (resample) and holds the results of every model:
 \itemize{
-\item For classification: \code{all_loaded[[fold]][[param]][[model]][[1]]}
-contains predictions, and \verb{[[2]]} the corresponding hyperparameters.
-\item For survival: \code{all_loaded[[fold]][[param]][[model]]} contains
-the C-index and hyperparameter columns.
-}}
+\item For classification (output of \code{compute_custom_k_fold_CV()}): \code{all_loaded[[fold]][[param]][[model]][[1]]}
+is a data frame with one row per test sample and hyperparameter configuration (\code{rowIndex}, \code{Resample},
+\code{obs}, \code{pred}, the class probabilities, the hyperparameter values and, with tunable arguments, the
+feature parameters), and \verb{[[2]]} the \strong{names} of the model hyperparameters.
+\item For survival: \code{all_loaded[[fold]][[param]][[model]]} is a data frame with one row per test sample
+and hyperparameter configuration: \code{predictions}, the C-index of the fold repeated on each row
+(\code{c_index}), \code{Resample}, \code{model}, the hyperparameter values and, with tunable arguments, the feature
+parameters. A failed fit gives a single row with its error message in \code{fit_error}.
+}
+The \verb{[[param]]} level only exists when the custom fold construction function has tunable
+arguments; otherwise the structure is \code{all_loaded[[fold]][[model]]}.}
 
 \item{task}{Character string specifying the task type.
 Must be one of: \code{"classification"} or \code{"survival"}.}
 }
 \value{
 A list of length equal to the number of models evaluated.
-Each element contains:
+Each element (\code{NULL} for a survival model without any configuration left) contains:
 \describe{
-\item{\code{Prediction_folds}}{All predictions or C-index values per fold.}
-\item{\code{Results_folds}}{Aggregated performance summaries across folds.}
-\item{\code{bestTune}}{Best-performing hyperparameter combination.}
-\item{\code{Resample_matrix}}{Fold-level metrics for the best configuration.}
+\item{\code{Prediction_folds}}{The rows of all folds and configurations bound together (see \code{all_loaded}).}
+\item{\code{Results_folds}}{One row per configuration: classification \code{Accuracy}, \code{Kappa}, \code{AccuracySD},
+\code{KappaSD} (median and MAD across resamples); survival \code{c_index_median} and \code{c_index_mad}.}
+\item{\code{bestTune}}{The selected configuration: model hyperparameters plus, with tunable arguments, the feature
+parameters.}
+\item{\code{Resample_matrix}}{Results of the selected configuration: classification, \code{Accuracy} and \code{Kappa} per
+resample; survival, its rows of \code{Prediction_folds} (one per test sample, with the C-index of the fold).}
 }
 }
 \description{
-Aggregates performance metrics from nested cross-validation experiments for
+Aggregates performance metrics from cross-validation experiments for
 either \strong{classification} or \strong{survival} models.
-This function reads the resampled predictions (often saved per fold and
+This function takes the resampled predictions (per fold and
 hyperparameter combination) and computes overall performance summaries,
 identifies the best hyperparameter configuration, and collates
 per-resample metrics for detailed inspection.
 }
 \details{
-The function automatically detects whether the input structure includes
-tunable hyperparameters (\code{has_params}) by inspecting the nested list depth.
+The function detects from the nesting of \code{all_loaded} whether the custom fold construction function had
+tunable arguments (\code{has_params}). The model hyperparameters are always there; the feature parameters
+(tunable arguments) are then handled as extra hyperparameter columns.
 
 For \strong{classification} tasks:
 \itemize{
-\item Aggregates fold-level predictions and computes Accuracy and Kappa.
-\item Computes the median and MAD (robust SD) across resamples.
-\item Selects the hyperparameter set with the highest median Accuracy.
+\item Binds the predictions of all folds and computes Accuracy and Kappa per resample and configuration.
+\item Computes their median and MAD (scaled, robust SD) across resamples.
+\item Selects the configuration with the highest median Accuracy. This \code{bestTune} is only provisional:
+\code{compute_k_fold_CV()} selects it again by AUROC or AUPRC with \code{calculate_cv_metrics()}.
 }
 
 For \strong{survival} tasks:
 \itemize{
-\item Aggregates per-fold C-index values across hyperparameter configurations.
-\item Computes the median and MAD of the C-index per configuration.
-\item Identifies and returns the best-performing parameter combination.
+\item Binds the C-index rows of all folds and configurations.
+\item Reports the fits that failed, and the resamples where the C-index could not be computed (\code{NA}, e.g. a
+held-out fold without events), and excludes every configuration with a failed fit or an \code{NA} C-index in
+at least one resample, so all configurations are compared over the same resamples. A model without any
+configuration left is \code{NULL}.
+\item Computes the median and MAD (scaled, robust SD, as for classification) of the C-index per configuration.
+\item Selects the configuration with the highest median C-index.
 }
 
 The function is compatible with results produced by

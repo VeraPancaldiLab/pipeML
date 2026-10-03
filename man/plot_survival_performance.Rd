@@ -4,7 +4,7 @@
 \alias{plot_survival_performance}
 \title{Plot Kaplan-Meier Curves by Predicted Risk Group}
 \usage{
-plot_survival_performance(df_test, prediction, n_groups = 3, file_name = NULL)
+plot_survival_performance(df_test, prediction, n_groups = 2, file_name = NULL)
 }
 \arguments{
 \item{df_test}{Data frame with the observed outcome of the test samples, in columns \code{time} and
@@ -14,25 +14,35 @@ plot_survival_performance(df_test, prediction, n_groups = 3, file_name = NULL)
 in \code{$preds}, C-index and its confidence interval in \code{$c_index}, \code{$c_index_lower} and
 \code{$c_index_upper}).}
 
-\item{n_groups}{Integer. Number of risk groups for stratification (default = 3).}
+\item{n_groups}{Integer. Number of risk groups for stratification (default = 2, as in \code{compute_prediction()}).
+It must be at least 2 and not larger than the number of samples. Groups are labelled
+Low/High risk (2 groups), Low/Medium/High risk (3 groups) or Group 1 (lowest risk) to Group n (highest risk).}
 
-\item{file_name}{Optional character. If provided, saves the Kaplan-Meier plot
-to "Results/Survival_KM_<file_name>.pdf".}
+\item{file_name}{Optional character. The Kaplan-Meier plot is saved
+to "Results/Survival_KM_<file_name>.pdf" ("Results/Survival_KM.pdf" if \code{NULL}).}
 }
 \value{
-Invisibly returns the \code{ggsurvplot} object for further customization.
+Invisibly returns the \code{ggsurvplot} object for further customization. The plot (curves and
+number-at-risk table) is saved as a PDF.
 }
 \description{
 Stratifies individuals into risk groups based on predicted risk scores from
 a fitted survival model, plots Kaplan-Meier survival curves per risk group,
 performs a log-rank test, and displays the concordance index (C-index) with
-confidence interval. Optionally saves the plot as a PDF in "Results/".
+confidence interval. The plot is saved as a PDF in "Results/".
 }
 \details{
 Risk groups are defined by quantiles of the predicted risk scores. Kaplan-Meier
 curves visualize survival per risk group, and a log-rank test assesses
 differences. The C-index and its 95\% confidence interval are displayed in the
 plot subtitle.
+
+When the predictions take few distinct values (e.g. tree-based models) and some quantiles are equal, samples
+with the same prediction are kept in the same group. Fewer groups than \code{n_groups} can then be formed
+(with a message); the function stops if all predictions are equal.
+
+\code{df_test} must have one row per prediction, in the same order. Samples without a prediction (\code{NA}) are
+left out of the plot, with a message.
 }
 \examples{
 \dontrun{

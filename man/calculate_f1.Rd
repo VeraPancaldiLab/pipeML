@@ -7,12 +7,13 @@
 calculate_f1(metrics, target)
 }
 \arguments{
-\item{metrics}{A vector of predicted class labels or probabilities.}
+\item{metrics}{A data frame with metrics obtained using \code{get_sensitivity_specificity()}, containing
+at least two columns: "Sensitivity" and "Specificity" (one row per probability threshold).}
 
-\item{target}{A vector of true class labels.}
+\item{target}{A vector of true class labels (\code{"yes"} / \code{"no"}).}
 }
 \value{
-The F1 score, a numeric value between 0 and 1.
+A numeric vector with the F1 score (between 0 and 1) at each probability threshold.
 }
 \description{
 The F1 score is the harmonic mean of precision and recall, and is used to evaluate the balance between the two metrics.

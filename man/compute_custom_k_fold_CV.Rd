@@ -2,53 +2,51 @@
 % Please edit documentation in R/machine_learning.R
 \name{compute_custom_k_fold_CV}
 \alias{compute_custom_k_fold_CV}
-\title{Train and evaluate machine learning models on custom cross-validation folds}
+\title{Train one machine learning model on one custom cross-validation fold}
 \usage{
 compute_custom_k_fold_CV(processed_folds, ml_method, tuneGrid)
 }
 \arguments{
-\item{processed_folds}{A list of folds. Each fold should contain processed
-training and test datasets with features.}
+\item{processed_folds}{A list with the data of one fold, as saved by the custom
+fold construction function: \code{train_data} (features and \code{target}),
+\code{test_data} (features), \code{rowIndex} (row indices of the test samples),
+\code{fold_name}, \code{obs_test} (observed labels of the test samples, in the
+same order as the rows of \code{test_data}) and, when the function has tunable
+arguments, \code{params} (the parameter combination used to build the features).}
 
 \item{ml_method}{Character string specifying the machine learning model to use,
 as supported by the \code{caret} package (e.g., \code{"rf"}, \code{"svmRadial"},
 \code{"glmnet"}).}
 
-\item{tuneGrid}{Optional. A data frame specifying the grid of hyperparameters
-to evaluate. If \code{NULL}, a default grid of length 3 is generated using
-\code{caret::getModelInfo()}.}
+\item{tuneGrid}{A data frame specifying the grid of hyperparameters to evaluate
+(one row per combination), as returned by \code{get_tune_grid()}.}
 }
 \value{
-A list containing:
-\itemize{
-\item \code{Results_folds}: Data frame summarizing average cross-validated
-Accuracy, Kappa, and standard deviations for each hyperparameter combination.
-\item \code{Prediction_folds}: Data frame of predictions from each fold,
-including class probabilities, observed and predicted labels, and
-hyperparameter values.
-\item \code{Resample_matrix}: Data frame summarizing Accuracy and Kappa
-per fold for the best-tuned model.
-\item \code{Besttune}: List of optimized hyperparameters.
+A list with two elements:
+\enumerate{
+\item Data frame of predictions on the test part of the fold, with one row per
+test sample and hyperparameter combination: \code{rowIndex}, \code{Resample}
+(fold name), \code{obs} and \code{pred} (observed and predicted labels), the
+hyperparameter values, the class probabilities (\code{no}, \code{yes}) and the
+columns of \code{params} (if any).
+\item Character vector with the names of the hyperparameters in \code{tuneGrid}.
 }
 }
 \description{
-Internal function that trains and evaluates machine learning models using
-pre-constructed k-folds. This function is intended for \strong{cohort-aware or
-custom fold strategies} (see package vignette for details). It supports
-hyperparameter tuning over a grid and returns a model object that mimics
-the structure of caret's \code{train()} output, including performance metrics
-and predictions.
+Internal function used with \strong{custom fold construction functions} (see package
+vignette for details). For one fold built by the custom function and one machine
+learning model, it trains the model with each hyperparameter combination of the
+grid on the training part of the fold and predicts the test part.
 }
 \details{
-The function performs the following steps:
+The function performs the following steps for each row of \code{tuneGrid}:
 \enumerate{
-\item Train models for each fold and hyperparameter combination.
-\item Predict on the held-out test data for each fold.
-\item Aggregate predictions and evaluate Accuracy and Kappa for each
-fold and hyperparameter set.
-\item Select the best-performing hyperparameter set based on mean Accuracy
-across folds.
-\item Train the final model on the full dataset using the selected hyperparameters.
+\item Train the model on the training part of the fold with that hyperparameter
+combination (a single fit, without resampling).
+\item Predict the class and the class probabilities of the test part of the fold.
+\item Store the predictions together with the hyperparameter values.
 }
+The predictions of all folds are combined by \code{aggregate_results()}, and the
+hyperparameters are selected afterwards (\code{calculate_cv_metrics()}).
 }
 \keyword{internal}

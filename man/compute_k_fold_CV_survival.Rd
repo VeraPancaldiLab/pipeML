@@ -2,7 +2,7 @@
 % Please edit documentation in R/machine_learning.R
 \name{compute_k_fold_CV_survival}
 \alias{compute_k_fold_CV_survival}
-\title{Nested Cross-Validation for Survival Models (Internal)}
+\title{Repeated K-fold Cross-Validation for Survival Models (Internal)}
 \usage{
 compute_k_fold_CV_survival(
   df_features,
@@ -19,33 +19,43 @@ compute_k_fold_CV_survival(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  seed = 123
+  seed = 123,
+  preprocess = TRUE
 )
 }
 \arguments{
-\item{df_features}{Data frame of predictor variables (features).}
+\item{df_features}{Data frame of predictor variables (features). With \code{LODO = TRUE}, it also contains the
+cohort column named by \code{batch_id}.}
 
 \item{df_outcome}{Data frame of survival outcomes (time and event columns).}
 
-\item{outcome_col}{Character. Name of the survival time column.}
+\item{outcome_col}{Character. Name of the survival time column. Must be \code{"time"}: the custom fold path, the final
+fit and the prediction functions use the columns \code{time} and \code{event} directly, so other names are not supported.}
 
-\item{event_col}{Character. Name of the event indicator column (\code{0 = censored}, \code{1 = event}).}
+\item{event_col}{Character. Name of the event indicator column (\code{0 = censored}, \code{1 = event}). Must be
+\code{"event"} (see \code{outcome_col}).}
 
-\item{k_folds}{Integer. Number of folds for K-fold CV (default = 5).}
+\item{k_folds}{Integer. Number of folds for K-fold CV.}
 
-\item{n_rep}{Integer. Number of repeated CV iterations (default = 1).}
+\item{n_rep}{Integer. Number of repeated CV iterations.}
 
-\item{ncores}{Integer. Number of CPU cores for parallelization.}
+\item{ncores}{Integer. Number of CPU cores. Without \code{fold_construction_fun}, the folds run in parallel; with
+it and tunable arguments, the parameter combinations of each fold run in parallel. \code{NULL} or 1: sequential.}
 
-\item{return}{Logical. Whether to return the generated plots.}
+\item{return}{Logical. Whether to save the plot of the cross-validation C-index in \code{"Results/"}.}
 
-\item{LODO}{Logical. If \code{TRUE}, performs Leave-One-Domain-Out CV using \code{batch_id}.}
+\item{LODO}{Logical. If \code{TRUE}, the folds are stratified by cohort (\code{batch_id}) and event.}
 
-\item{batch_id}{Character. Name of column representing cohort/batch. Required if \code{LODO = TRUE}.}
+\item{batch_id}{Character. Name of the column of \code{df_features} with the cohort/batch. Required if \code{LODO = TRUE}.
+The column is removed after the folds are built, so the cohort is not a predictor.}
 
 \item{file_name}{Optional string. Suffix for generated C-index summary PDF saved in \code{"Results/"}.}
 
-\item{fold_construction_fun}{Optional custom function to construct data folds.}
+\item{fold_construction_fun}{Optional custom function that builds the features of each fold (fold-aware
+features). It receives \code{data} (the features plus the \code{time} and \code{event} columns), \code{folds} and \code{bestune}:
+with \code{bestune = NULL} it saves each fold in \verb{Results/fold_<fold name>.rds}; with \code{bestune} it returns
+the features built on all training samples (plus \code{time} and \code{event}), its custom output and the selected
+parameters. See the \code{fold_construction_fun} argument of \code{\link[=compute_features.training.ML]{compute_features.training.ML()}} for the full contract.}
 
 \item{fold_construction_args_fixed}{Optional list of fixed arguments passed to \code{fold_construction_fun}.}
 
@@ -55,20 +65,29 @@ compute_k_fold_CV_survival(
 reproducible. In the parallel custom-fold branch, each worker iteration is seeded from \code{seed}, the fold
 and the parameter configuration, so results do not depend on worker scheduling. \code{NULL} leaves the random
 number generator untouched.}
+
+\item{preprocess}{Logical. If \code{TRUE} (default), near-zero variance and highly correlated features are
+removed with \code{preprocess_features()}: once on all training samples before the cross-validation, or,
+with \code{fold_construction_fun}, on the training part of each fold and on the final training set.}
 }
 \value{
 A named list containing:
 \describe{
-\item{\code{Model}}{The best-performing survival model retrained on the full dataset.}
-\item{\code{ML_Models}}{All evaluated survival models with aggregated C-index results.}
-\item{\code{C_index_median}}{Median C-index of the top-performing model.}
-\item{\code{Custom_output}}{Optional outputs from the custom fold construction function.}
+\item{\code{Model}}{The selected model: a list with the cross-validation results (\code{Results_folds},
+\code{Prediction_folds}, \code{Resample_matrix}), the selected hyperparameters (\code{bestTune}), the workflow fitted on
+all training samples (\code{Model_object}) and its training data (\code{trainingData}: features plus \code{time} and
+\code{event}).}
+\item{\code{ML_Models}}{All survival models with their cross-validation results (\code{NULL} for a model excluded
+because no configuration could be fitted and evaluated).}
+\item{\code{C_index_median}}{Median cross-validation C-index of the selected model.}
+\item{\code{Custom_output}}{Only with \code{fold_construction_fun}: the custom output of the selected model, plus the
+selected feature parameters in \code{Parameters}.}
 }
 }
 \description{
-Performs nested cross-validation for survival models using the \strong{tidymodels}
-ecosystem. Supports both standard event-stratified K-fold CV and
-Leave-One-Domain-Out (LODO) setups. Hyperparameter grids are automatically
+Performs repeated k-fold cross-validation with hyperparameter tuning for survival
+models using the \strong{tidymodels} ecosystem. Supports both standard event-stratified
+K-fold CV and Leave-One-Dataset-Out (LODO) setups. Hyperparameter grids are automatically
 generated for each model type.
 }
 \details{
@@ -77,21 +96,33 @@ The function can:
 \item Build folds internally or accept a custom fold construction function.
 \item Train multiple survival models with optional hyperparameter tuning.
 \item Compute and aggregate the Concordance Index (C-index) across folds.
-\item Retrain the top-performing model using its optimal hyperparameters.
+\item Train the selected model (best median C-index) on all training samples with its tuned
+hyperparameters. With \code{fold_construction_fun}, every model is trained on the features rebuilt on all
+training samples, and the best one is kept; without it, only the selected model is retrained.
 }
 
 The function internally:
 \itemize{
 \item Merges predictors and outcomes.
 \item Creates stratified folds using \strong{rsample}, either by event or by cohort x event (LODO).
+\item Preprocesses the features (\code{preprocess = TRUE}): once before the cross-validation, or, with
+\code{fold_construction_fun}, on each fold's training table and on the final training set.
+\item Builds the hyperparameter grids with \code{\link[=get_default_hyperparams]{get_default_hyperparams()}}. With \code{fold_construction_fun},
+the \code{mtry} of the forests is sized from the features built by the function (the fold with the fewest
+features), not from the input columns.
 \item Evaluates predefined survival models: Cox PH, penalized Cox (glmnet), AFT (flexsurv),
 decision trees, bagged trees, and random forests.
-\item Aggregates the median and MAD of C-index across resamples.
-\item Retrains the top-performing model on the full dataset.
+\item Aggregates the median and MAD of C-index across resamples with \code{\link[=aggregate_results]{aggregate_results()}}, which excludes
+every configuration with a failed fit or an \code{NA} C-index in a resample (a model without any configuration
+left is excluded).
+\item Trains the selected model on all training samples (see above). The function stops with a clear message
+if no model is left.
 }
 
-If \code{fold_construction_fun} is provided, the function handles folds in parallel
-and returns additional outputs for advanced integration.
+Without \code{fold_construction_fun}, the folds run in parallel when \code{ncores > 1}. With
+\code{fold_construction_fun}, the folds are processed one after the other; if it has tunable
+arguments, the parameter combinations of each fold run in parallel. Additional outputs of
+the custom function are returned in \code{Custom_output}.
 }
 \seealso{
 \code{\link[=compute_ml_survival]{compute_ml_survival()}}, \code{\link[=get_default_hyperparams]{get_default_hyperparams()}}, \code{\link[=aggregate_results]{aggregate_results()}}

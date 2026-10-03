@@ -24,7 +24,8 @@ compute_features.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  seed = 123
+  seed = 123,
+  preprocess = TRUE
 )
 }
 \arguments{
@@ -33,8 +34,8 @@ compute_features.ML(
 
 \item{features_test}{A data frame or matrix of predictor variables used for testing.}
 
-\item{coldata}{A data frame containing outcome information. Row names must match
-those of \code{features_train} and \code{features_test}.}
+\item{coldata}{A data frame containing outcome information. Its row names must include
+those of \code{features_train} and \code{features_test}: the outcome of each sample is taken by row name.}
 
 \item{task_type}{Character. Type of task: \code{"classification"} or \code{"survival"}.}
 
@@ -69,7 +70,8 @@ Ensures all performance metrics and interpretability analyses consistently treat
 Kaplan-Meier plots are saved as \code{"Results/Survival_KM_<file_name>.pdf"}.}
 
 \item{ncores}{Integer. Number of CPU cores for parallelization (cross-validation folds are processed in parallel).
-Default: \code{NULL} (sequential).}
+Default: \code{NULL} (sequential). For classification with \code{fold_construction_fun}, the models are
+trained sequentially and \code{ncores} is not used.}
 
 \item{return}{Logical. Whether to save the plots in \code{Results/}. Default: \code{FALSE}.}
 
@@ -85,9 +87,13 @@ this function (e.g. the test samples projected onto the structure learned on the
 \item{seed}{Integer. Random seed for reproducible cross-validation (fold assignment and model fitting,
 including parallel runs). Default: \code{123}. Use \code{NULL} to leave the random number generator
 untouched. See \code{compute_features.training.ML()} for details.}
+
+\item{preprocess}{Logical. If \code{TRUE} (default), near-constant and highly correlated (|r| > 0.9)
+features are removed from the training features before training. Use \code{FALSE} to train on the features
+as given. See \code{compute_features.training.ML()} for details.}
 }
 \value{
-A named list, or \code{NULL} if no model could be trained (classification):
+A named list:
 \describe{
 \item{Model}{The output of \code{compute_features.training.ML()} on the training set (the selected model
 is \code{$Model$Model}).}
@@ -104,7 +110,7 @@ This function trains and evaluates machine learning models using cross-validatio
 and then evaluates performance on independent test data. It supports both \strong{classification} and
 \strong{survival analysis} tasks, including hyperparameter tuning and cohort-based
 (Leave-One-Dataset-Out, LODO) validation. For survival models, it computes the \strong{C-index}
-and generates Kaplan-Meier plots stratified by predicted risk.
+and, with \code{return = TRUE}, generates Kaplan-Meier plots stratified by predicted risk.
 }
 \details{
 For \strong{classification tasks}, the function performs repeated k-fold cross-validation

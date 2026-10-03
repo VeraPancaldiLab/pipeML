@@ -20,31 +20,43 @@ Supported options include:
 \item \code{"boost_tree_mboost"} - Gradient boosting for survival
 }}
 
-\item{train_x}{Optional data frame or matrix of training predictors.
-This is required for parameters that depend on the number of features,
-such as \code{mtry}, which determines the number of variables randomly
-sampled at each split in tree-based models.}
+\item{train_x}{Optional data frame or matrix of training predictors (features only).
+Its number of columns gives the range of \code{mtry} (number of features sampled at each split of the
+forests): without \code{train_x}, the forest grids have no \code{mtry} and the engine's default is used.
+Its number of rows, with \code{v}, caps \code{min_n} of the tree and the forests; without it, \code{min_n} is
+not capped.}
 
 \item{levels}{Integer specifying how many values to generate per hyperparameter.
 Defaults to \code{5}. Must be at least 2.}
 
-\item{v}{Integer. Number of folds for K-fold cross-validation (default = 5).}
+\item{v}{Integer. Number of folds for K-fold cross-validation (default = 5), used to cap \code{min_n}
+to the size of the training part of a fold.}
 }
 \value{
-A named list of hyperparameter grids.
-Each element is a numeric vector of sampled values for that parameter.
-Returns \code{NULL} for models without tunable hyperparameters.
+A named list with one numeric vector of values per tuned argument (the grid is all their
+combinations), or \code{NULL} for models without tunable hyperparameters:
+\itemize{
+\item \code{"proportional_hazards_glmnet"}: \code{penalty}, \code{mixture}.
+\item \code{"decision_tree_partykit"}: \code{tree_depth}, \code{min_n}.
+\item \code{"bag_tree_rpart"}: \code{trees}, the number of bagged trees (25 to 100). It is passed to the
+engine as \code{nbagg} (\code{ipred::bagging()}) by \code{compute_ml_survival()} and
+\code{wrapper_train_best_hyperparams_survival()}.
+\item \code{"rand_forest_aorsf"}, \code{"rand_forest_partykit"}: \code{trees}, \code{min_n}, \code{mtry}.
+\item \code{"boost_tree_mboost"}: \code{trees}, \code{min_n}, \code{tree_depth}.
+}
 }
 \description{
 This function generates default hyperparameter grids for various survival models
 compatible with the tidymodels framework. It uses the default parameter ranges
-from the \pkg{dials} package and produces a sequence of evenly spaced values
-within those ranges for each tunable hyperparameter.
+from the \pkg{dials} package and produces \code{levels} evenly spaced values
+within those ranges for each tunable hyperparameter (on the log scale for \code{penalty}). Only arguments that
+parsnip passes to the engine are tuned. \code{min_n} is capped so that a node of the training part of a fold
+can still be split, and \code{mtry} at the number of features; values made equal by these caps are kept once.
 }
 \details{
 The function supports models such as Cox proportional hazards (regular and penalized),
 parametric survival regression, decision trees, bagging, random forests, and gradient boosting.
-For models without tunable parameters (e.g., classic Cox or AFT models),
+For models without tunable parameters (Cox proportional hazards and the AFT model),
 the function returns \code{NULL}.
 
 The helper function \code{vs()} internally calls \code{dials::value_seq()}

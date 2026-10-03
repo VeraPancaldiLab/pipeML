@@ -7,19 +7,23 @@
 compute_cv_AUC(models, file_name = NULL, AUC_type = "AUROC", return = TRUE)
 }
 \arguments{
-\item{models}{Named list of trained ML models. Each model must contain a \code{$resample} data frame with \code{AUROC} and \code{AUPRC} columns.}
+\item{models}{Named list of trained ML models. Each model must contain a \code{$resample} data frame with \code{AUROC} and \code{AUPRC} columns
+(and, to save the plots, \code{$trainingData} with the outcome in \code{.outcome}).}
 
 \item{file_name}{Optional character string. Prefix for saving AUROC/AUPRC plots in the \code{Results/} directory.}
 
 \item{AUC_type}{Character. Either \code{"AUROC"} or \code{"AUPRC"}, used to select the top-performing model.}
 
-\item{return}{Logical. If \code{TRUE}, saves barplots of AUROC and AUPRC values in the \code{Results/} directory.}
+\item{return}{Logical. If \code{TRUE}, saves barplots of AUROC and AUPRC values in the \code{Results/} directory
+(\code{AUROC_CV_methods_<file_name>.pdf} and \code{AUPRC_CV_methods_<file_name>.pdf}): models sorted from best to worst,
+selected model highlighted, error bars of one MAD and a dashed line for a random classifier
+(\code{\link[=plot_cv_metric]{plot_cv_metric()}}, also used for the survival C-index).}
 }
 \value{
 A list containing:
 \describe{
-\item{\code{AUROC}}{Data frame with median and MAD of AUROC for each model.}
-\item{\code{AUPRC}}{Data frame with median and MAD of AUPRC for each model.}
+\item{\code{AUROC}}{Data frame with the median (\code{Median_AUROC}) and MAD (\code{MAD_AUROC}) of AUROC for each model, sorted from best to worst.}
+\item{\code{AUPRC}}{Data frame with the median (\code{Median_AUPRC}) and MAD (\code{MAD_AUPRC}) of AUPRC for each model, sorted from best to worst.}
 \item{\code{Top_model}}{Character string: the model with the highest median value for the selected metric (\code{AUC_type}).}
 }
 }
