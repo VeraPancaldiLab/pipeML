@@ -56,7 +56,8 @@ Computes median and MAD for each model and optionally generates barplots.</p>
 
 
 <dl><dt id="arg-models">models<a class="anchor" aria-label="anchor" href="#arg-models"></a></dt>
-<dd><p>Named list of trained ML models. Each model must contain a <code>$resample</code> data frame with <code>AUROC</code> and <code>AUPRC</code> columns.</p></dd>
+<dd><p>Named list of trained ML models. Each model must contain a <code>$resample</code> data frame with <code>AUROC</code> and <code>AUPRC</code> columns
+(and, to save the plots, <code>$trainingData</code> with the outcome in <code>.outcome</code>).</p></dd>
 
 
 <dt id="arg-file-name">file_name<a class="anchor" aria-label="anchor" href="#arg-file-name"></a></dt>
@@ -68,16 +69,19 @@ Computes median and MAD for each model and optionally generates barplots.</p>
 
 
 <dt id="arg-return">return<a class="anchor" aria-label="anchor" href="#arg-return"></a></dt>
-<dd><p>Logical. If <code>TRUE</code>, saves barplots of AUROC and AUPRC values in the <code>Results/</code> directory.</p></dd>
+<dd><p>Logical. If <code>TRUE</code>, saves barplots of AUROC and AUPRC values in the <code>Results/</code> directory
+(<code>AUROC_CV_methods_&lt;file_name&gt;.pdf</code> and <code>AUPRC_CV_methods_&lt;file_name&gt;.pdf</code>): models sorted from best to worst,
+selected model highlighted, error bars of one MAD and a dashed line for a random classifier
+(<code><a href="plot_cv_metric.html">plot_cv_metric()</a></code>, also used for the survival C-index).</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A list containing:</p><dl><dt><code>AUROC</code></dt>
-<dd><p>Data frame with median and MAD of AUROC for each model.</p></dd>
+<dd><p>Data frame with the median (<code>Median_AUROC</code>) and MAD (<code>MAD_AUROC</code>) of AUROC for each model, sorted from best to worst.</p></dd>
 
 <dt><code>AUPRC</code></dt>
-<dd><p>Data frame with median and MAD of AUPRC for each model.</p></dd>
+<dd><p>Data frame with the median (<code>Median_AUPRC</code>) and MAD (<code>MAD_AUPRC</code>) of AUPRC for each model, sorted from best to worst.</p></dd>
 
 <dt><code>Top_model</code></dt>
 <dd><p>Character string: the model with the highest median value for the selected metric (<code>AUC_type</code>).</p></dd>

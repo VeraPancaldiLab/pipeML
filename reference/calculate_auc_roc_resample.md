@@ -2,7 +2,9 @@
 
 Computes the Area Under the ROC Curve (AUROC) for a single
 cross-validation resample. This function assumes binary classification
-with the positive class labeled `"yes"`.
+with the positive class labeled `"yes"`. Samples with the same predicted
+probability enter the curve together, so the result does not depend on
+the order of the samples.
 
 ## Usage
 
@@ -23,4 +25,5 @@ calculate_auc_roc_resample(obs, pred)
 
 ## Value
 
-Numeric value of AUROC.
+Numeric value of AUROC. `NA` (with a warning) if the resample has
+samples of a single class.

@@ -119,8 +119,9 @@ selects the best one.</p>
 <strong>trait.positive</strong>: value of <code>target_var</code>
 considered as the positive class</li>
 <li>
-<strong>metric</strong>: metric used to tune and select the models,
-<code>"AUROC"</code> (default) or <code>"AUPRC"</code>
+<strong>metric</strong>: metric used to tune the hyperparameters of
+each model and to select the best model, <code>"AUROC"</code> (default)
+or <code>"AUPRC"</code>
 </li>
 <li>
 <strong>k_folds</strong>, <strong>n_rep</strong>: number of folds
@@ -131,6 +132,14 @@ parallel (<code>NULL</code> runs sequentially)</li>
 <li>
 <strong>seed</strong>: random seed for the folds and the model
 fitting (default <code>123</code>), so results are reproducible</li>
+<li>
+<strong>preprocess</strong>: whether to remove near-constant and
+highly correlated features (|r| &gt; 0.9) from the training features
+before the cross-validation (default <code>TRUE</code>). The outcome is
+not used for this. Here it removes <code>Cell.size</code>, which is
+highly correlated with <code>Cell.shape</code>, so the models are
+trained on 8 of the 9 features. Use <code>preprocess = FALSE</code> to
+train on the features as given</li>
 <li>
 <strong>return</strong>: whether to save the cross-validation
 performance plots in <code>Results/</code> (named with
@@ -149,23 +158,48 @@ performance plots in <code>Results/</code> (named with
 <span>                                    file_name <span class="op">=</span> <span class="st">"Example_classification"</span>,</span>
 <span>                                    return <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p>The selected model is a <code>caret</code> <code>train</code> object,
-trained on all training samples with the tuned hyperparameters:</p>
+trained on all training samples with the hyperparameters selected by
+<code>metric</code> (in <code>bestTune</code>):</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span><span class="op">$</span><span class="va">Model</span></span>
 <span><span class="va">res</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">bestTune</span></span></code></pre></div>
-<p>All trained and tuned models:</p>
+<p>All trained and tuned models (a model that predicts the same
+probability for all training samples is left out):</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">res</span><span class="op">$</span><span class="va">ML_Models</span><span class="op">)</span></span></code></pre></div>
 <p><code>res$AUROC_median</code> and <code>res$AUPRC_median</code>
-compare the cross-validation performance of all the algorithms (median
-and MAD across resamples). The performance of the selected model per
-resample is in <code>res$Model$resample</code>:</p>
+compare the cross-validation performance of all the algorithms: the
+median (<code>Median_AUROC</code>, <code>Median_AUPRC</code>) and the
+MAD (<code>MAD_AUROC</code>, <code>MAD_AUPRC</code>) across resamples,
+sorted from the best to the worst model. The performance of the selected
+model per resample is in <code>res$Model$resample</code>:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res</span><span class="op">$</span><span class="va">AUROC_median</span></span>
+<span><span class="va">res</span><span class="op">$</span><span class="va">AUPRC_median</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">res</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">resample</span><span class="op">)</span></span></code></pre></div>
+<p>With <code>return = TRUE</code>, both tables are also saved as plots
+in <code>Results/</code>
+(<code>AUROC_CV_methods_&lt;file_name&gt;.pdf</code> and
+<code>AUPRC_CV_methods_&lt;file_name&gt;.pdf</code>). In each plot:</p>
+<ul>
+<li>the models are sorted from the best to the worst, with the median
+value above each bar;</li>
+<li>the selected model (the best one for <code>metric</code>) is in
+blue;</li>
+<li>the error bars show the median plus and minus one MAD across
+resamples;</li>
+<li>the dashed line is the performance of a random classifier: 0.5 for
+AUROC, and the proportion of positive samples for AUPRC.</li>
+</ul>
 <div class="figure" style="text-align: center">
-<img src="figures/AUROC_classification.png" class="r-plt" alt="Figure 1. Cross-validation performance of the trained models." width="80%"><p class="caption">
-Figure 1. Cross-validation performance of the trained models.
+<img src="figures/AUROC_classification.png" class="r-plt" alt="Figure 1. Cross-validation AUROC of the trained models." width="80%"><p class="caption">
+Figure 1. Cross-validation AUROC of the trained models.
+</p>
+</div>
+<div class="figure" style="text-align: center">
+<img src="figures/AUPRC_classification.png" class="r-plt" alt="Figure 2. Cross-validation AUPRC of the trained models. The blue bar is still the model selected by AUROC." width="80%"><p class="caption">
+Figure 2. Cross-validation AUPRC of the trained models. The blue bar is
+still the model selected by AUROC.
 </p>
 </div>
 </div>
@@ -174,7 +208,10 @@ Figure 1. Cross-validation performance of the trained models.
 <strong>Predict on test data</strong><a class="anchor" aria-label="anchor" href="#predict-on-test-data"></a>
 </h2>
 <p><code><a href="../reference/compute_prediction.html">compute_prediction()</a></code> applies the selected model to the
-test set. The test data must contain the features used for training:</p>
+test set. The test data must contain the features used for training, and
+<code>target_var</code> must be in the order of the rows of
+<code>test_data</code>, without missing values and with samples of both
+classes (AUROC and AUPRC cannot be calculated otherwise):</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">pred</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_prediction.html">compute_prediction</a></span><span class="op">(</span>model <span class="op">=</span> <span class="va">res</span><span class="op">$</span><span class="va">Model</span>,</span>
 <span>                           test_data <span class="op">=</span> <span class="va">X_test</span>,</span>
@@ -194,7 +231,8 @@ positive class):</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">pred</span><span class="op">$</span><span class="va">Predictions</span><span class="op">)</span></span></code></pre></div>
 <p>Accuracy, sensitivity, specificity, precision, recall, F1 score and
-MCC at each probability threshold:</p>
+MCC at each probability threshold (one row per test sample, sorted by
+decreasing predicted probability):</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">pred</span><span class="op">$</span><span class="va">Metrics</span><span class="op">)</span></span></code></pre></div>
 <p>With <code>return = TRUE</code>, the ROC and precision-recall curves
@@ -202,13 +240,13 @@ are saved in <code>Results/</code> (named with <code>file.name</code>).
 The shaded areas are pointwise 95% bootstrap confidence bands, also
 returned in <code>pred$Curve_bands</code>.</p>
 <div class="figure" style="text-align: center">
-<img src="figures/ROC.png" class="r-plt" alt="Figure 2. ROC curve on the test set." width="80%"><p class="caption">
-Figure 2. ROC curve on the test set.
+<img src="figures/ROC.png" class="r-plt" alt="Figure 3. ROC curve on the test set." width="80%"><p class="caption">
+Figure 3. ROC curve on the test set.
 </p>
 </div>
 <div class="figure" style="text-align: center">
-<img src="figures/PR.png" class="r-plt" alt="Figure 3. Precision-recall curve on the test set." width="80%"><p class="caption">
-Figure 3. Precision-recall curve on the test set.
+<img src="figures/PR.png" class="r-plt" alt="Figure 4. Precision-recall curve on the test set." width="80%"><p class="caption">
+Figure 4. Precision-recall curve on the test set.
 </p>
 </div>
 <p>The curves can also be drawn directly with

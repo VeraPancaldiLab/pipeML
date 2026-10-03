@@ -61,7 +61,7 @@ for both curves in the plot legends.</p>
 <span>  <span class="va">auc_roc</span>,</span>
 <span>  <span class="va">auc_prc</span>,</span>
 <span>  LODO <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  <span class="va">file.name</span>,</span>
+<span>  file.name <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  width <span class="op">=</span> <span class="fl">6</span>,</span>
 <span>  height <span class="op">=</span> <span class="fl">6</span>,</span>
 <span>  roc_band <span class="op">=</span> <span class="cn">NULL</span>,</span>
@@ -74,7 +74,8 @@ for both curves in the plot legends.</p>
 
 
 <dl><dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
-<dd><p>A data frame containing the prediction metrics.</p></dd>
+<dd><p>A data frame containing the prediction metrics at each threshold, as returned in
+<code>compute_prediction()$Metrics</code> (sorted by decreasing predicted probability within each curve).</p></dd>
 
 
 <dt id="arg-spec">spec<a class="anchor" aria-label="anchor" href="#arg-spec"></a></dt>
@@ -94,8 +95,10 @@ for both curves in the plot legends.</p>
 
 
 <dt id="arg-color">color<a class="anchor" aria-label="anchor" href="#arg-color"></a></dt>
-<dd><p>The name of the column containing the cohort names. Each cohort will have a
-corresponding color in the plot. Multiple cohorts will result in different curves.</p></dd>
+<dd><p>The name of the column that identifies each curve (e.g. <code>"model"</code> for the output of
+<code><a href="compute_prediction.html">compute_prediction()</a></code>, or the column with the cohort names). Each value will have a
+corresponding color in the plot. Several curves (several values in this column) are only supported
+with <code>LODO = TRUE</code>.</p></dd>
 
 
 <dt id="arg-auc-roc">auc_roc<a class="anchor" aria-label="anchor" href="#arg-auc-roc"></a></dt>
@@ -112,11 +115,12 @@ vector with one value per cohort, named to match the values of the <code>color</
 
 <dt id="arg-lodo">LODO<a class="anchor" aria-label="anchor" href="#arg-lodo"></a></dt>
 <dd><p>Logical. If TRUE, the function assumes the data contains stacked predictions from
-multiple cohorts and assigns AUROC/AUPRC per cohort (default = FALSE).</p></dd>
+multiple cohorts and assigns AUROC/AUPRC per cohort (default = FALSE). <code>auc_roc</code> and <code>auc_prc</code>
+must then hold named vectors, with the names of the cohorts.</p></dd>
 
 
 <dt id="arg-file-name">file.name<a class="anchor" aria-label="anchor" href="#arg-file-name"></a></dt>
-<dd><p>A character string used as the file name prefix for saving the plots.</p></dd>
+<dd><p>Optional character string added to the names of the saved plots.</p></dd>
 
 
 <dt id="arg-width">width<a class="anchor" aria-label="anchor" href="#arg-width"></a></dt>
@@ -141,8 +145,14 @@ curve in the same way.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>Saves two PDF plots: one for the ROC curve and one for the Precision-Recall curve
-in the "Results/" directory.</p>
+    <p>No return value. Saves two PDF plots in the "Results/" directory: <code>ROC_curve_&lt;file.name&gt;.pdf</code>
+for the ROC curve and <code>PRC_curve_&lt;file.name&gt;.pdf</code> for the Precision-Recall curve
+(<code>ROC_curve.pdf</code> and <code>PRC_curve.pdf</code> if <code>file.name</code> is <code>NULL</code>).</p>
+    </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>The ROC curve is drawn from the point (0, 0), and the precision-recall curve from recall 0 with the precision of
+its first point, which are the starting points used to calculate AUROC and AUPRC.</p>
     </div>
 
     <div class="section level2">

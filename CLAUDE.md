@@ -125,12 +125,15 @@ columns), `test_data` (features; plus `time`/`event` for survival),
 `obs_test` (classification), `rowIndex`, `fold_name`, and `params` when
 there are tunable arguments. - Final mode (`bestune` given): returns
 `list(features + outcome columns, custom output, bestune or the selected parameters)`. -
-For survival,
-[`check_survival_fold_features()`](https://verapancaldilab.github.io/pipeML/reference/check_survival_fold_features.md)
-stops if the returned features contain a copy of `time` or `event`
-(outcome not removed). Before 2026-09-29 survival fold functions
-received the features only and had to get time/event through
-`fold_construction_args_fixed`.
+Every `Results/fold_*.rds` file is read as a resample, so both CV
+functions delete leftover ones (from an interrupted run) before calling
+the fold function, and delete the new ones after reading them. - Before
+2026-09-29 survival fold functions received the features only and had to
+get time/event through `fold_construction_args_fixed`. Nothing checks
+that the returned features exclude the outcome:
+`check_survival_fold_features()` (which stopped on a missing
+`time`/`event` or a feature identical to them) was removed on 2026-10-03
+at the user’s request; the fold function must follow the contract.
 
 ### Cross-Validation Strategies
 
@@ -143,6 +146,22 @@ received the features only and had to get time/event through
 - `doParallel` + `foreach %dopar%` for cross-fold parallelization
 - XGBoost uses internal threading — external parallel is disabled to
   avoid contention
+- Classification with `fold_construction_fun` trains the models
+  sequentially: `ncores` is not used there (parallelism belongs to the
+  fold function). The survival custom-fold branch with tunable arguments
+  runs the parameter combinations of each fold in parallel.
+- Survival custom-fold branch with tunable arguments: since 2026-10-03
+  it runs sequentially (`%do%`) when `ncores` is `NULL` or 1, and
+  creates one cluster for all folds when `ncores > 1`. Before, it always
+  called `makeCluster(ncores)` inside the fold loop, so the default
+  `ncores = NULL` made a 0-worker cluster and stopped with “subscript
+  out of bounds”.
+- Clusters are released also on error:
+  [`on.exit()`](https://rdrr.io/r/base/on.exit.html) after
+  `makeCluster()` in
+  [`compute_k_fold_CV()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV.md)
+  and in the survival custom-fold branch, `tryCatch(finally = )` in the
+  standard survival CV.
 
 ### Hyperparameter Tuning
 
@@ -150,13 +169,124 @@ received the features only and had to get time/event through
   (survival)
 - Grid search within CV folds → best params applied to full training
   data
+- Standard classification path: caret tunes on Accuracy and fits
+  `finalModel` with those values;
+  [`compute_k_fold_CV()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV.md)
+  re-tunes by `metric`
+  ([`calculate_cv_metrics()`](https://verapancaldilab.github.io/pipeML/reference/calculate_cv_metrics.md))
+  and retrains every model on all training samples with that `bestTune`
+  ([`caret_train()`](https://verapancaldilab.github.io/pipeML/reference/caret_train.md)
+  with `trainControl(method = "none")`, as the custom-fold path does),
+  re-attaching `$results`, `$pred`, `$resample` and `$bestTune`. Before
+  2026-10-01 only `$bestTune` was replaced, so the returned model was
+  still the Accuracy-tuned one.
+- Custom-fold classification path:
+  [`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md)
+  selects `bestTune` on Accuracy; each branch must copy `res$bestTune`
+  from
+  [`calculate_cv_metrics()`](https://verapancaldilab.github.io/pipeML/reference/calculate_cv_metrics.md)
+  into the model before the final `train(method = "none")`. The branch
+  without tunable arguments did not do this before 2026-10-01.
+- treebag has no hyperparameters: its entry in the `hyperparams` lists
+  is `"parameter"` (the column caret fills with `"none"`), not `NULL`.
+  With `NULL`,
+  [`calculate_cv_metrics()`](https://verapancaldilab.github.io/pipeML/reference/calculate_cv_metrics.md)
+  takes a branch that gives every resample the same AUROC (MAD 0).
+- Custom-fold path: the `rf` `mtry` grid is sized from `grid_data`, the
+  fold training table with the fewest features after preprocessing, read
+  from the fold files before the loop. It must be the same in every fold
+  (the sanity check requires each setting in all resamples), so it
+  cannot be sized per fold; the raw `train_data` has an unrelated number
+  of columns.
+- Grids: the custom-fold classification path uses
+  [`get_tune_grid()`](https://verapancaldilab.github.io/pipeML/reference/get_tune_grid.md);
+  the standard path uses caret’s default grids (except lasso/ridge,
+  which share the `lambda` values), so the two paths do not tune over
+  the same values. Since 2026-10-03 `lambda` is log-spaced
+  (`10^seq(-3, 0, length = 20)`, before `seq(0.001, 1, length = 20)`,
+  where 18 of 20 values were \>= 0.05) and the custom `svmRadial`
+  `sigma` is estimated from `grid_data` (quantiles of 1/\|x - x’\|^2
+  over all sample pairs on scaled features, deterministic so the grid is
+  the same in every fold; before fixed at 0.01/0.05/0.1, too large with
+  many features).
+- Survival grids
+  ([`get_default_hyperparams()`](https://verapancaldilab.github.io/pipeML/reference/get_default_hyperparams.md)):
+  only arguments that parsnip passes to the engine are tuned. Since
+  2026-10-03 the partykit tree has no `cost_complexity` (dropped by
+  parsnip: 5 identical trees per configuration before) and the
+  (inactive) mboost grid has only `trees`, `min_n`, `tree_depth` (was
+  5^7 = 78,125 configurations, with 3 dropped arguments and
+  `loss_reduction` outside mincriterion’s 0-1 range). `bag_tree_rpart`
+  tunes `trees` (number of bags, 25 to 100): `bag_tree()` has no such
+  argument and `set_args(trees = )` is silently ignored
+  ([`ipred::bagging()`](https://rdrr.io/pkg/ipred/man/bagging.html)
+  built 25 trees for every value before 2026-10-03), so
+  [`compute_ml_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_ml_survival.md)
+  and
+  [`wrapper_train_best_hyperparams_survival()`](https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_survival.md)
+  pass it with `set_engine("rpart", nbagg = !!n_bags)`.
+- [`calculate_cv_metrics()`](https://verapancaldilab.github.io/pipeML/reference/calculate_cv_metrics.md)
+  sorts `Prediction_folds` by resample, hyperparameters and decreasing
+  `yes` before `bind_cols(metrics)`, because `metrics` comes out in that
+  order. `$pred` is therefore sorted that way, not in caret’s order.
 
-### Feature Preprocessing (internal `preprocess_features()`)
+### Feature Preprocessing (internal `preprocess_features()`, `preprocess` argument, default `TRUE`)
 
+- Takes the features only (no outcome column) and returns the kept
+  features; every caller sets the outcome columns aside (`target`, or
+  `time` and `event`) and adds them back with
+  [`cbind()`](https://rdrr.io/r/base/cbind.html). Before 2026-10-03 it
+  took the outcome too (`target_col`, `time_var`, `event_var`).
 - Near-zero variance removal
 - Collinearity filtering (correlation threshold)
-- Removal of features constant within any target class (classification
-  only)
+- Where it runs (classification and survival), all switched off by
+  `preprocess = FALSE`:
+  - Standard path: once on all training samples before the CV
+    ([`compute_k_fold_CV()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV.md)
+    after the `dataset` column is dropped;
+    [`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md)
+    before the hyperparameter grids, so `mtry` is sized from the kept
+    features). Added on 2026-10-02 as the user’s decision: the filter is
+    unsupervised, but the held-out fold’s feature values take part in
+    it. Before, the standard path had no filter.
+  - Custom folds: on each fold’s training table (per parameter
+    combination), the held-out table is cut to the kept columns; and
+    once on the final training table of all samples (classification: in
+    [`compute_k_fold_CV()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV.md),
+    after re-tuning by `metric`; survival: in
+    [`wrapper_train_best_hyperparams_survival()`](https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_survival.md)).
+    Both custom paths (with and without tunable arguments) build,
+    preprocess and train the final table once per model. Before
+    2026-10-03 the classification path with tunable arguments also
+    called `wrapper_train_best_hyperparams_classification()` with the
+    Accuracy `bestTune` (fold function on all samples, preprocessing and
+    training), whose results were all discarded; that function is now
+    commented out in `machine_learning.R` (kept for reference, no help
+    page).
+  - [`wrapper_train_best_hyperparams_survival()`](https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_survival.md)
+    returns `NULL` with a warning if the final fit fails, so that model
+    is excluded
+    ([`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md)
+    stops with a clear message only if no model is left, in both paths).
+    Its `Model$bestTune` holds the model hyperparameters only, as in
+    classification; the feature parameters are in
+    `custom_output$Parameters`.
+  - Custom folds: `grid_data` is taken from the fold tables after
+    preprocessing, since the models are trained on those. Classification
+    sizes the `rf` grid from it; survival (since 2026-10-03) re-sizes
+    the `mtry` of the forests (`rand_forest_aorsf`,
+    `rand_forest_partykit`) from it. Before, the survival custom path
+    sized `mtry` from the input columns; parsnip (`min_cols()`) then
+    reset every `mtry` above the number of predictors to that number
+    with a warning, so several grid values were the same model.
+  - The test set is never involved:
+    [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md)
+    keeps the features of the final model.
+- The outcome is not used: the step removing features with near-zero
+  variance within a class (classification) was deleted on 2026-10-02,
+  because it also removed features that separate the classes (e.g. a
+  marker absent in one class)
+- Stops if a feature is not numeric or if no feature is left
 
 ### Reproducibility (`seed` argument, default `123`)
 
@@ -178,6 +308,12 @@ received the features only and had to get time/event through
   `seed + 1000L * fold_i + parameter_i` in the survival custom-fold
   branch. Results are therefore independent of worker scheduling and
   `ncores`.
+  [`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md)
+  also calls `set.seed(seed)` right before the final training: without
+  `ncores` the per-fold seeds are set in the main session, with `ncores`
+  in the workers, so before 2026-10-03 the final survival model
+  (forests, bagged trees) depended on `ncores` while the CV results did
+  not.
 - [`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md)
   passes `seed` to
   [`fastshap::explain()`](https://bgreenwell.github.io/fastshap/reference/explain.html)
@@ -210,16 +346,45 @@ received the features only and had to get time/event through
   is the value on the full test set, and the CI comes from 1000
   bootstrap resamples
   ([`bootstrap_auc()`](https://verapancaldilab.github.io/pipeML/reference/bootstrap_auc.md),
-  seed 123).
+  seed 123). Since 2026-10-03 both bootstraps are stratified:
+  [`bootstrap_auc()`](https://verapancaldilab.github.io/pipeML/reference/bootstrap_auc.md)
+  resamples positives and negatives separately (before, a resample with
+  one class gave NaN and
+  [`quantile()`](https://rdrr.io/r/stats/quantile.html) stopped
+  [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md),
+  e.g. 20 test samples with 2 positives), and
+  [`compute_cindex_ci()`](https://verapancaldilab.github.io/pipeML/reference/compute_cindex_ci.md)
+  resamples events and censored samples separately (before, resamples
+  without events were silently dropped by `na.rm = TRUE`).
 - The shaded bands are pointwise 95% bootstrap bands.
   [`bootstrap_auc()`](https://verapancaldilab.github.io/pipeML/reference/bootstrap_auc.md)
-  evaluates each resample’s curve on a 101-point grid
-  ([`roc_at_grid()`](https://verapancaldilab.github.io/pipeML/reference/roc_at_grid.md):
-  best sensitivity at FPR ≤ x;
-  [`prc_at_grid()`](https://verapancaldilab.github.io/pipeML/reference/prc_at_grid.md):
-  precision at the first threshold reaching recall x), returned as
-  `Curve_bands`. `get_curves(roc_band, prc_band)` draws them under the
-  curve; the LODO branch draws no band.
+  evaluates each resample’s curve on a 101-point grid with straight
+  lines between consecutive points
+  ([`roc_at_grid()`](https://verapancaldilab.github.io/pipeML/reference/roc_at_grid.md),
+  [`prc_at_grid()`](https://verapancaldilab.github.io/pipeML/reference/prc_at_grid.md)),
+  as
+  [`get_curves()`](https://verapancaldilab.github.io/pipeML/reference/get_curves.md)
+  draws the curves (`geom_line()`) and as AUROC/AUPRC are integrated
+  (trapezoids), returned as `Curve_bands`. Before 2026-10-03 the ROC was
+  read as a staircase (best sensitivity at FPR \<= x: band up to ~0.16
+  below the drawn curve on diagonal segments from tied probabilities)
+  and the PR curve at the next point (gap up to ~0.13 even without
+  ties). `get_curves(roc_band, prc_band)` draws them under the curve;
+  the LODO branch draws no band.
+- Tied probabilities: the curves are built from cumulative TP/FP counts
+  over samples sorted by decreasing probability
+  ([`calculate_auc_roc_resample()`](https://verapancaldilab.github.io/pipeML/reference/calculate_auc_roc_resample.md),
+  [`calculate_auc_prc_resample()`](https://verapancaldilab.github.io/pipeML/reference/calculate_auc_prc_resample.md),
+  [`get_sensitivity_specificity()`](https://verapancaldilab.github.io/pipeML/reference/get_sensitivity_specificity.md)).
+  Samples with the same probability get the counts at the end of their
+  tie group (`stats::ave(tp, yes, FUN = max)`); without this,
+  AUROC/AUPRC depend on the row order (a constant predictor scored 1 or
+  0 with rows sorted by class).
+  [`calculate_auroc()`](https://verapancaldilab.github.io/pipeML/reference/calculate_auroc.md)
+  starts the curve at (0, 0) and
+  [`calculate_auprc()`](https://verapancaldilab.github.io/pipeML/reference/calculate_auprc.md)
+  at recall 0 with the precision of the first point, so a perfect model
+  has AUPRC 1 and a constant one has AUPRC = prevalence.
 
 ### Outcome Alignment (`compute_features.ML()`)
 
@@ -308,8 +473,8 @@ pkgdown::build_site()      # Rebuild docs website
     in `machine_learning.R`
 2.  Add a hyperparameter grid entry in
     [`get_tune_grid()`](https://verapancaldilab.github.io/pipeML/reference/get_tune_grid.md)
-3.  Handle retraining in
-    [`wrapper_train_best_hyperparams_classification()`](https://verapancaldilab.github.io/pipeML/reference/wrapper_train_best_hyperparams_classification.md)
+3.  Add its final `train(method = "none")` block in the custom path of
+    [`compute_k_fold_CV()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV.md)
 4.  Document in vignette and function `@param method` Roxygen docs
 
 ### Adding a new metric
@@ -346,6 +511,22 @@ publish on merge to main.
   points call the internal
   [`ensure_caret()`](https://verapancaldilab.github.io/pipeML/reference/ensure_caret.md).
 
+- Bootstraps with a fixed seed
+  ([`bootstrap_auc()`](https://verapancaldilab.github.io/pipeML/reference/bootstrap_auc.md),
+  [`compute_cindex_ci()`](https://verapancaldilab.github.io/pipeML/reference/compute_cindex_ci.md),
+  seed 123) save and restore the session’s random state
+  ([`withr::local_preserve_seed()`](https://withr.r-lib.org/reference/with_seed.html)
+  then [`set.seed()`](https://rdrr.io/r/base/Random.html)), so
+  [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md)
+  no longer resets the user’s RNG and survival CV fits no longer restart
+  from the same state after each evaluation (before 2026-10-03 they
+  called [`set.seed()`](https://rdrr.io/r/base/Random.html) directly).
+  [`withr::local_seed()`](https://withr.r-lib.org/reference/with_seed.html)
+  is not used: in withr 3.0.2 it does not restore the state. Survival CV
+  evaluates folds with `predict_and_evaluate_survival(ci = FALSE)`: the
+  bootstrap CI (about 1.5 s per call, ~180 configurations per fold) was
+  computed and discarded for every fit.
+
 - Don’t add [`set.seed()`](https://rdrr.io/r/base/Random.html) calls
   inside helpers: they override the user’s `seed` mid-run
   ([`get_tune_grid()`](https://verapancaldilab.github.io/pipeML/reference/get_tune_grid.md)
@@ -369,6 +550,21 @@ publish on merge to main.
   Survival formulas must use `survival::Surv(...)`, not bare `Surv(...)`
   — the bare form only works when some other package happened to attach
   `survival`.
+
+- Direction of survival predictions: parsnip/censored return every
+  prediction type as “higher = longer survival”, including `linear_pred`
+  of Cox models (`censored:::predict_linear_pred._coxph()` negates the
+  log hazard by default, `increasing = TRUE`).
+  [`yardstick::concordance_survival_vec()`](https://yardstick.tidymodels.org/reference/concordance_survival.html)
+  expects that direction, so
+  [`predict_and_evaluate_survival()`](https://verapancaldilab.github.io/pipeML/reference/predict_and_evaluate_survival.md)
+  computes the C-index first and only then negates all predictions into
+  risk scores (higher = higher risk), which is what `preds`, the
+  Kaplan-Meier risk groups and the survival SHAP values use. Before
+  2026-10-02 nothing was negated (the `pred_type` set inside the
+  `tryCatch` handlers never reached the outer variable), so “High risk”
+  labelled the longest survivors. The `pred_type` assignments are still
+  there but unused.
 
 - `multideconv` is a remote (GitHub) dependency — not on CRAN.
   Installation requires
@@ -402,6 +598,28 @@ publish on merge to main.
   (for classification, the caret `train` object). It validates this and
   stops with a clear error if given the wrong object (e.g. `res` instead
   of `res$Model`).
+
+- Survival MAD: since 2026-10-03
+  [`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md)
+  (`c_index_mad`) and
+  [`compute_cv_CINDEX()`](https://verapancaldilab.github.io/pipeML/reference/compute_cv_CINDEX.md)
+  (`MAD_CINDEX`) use the scaled MAD
+  ([`stats::mad()`](https://rdrr.io/r/stats/mad.html) default), as
+  classification does; before they used `constant = 1`, so the
+  same-looking error bars were ~1.5x narrower. The C-index plot uses the
+  same helper as the classification plots
+  ([`plot_cv_metric()`](https://verapancaldilab.github.io/pipeML/reference/plot_cv_metric.md)).
+
+- Survival CV,
+  [`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md):
+  a configuration is excluded if its fit failed or its C-index is `NA`
+  (e.g. a held-out fold without events) in at least one resample, with a
+  message, so all configurations are summarized over the same resamples.
+  Before 2026-10-03 an `NA` C-index was silently dropped
+  (`na.rm = TRUE`). Known, left as is: the C-index median/MAD are
+  computed over per-sample rows (the fold’s C-index repeated on each
+  test sample), which differs from per-resample values with unequal
+  folds and an even number of resamples.
 
 - Survival LODO:
   [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)

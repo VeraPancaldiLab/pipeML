@@ -2,8 +2,8 @@
 
 Internal function that performs repeated stratified k-fold
 cross-validation to train and tune hyperparameters across multiple
-machine learning models. Model performance is evaluated using
-user-specified metrics such as Accuracy, AUROC, or AUPRC.
+machine learning models. Hyperparameters are tuned and the best model is
+selected with the user-specified metric (AUROC or AUPRC).
 
 ## Usage
 
@@ -20,7 +20,8 @@ compute_k_fold_CV(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  seed = 123
+  seed = 123,
+  preprocess = TRUE
 )
 ```
 
@@ -33,13 +34,11 @@ compute_k_fold_CV(
 
 - k_folds:
 
-  Integer. Number of folds used for k-fold cross-validation. Default is
-  5.
+  Integer. Number of folds used for k-fold cross-validation.
 
 - n_rep:
 
-  Integer. Number of repetitions of the k-fold cross-validation. Default
-  is 100.
+  Integer. Number of repetitions of the k-fold cross-validation.
 
 - metric:
 
@@ -53,17 +52,22 @@ compute_k_fold_CV(
 
 - LODO:
 
-  Logical. If `TRUE`, performs Leave-One-Dataset-Out (LODO)
-  cross-validation by stratifying folds based on cohort membership.
+  Logical. If `TRUE`, the folds are stratified by cohort and by `target`
+  (for Leave-One-Dataset-Out analyses). `train_data` must then contain a
+  column named `dataset` with the cohort of each sample; it is removed
+  before training.
 
 - ncores:
 
-  Integer. Number of cores used for parallel computation. If `NULL`,
-  `parallel::detectCores() - 1` will be used.
+  Integer. Number of cores used for parallel computation. If `NULL`
+  (default), the computation is sequential. Not used when
+  `fold_construction_fun` is provided (the models are trained
+  sequentially).
 
 - return:
 
-  Logical. Whether to return the results and generated plots.
+  Logical. Whether to save the cross-validation performance plots in the
+  `Results/` directory.
 
 - fold_construction_fun:
 
@@ -91,12 +95,27 @@ compute_k_fold_CV(
   assignment and model fitting are reproducible. `NULL` leaves the
   random number generator untouched.
 
+- preprocess:
+
+  Logical. If `TRUE` (default), near-zero variance and highly correlated
+  features are removed with
+  [`preprocess_features()`](https://verapancaldilab.github.io/pipeML/reference/preprocess_features.md):
+  once on all training samples before the cross-validation, or, with
+  `fold_construction_fun`, on the training part of each fold and on the
+  final training set.
+
 ## Value
 
 A list containing:
 
-- Features used during training
+- `Model`: the selected machine learning model, trained on all training
+  samples
 
-- The selected machine learning model
+- `ML_Models`: all trained machine learning models (models that predict
+  the same value for all training samples are excluded)
 
-- All trained machine learning models
+- `AUROC_median`, `AUPRC_median`: median and MAD of the cross-validation
+  AUROC and AUPRC of each model
+
+- `Custom_output`: output of `fold_construction_fun` for the selected
+  model (only with a custom function)

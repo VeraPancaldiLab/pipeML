@@ -1,9 +1,9 @@
 # counts_example
 
-Gene expression matrix from the Gide et al. (2019) metastatic melanoma
-cohort. Rows correspond to genes (HUGO gene symbols) and columns to
-patient samples. This dataset is used to compute features for training
-machine learning models.
+Gene expression matrix of melanoma samples, including the Gide et al.
+(2019) metastatic melanoma cohort. Rows correspond to genes (HUGO gene
+symbols) and columns to patient samples. This dataset is used to compute
+features for training machine learning models.
 
 ## Usage
 
@@ -13,7 +13,10 @@ counts_example
 
 ## Format
 
-A numeric matrix with genes as rows and samples as columns.
+A numeric matrix with 5000 genes as rows and 336 samples as columns,
+with normalized (non-integer) expression values. The 73 samples of the
+Gide cohort are the ones annotated in `coldata_example`
+(`counts_example[, rownames(coldata_example)]`).
 
 ## Source
 

@@ -62,35 +62,40 @@ and optionally generates a bar plot summarizing performance.</p>
 
 
 <dl><dt id="arg-models">models<a class="anchor" aria-label="anchor" href="#arg-models"></a></dt>
-<dd><p>Named list of survival model objects. Each element must contain
-a <code>Resample_matrix</code> data frame with columns:</p><dl><dt><code>c_index</code></dt>
-<dd><p>Numeric C-index per fold/resample.</p></dd>
+<dd><p>Named list of survival model objects (from <code><a href="aggregate_results.html">aggregate_results()</a></code>). Each element contains
+a <code>Resample_matrix</code> data frame with one row per test sample of each resample (for the selected
+configuration), with columns:</p><dl><dt><code>c_index</code></dt>
+<dd><p>C-index of the resample, repeated on each of its rows.</p></dd>
 
 <dt><code>Resample</code></dt>
-<dd><p>Fold or resample identifier (e.g., "Fold1").</p></dd>
+<dd><p>Resample identifier (e.g., "Fold1.Rep1").</p></dd>
 
 
-</dl></dd>
+</dl><p>Excluded models are <code>NULL</code> and are ignored.</p></dd>
 
 
 <dt id="arg-file-name">file_name<a class="anchor" aria-label="anchor" href="#arg-file-name"></a></dt>
 <dd><p>Optional character string to name the output PDF saved under
-<code>"Results/CINDEX_CV_methods_&lt;file_name&gt;.pdf"</code>. If <code>NULL</code>, the file uses
-a default naming convention.</p></dd>
+<code>"Results/CINDEX_CV_methods_&lt;file_name&gt;.pdf"</code>. If <code>NULL</code>, the file is
+<code>"Results/CINDEX_CV_methods_.pdf"</code>.</p></dd>
 
 
 <dt id="arg-plot-results">plot_results<a class="anchor" aria-label="anchor" href="#arg-plot-results"></a></dt>
-<dd><p>Logical (default = TRUE). If <code>TRUE</code>, generates a PDF bar plot
-showing median C-index +/- MAD per model.</p></dd>
+<dd><p>Logical (default = TRUE). If <code>TRUE</code>, saves a bar plot of the median C-index +/- MAD
+of each model, with the same layout as the classification AUROC/AUPRC plots (<code><a href="plot_cv_metric.html">plot_cv_metric()</a></code>): models
+sorted from best to worst, selected model in blue, values above the bars and a dashed line at 0.5 (random
+prediction).</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A list with:</p><dl><dt><code>CINDEX_summary</code></dt>
-<dd><p>Tibble summarizing median and MAD per model.</p></dd>
+<dd><p>Tibble with one row per model (<code>model</code>, <code>Median_CINDEX</code>, <code>MAD_CINDEX</code>), sorted from
+best to worst.</p></dd>
 
 <dt><code>All_folds</code></dt>
-<dd><p>Tibble of raw C-index values for all models and folds.</p></dd>
+<dd><p>Tibble with the rows of all models (<code>model</code>, <code>c_index</code>, <code>Resample</code>): one row per test sample
+of each resample.</p></dd>
 
 <dt><code>Top_model</code></dt>
 <dd><p>Character string of the model with highest median C-index.</p></dd>
@@ -100,9 +105,12 @@ showing median C-index +/- MAD per model.</p></dd>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
 
-<ul><li><p>Median C-index represents typical discrimination performance across folds.</p></li>
-<li><p>MAD provides robust variability estimation of C-index values.</p></li>
-<li><p>The optional plot displays model performance with error bars +/- MAD.</p></li>
+<ul><li><p>The median and MAD are computed over the rows of <code>Resample_matrix</code>, i.e. each resample counts in proportion
+to its number of test samples (the same as per resample when the folds have the same size).</p></li>
+<li><p>The MAD is scaled (<code><a href="https://rdrr.io/r/stats/mad.html" class="external-link">stats::mad()</a></code> default, comparable to a standard deviation), as for the classification
+AUROC and AUPRC.</p></li>
+<li><p>Models without cross-validation results (excluded because they could not be fitted) are ignored.</p></li>
+<li><p>The optional plot displays model performance with error bars +/- MAD (see <code>plot_results</code>).</p></li>
 </ul></div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

@@ -2,7 +2,8 @@
 
 This function calculates the Area Under the Precision-Recall Curve
 (AUPRC). It uses the trapezoidal rule to compute the AUPRC from the
-recall and precision values.
+recall and precision values. The curve is started at recall 0, with the
+precision of its first point.
 
 ## Usage
 

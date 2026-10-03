@@ -5,8 +5,8 @@ cross-validation on training data and then evaluates performance on
 independent test data. It supports both **classification** and
 **survival analysis** tasks, including hyperparameter tuning and
 cohort-based (Leave-One-Dataset-Out, LODO) validation. For survival
-models, it computes the **C-index** and generates Kaplan-Meier plots
-stratified by predicted risk.
+models, it computes the **C-index** and, with `return = TRUE`, generates
+Kaplan-Meier plots stratified by predicted risk.
 
 ## Usage
 
@@ -31,7 +31,8 @@ compute_features.ML(
   fold_construction_fun = NULL,
   fold_construction_args_fixed = NULL,
   fold_construction_args_tunable = NULL,
-  seed = 123
+  seed = 123,
+  preprocess = TRUE
 )
 ```
 
@@ -48,8 +49,9 @@ compute_features.ML(
 
 - coldata:
 
-  A data frame containing outcome information. Row names must match
-  those of `features_train` and `features_test`.
+  A data frame containing outcome information. Its row names must
+  include those of `features_train` and `features_test`: the outcome of
+  each sample is taken by row name.
 
 - task_type:
 
@@ -113,7 +115,9 @@ compute_features.ML(
 - ncores:
 
   Integer. Number of CPU cores for parallelization (cross-validation
-  folds are processed in parallel). Default: `NULL` (sequential).
+  folds are processed in parallel). Default: `NULL` (sequential). For
+  classification with `fold_construction_fun`, the models are trained
+  sequentially and `ncores` is not used.
 
 - return:
 
@@ -146,9 +150,17 @@ compute_features.ML(
   [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
   for details.
 
+- preprocess:
+
+  Logical. If `TRUE` (default), near-constant and highly correlated
+  (\|r\| \> 0.9) features are removed from the training features before
+  training. Use `FALSE` to train on the features as given. See
+  [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
+  for details.
+
 ## Value
 
-A named list, or `NULL` if no model could be trained (classification):
+A named list:
 
 - Model:
 

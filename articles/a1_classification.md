@@ -52,14 +52,20 @@ Key parameters:
 
 - **trait.positive**: value of `target_var` considered as the positive
   class
-- **metric**: metric used to tune and select the models, `"AUROC"`
-  (default) or `"AUPRC"`
+- **metric**: metric used to tune the hyperparameters of each model and
+  to select the best model, `"AUROC"` (default) or `"AUPRC"`
 - **k_folds**, **n_rep**: number of folds and repetitions of the
   cross-validation
 - **ncores**: number of cores used to run the folds in parallel (`NULL`
   runs sequentially)
 - **seed**: random seed for the folds and the model fitting (default
   `123`), so results are reproducible
+- **preprocess**: whether to remove near-constant and highly correlated
+  features (\|r\| \> 0.9) from the training features before the
+  cross-validation (default `TRUE`). The outcome is not used for this.
+  Here it removes `Cell.size`, which is highly correlated with
+  `Cell.shape`, so the models are trained on 8 of the 9 features. Use
+  `preprocess = FALSE` to train on the features as given
 - **return**: whether to save the cross-validation performance plots in
   `Results/` (named with `file_name`)
 
@@ -79,7 +85,7 @@ res <- compute_features.training.ML(features_train = X_train,
 ```
 
 The selected model is a `caret` `train` object, trained on all training
-samples with the tuned hyperparameters:
+samples with the hyperparameters selected by `metric` (in `bestTune`):
 
 ``` r
 
@@ -87,7 +93,8 @@ res$Model
 res$Model$bestTune
 ```
 
-All trained and tuned models:
+All trained and tuned models (a model that predicts the same probability
+for all training samples is left out):
 
 ``` r
 
@@ -95,26 +102,48 @@ names(res$ML_Models)
 ```
 
 `res$AUROC_median` and `res$AUPRC_median` compare the cross-validation
-performance of all the algorithms (median and MAD across resamples). The
-performance of the selected model per resample is in
-`res$Model$resample`:
+performance of all the algorithms: the median (`Median_AUROC`,
+`Median_AUPRC`) and the MAD (`MAD_AUROC`, `MAD_AUPRC`) across resamples,
+sorted from the best to the worst model. The performance of the selected
+model per resample is in `res$Model$resample`:
 
 ``` r
 
 res$AUROC_median
+res$AUPRC_median
 head(res$Model$resample)
 ```
 
-![Figure 1. Cross-validation performance of the trained
+With `return = TRUE`, both tables are also saved as plots in `Results/`
+(`AUROC_CV_methods_<file_name>.pdf` and
+`AUPRC_CV_methods_<file_name>.pdf`). In each plot:
+
+- the models are sorted from the best to the worst, with the median
+  value above each bar;
+- the selected model (the best one for `metric`) is in blue;
+- the error bars show the median plus and minus one MAD across
+  resamples;
+- the dashed line is the performance of a random classifier: 0.5 for
+  AUROC, and the proportion of positive samples for AUPRC.
+
+![Figure 1. Cross-validation AUROC of the trained
 models.](figures/AUROC_classification.png)
 
-Figure 1. Cross-validation performance of the trained models.
+Figure 1. Cross-validation AUROC of the trained models.
+
+![Figure 2. Cross-validation AUPRC of the trained models. The blue bar
+is still the model selected by AUROC.](figures/AUPRC_classification.png)
+
+Figure 2. Cross-validation AUPRC of the trained models. The blue bar is
+still the model selected by AUROC.
 
 ## **Predict on test data**
 
 [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md)
 applies the selected model to the test set. The test data must contain
-the features used for training:
+the features used for training, and `target_var` must be in the order of
+the rows of `test_data`, without missing values and with samples of both
+classes (AUROC and AUPRC cannot be calculated otherwise):
 
 ``` r
 
@@ -144,7 +173,8 @@ head(pred$Predictions)
 ```
 
 Accuracy, sensitivity, specificity, precision, recall, F1 score and MCC
-at each probability threshold:
+at each probability threshold (one row per test sample, sorted by
+decreasing predicted probability):
 
 ``` r
 
@@ -155,13 +185,13 @@ With `return = TRUE`, the ROC and precision-recall curves are saved in
 `Results/` (named with `file.name`). The shaded areas are pointwise 95%
 bootstrap confidence bands, also returned in `pred$Curve_bands`.
 
-![Figure 2. ROC curve on the test set.](figures/ROC.png)
+![Figure 3. ROC curve on the test set.](figures/ROC.png)
 
-Figure 2. ROC curve on the test set.
+Figure 3. ROC curve on the test set.
 
-![Figure 3. Precision-recall curve on the test set.](figures/PR.png)
+![Figure 4. Precision-recall curve on the test set.](figures/PR.png)
 
-Figure 3. Precision-recall curve on the test set.
+Figure 4. Precision-recall curve on the test set.
 
 The curves can also be drawn directly with
 [`get_curves()`](https://verapancaldilab.github.io/pipeML/reference/get_curves.md):

@@ -12,8 +12,10 @@ data_example_classification
 
 ## Format
 
-A data frame with samples as rows and features as columns (e.g., cell or
-tissue measurements).
+A data frame with 683 samples as rows and 10 columns: 9 cytological
+features (`Cl.thickness`, `Cell.size`, `Cell.shape`, `Marg.adhesion`,
+`Epith.c.size`, `Bare.nuclei`, `Bl.cromatin`, `Normal.nucleoli`,
+`Mitoses`) and the outcome `target` (1 = malignant, 0 = benign).
 
 ## Source
 

@@ -1,8 +1,17 @@
 # Evaluate an ROC Curve on a Fixed False-Positive-Rate Grid (Internal)
 
-Treats the ROC curve as a step function and returns, for each grid
-value, the highest sensitivity reached at a false positive rate at or
-below it.
+Returns, for each grid value, the sensitivity of the ROC curve at that
+false positive rate, with straight lines between consecutive points: the
+curve as
+[`get_curves()`](https://verapancaldilab.github.io/pipeML/reference/get_curves.md)
+draws it
+([`geom_line()`](https://ggplot2.tidyverse.org/reference/geom_path.html))
+and as
+[`calculate_auroc()`](https://verapancaldilab.github.io/pipeML/reference/calculate_auroc.md)
+integrates it (trapezoids). At a vertical step (several points with the
+same false positive rate), the highest sensitivity is used. Tied
+probabilities of both classes give diagonal segments, which a step
+function would place below the drawn curve.
 
 ## Usage
 

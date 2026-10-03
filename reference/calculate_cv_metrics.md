@@ -17,7 +17,7 @@ calculate_cv_metrics(ml_model, metric, hyperparameters = NULL)
 - ml_model:
 
   A trained machine learning model object containing `Prediction_folds`
-  and `Resample_matrix`.
+  (out-of-fold predictions), `Results_folds` and `Resample_matrix`.
 
 - metric:
 
@@ -26,8 +26,11 @@ calculate_cv_metrics(ml_model, metric, hyperparameters = NULL)
 
 - hyperparameters:
 
-  Optional character vector of hyperparameter column names to evaluate.
-  If `NULL`, no hyperparameter tuning is performed.
+  Character vector of hyperparameter column names of `Prediction_folds`
+  to evaluate. For a model without hyperparameters (treebag),
+  `"parameter"` is used: the column that holds `"none"`. With `NULL`, no
+  hyperparameter tuning is performed and all resamples get the same
+  aggregated value.
 
 ## Value
 
@@ -36,7 +39,8 @@ A list containing:
 - `Prediction_folds`:
 
   Data frame of out-of-fold predictions with computed metrics for each
-  resample and hyperparameter combination.
+  resample and hyperparameter combination, sorted by resample,
+  hyperparameters and decreasing predicted probability.
 
 - `Resample_matrix`:
 
@@ -45,8 +49,7 @@ A list containing:
 
 - `Results_folds`:
 
-  Aggregated performance metrics across hyperparameter combinations or
-  resamples.
+  Median AUROC, AUPRC and Accuracy of each hyperparameter combination.
 
 - `bestTune`:
 

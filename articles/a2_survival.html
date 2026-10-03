@@ -94,7 +94,8 @@ outcomes. The outcome has two components:</p>
 <strong>time</strong>: follow-up or survival time</li>
 <li>
 <strong>event</strong>: whether the event occurred (1) or the
-observation was censored (0)</li>
+observation was censored (0). It must be coded with these two values,
+without missing values.</li>
 </ul>
 <p>Survival models are built with <code>parsnip</code> and its
 <code>censored</code> extension. <code>censored</code> must be
@@ -141,6 +142,10 @@ and oblique random survival forest) with repeated k-fold
 cross-validation stratified by event. <code>time_var</code> and
 <code>event_var</code> are the time and event of each training sample.
 The best model is selected by the concordance index (C-index).</p>
+<p>As for classification, near-constant and highly correlated features
+(|r| &gt; 0.9) are removed from the training features before the
+cross-validation (<code>preprocess = TRUE</code>, the default); none of
+the features of this example is removed.</p>
 <p>Survival models are slower to train than classification models: here
 we use 3 folds and 1 repetition to keep the example fast. Use more folds
 and repetitions (e.g. <code>k_folds = 5</code>, <code>n_rep = 5</code>)
@@ -159,7 +164,7 @@ for real analyses.</p>
 <p>All trained models and the name of the selected one:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">res_survival</span><span class="op">$</span><span class="va">ML_Models</span><span class="op">)</span></span>
-<span><span class="va">res_survival</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">model</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">res_survival</span><span class="op">$</span><span class="va">Model</span><span class="op">$</span><span class="va">Resample_matrix</span><span class="op">$</span><span class="va">model</span><span class="op">)</span></span></code></pre></div>
 <p>The selected model trained on all training samples with the tuned
 hyperparameters (a fitted <code>workflows</code> object), and those
 hyperparameters:</p>
@@ -199,14 +204,16 @@ Figure 1. Cross-validation C-index of the trained models.
 <p>Predicted risk scores of the test samples:</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">pred_survival</span><span class="op">$</span><span class="va">preds</span><span class="op">)</span></span></code></pre></div>
-<p>Depending on the model, survival models predict a risk score, a
-survival time or a survival probability.
-<code><a href="../reference/compute_prediction.html">compute_prediction()</a></code> converts them into a risk score so
-that all models are read the same way:</p>
+<p>Depending on the model, survival models predict a linear predictor, a
+survival time or a survival probability. The modelling library
+(<code>parsnip</code>) returns all of them so that higher values mean
+longer survival. <code><a href="../reference/compute_prediction.html">compute_prediction()</a></code> reverses them into a
+risk score so that all models are read the same way:</p>
 <ul>
-<li>risk score (<strong>linear_pred</strong>), e.g. Cox models, is used
-as is;</li>
-<li>predicted survival time (<strong>time</strong>), e.g. parametric
+<li>linear predictor (<strong>linear_pred</strong>), e.g. Cox models:
+<code>parsnip</code> returns it with the sign changed (higher = longer
+survival), so it is reversed back into a risk score;</li>
+<li>predicted survival time (<strong>time</strong>), e.g. tree-based
 models, is reversed: a longer survival means a lower risk;</li>
 <li>survival probability (<strong>survival</strong>) is also reversed: a
 higher probability of survival means a lower risk.</li>
@@ -220,23 +227,52 @@ predicted risk.</strong></p>
 </h2>
 <p>With <code>return = TRUE</code>, <code><a href="../reference/compute_prediction.html">compute_prediction()</a></code>
 splits the test samples into two groups at the median predicted risk and
-saves their Kaplan-Meier curves in <code>Results/</code>, with the
-C-index and the log-rank test p-value.</p>
+saves their Kaplan-Meier curves in <code>Results/</code>
+(<code>Survival_KM_&lt;file.name&gt;.pdf</code>), with the C-index and
+the log-rank test p-value. The <strong>High risk</strong> group contains
+the samples with the highest predicted risk scores, so its curve is
+expected to drop faster than the one of the <strong>Low risk</strong>
+group.</p>
 <div class="figure" style="text-align: center">
-<img src="figures/KM.png" class="r-plt" alt="Figure 2. Kaplan-Meier curves of the test samples by predicted risk group." width="80%"><p class="caption">
+<img src="figures/KM.png" class="r-plt" alt="Figure 2. Kaplan-Meier curves of the test samples by predicted risk group (two groups)." width="80%"><p class="caption">
 Figure 2. Kaplan-Meier curves of the test samples by predicted risk
-group.
+group (two groups).
 </p>
 </div>
-<p>To use another number of groups, call
-<code><a href="../reference/plot_survival_performance.html">plot_survival_performance()</a></code> with the observed outcome of
-the test samples and the output of <code><a href="../reference/compute_prediction.html">compute_prediction()</a></code>.
-Groups are defined by quantiles of the predicted risk:</p>
+<p>The number of groups is set with <code>n_groups</code> (default 2).
+Groups are defined by quantiles of the predicted risk and are named
+Low/High risk (2 groups), Low/Medium/High risk (3 groups) or Group 1
+(lowest risk) to Group n (highest risk):</p>
 <div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">pred_survival</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_prediction.html">compute_prediction</a></span><span class="op">(</span>model <span class="op">=</span> <span class="va">res_survival</span><span class="op">$</span><span class="va">Model</span>,</span>
+<span>                                    test_data <span class="op">=</span> <span class="va">X_test</span>,</span>
+<span>                                    task_type <span class="op">=</span> <span class="st">"survival"</span>,</span>
+<span>                                    time_var <span class="op">=</span> <span class="va">time_test</span>,</span>
+<span>                                    event_var <span class="op">=</span> <span class="va">event_test</span>,</span>
+<span>                                    file.name <span class="op">=</span> <span class="st">"Example_survival_3groups"</span>,</span>
+<span>                                    return <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>                                    n_groups <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></code></pre></div>
+<div class="figure" style="text-align: center">
+<img src="figures/KM_3groups.png" class="r-plt" alt="Figure 3. Kaplan-Meier curves of the test samples by predicted risk group (three groups)." width="80%"><p class="caption">
+Figure 3. Kaplan-Meier curves of the test samples by predicted risk
+group (three groups).
+</p>
+</div>
+<p>The same plot can be drawn from an existing prediction with
+<code><a href="../reference/plot_survival_performance.html">plot_survival_performance()</a></code>, which takes the observed
+outcome of the test samples and the output of
+<code><a href="../reference/compute_prediction.html">compute_prediction()</a></code>. It returns the plot object, so it can
+be customized:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">km</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plot_survival_performance.html">plot_survival_performance</a></span><span class="op">(</span>df_test <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>time <span class="op">=</span> <span class="va">time_test</span>, event <span class="op">=</span> <span class="va">event_test</span><span class="op">)</span>,</span>
 <span>                                prediction <span class="op">=</span> <span class="va">pred_survival</span>,</span>
 <span>                                n_groups <span class="op">=</span> <span class="fl">3</span>,</span>
-<span>                                file_name <span class="op">=</span> <span class="st">"Example_survival_3groups"</span><span class="op">)</span></span></code></pre></div>
+<span>                                file_name <span class="op">=</span> <span class="st">"Example_survival_3groups"</span><span class="op">)</span></span>
+<span><span class="va">km</span><span class="op">$</span><span class="va">plot</span> <span class="op">+</span> <span class="fu">ggplot2</span><span class="fu">::</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>x <span class="op">=</span> <span class="st">"Time (days)"</span><span class="op">)</span></span></code></pre></div>
+<p>Some models (e.g. tree-based ones) predict only a few distinct risk
+scores. Samples with the same predicted risk are always kept in the same
+group, so the groups can have different sizes, and fewer groups than
+<code>n_groups</code> may be formed (a message says so).</p>
 </div>
 <div class="section level2">
 <h2 id="shap-values">
@@ -246,7 +282,7 @@ Groups are defined by quantiles of the predicted risk:</p>
 classification, with <code>task_type = "survival"</code>. SHAP values
 are in risk-score units: positive values push the prediction towards a
 higher risk.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">shap_survival</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_shap_values.html">compute_shap_values</a></span><span class="op">(</span>model_trained <span class="op">=</span> <span class="va">res_survival</span><span class="op">$</span><span class="va">Model</span>,</span>
 <span>                                     task_type <span class="op">=</span> <span class="st">"survival"</span>,</span>
 <span>                                     seed <span class="op">=</span> <span class="fl">123</span><span class="op">)</span></span>
@@ -260,7 +296,7 @@ higher risk.</p>
 For survival, <code>time_var</code> and <code>event_var</code> are the
 names of the time and event columns of <code>coldata</code>, whose row
 names must be the sample names of the feature tables:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_onestep_survival</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.ML.html">compute_features.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="va">X_train</span>,</span>
 <span>                                            features_test <span class="op">=</span> <span class="va">X_test</span>,</span>
 <span>                                            coldata <span class="op">=</span> <span class="va">data</span>,</span>
@@ -276,7 +312,7 @@ names must be the sample names of the feature tables:</p>
 <code><a href="../reference/compute_features.training.ML.html">compute_features.training.ML()</a></code>, <code>C_index</code> the
 C-index on the test set and <code>Prediction</code> the predicted risk
 scores:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_onestep_survival</span><span class="op">$</span><span class="va">C_index</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">res_onestep_survival</span><span class="op">$</span><span class="va">Prediction</span><span class="op">)</span></span></code></pre></div>
 </div>

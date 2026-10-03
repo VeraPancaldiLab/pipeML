@@ -1,10 +1,15 @@
 # Get Hyperparameter Grid for a Classification Method
 
-Internal helper that returns the fixed hyperparameter grid evaluated for
-each classification method during custom-fold cross-validation
-([`compute_custom_k_fold_CV()`](https://verapancaldilab.github.io/pipeML/reference/compute_custom_k_fold_CV.md)).
-The grids are deliberately small so that the full grid can be evaluated
-in every fold.
+Internal helper that returns the hyperparameter grid evaluated for each
+classification method during custom-fold cross-validation:
+[`compute_k_fold_CV()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV.md)
+passes it to
+[`compute_custom_k_fold_CV()`](https://verapancaldilab.github.io/pipeML/reference/compute_custom_k_fold_CV.md),
+which trains every row in every fold. The grids are deliberately small
+so that the full grid can be evaluated in every fold. The standard path
+(no fold construction function) does not use these grids: it uses
+caret's default grids, except for lasso and ridge, which use the same
+`lambda` values as here.
 
 ## Usage
 
@@ -22,8 +27,14 @@ get_tune_grid(method, train_data)
 
 - train_data:
 
-  Data frame of training data including the `target` column. Only used
-  by `"rf"`, to scale `mtry` to the number of features.
+  Data frame with the training features and the `target` column (the
+  only non-feature column). Only used by `"rf"`, to scale `mtry` to the
+  number of features (`ncol - 1`), and by `"svmRadial"`, to estimate
+  `sigma`.
+  [`compute_k_fold_CV()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV.md)
+  passes the fold training data with the fewest features after
+  preprocessing, the same in all folds, so that the grid is the same in
+  all folds.
 
 ## Value
 
@@ -33,24 +44,30 @@ the `tuneGrid` argument of
 
 - glmnet:
 
-  `alpha` of 0 or 1, times 20 `lambda` values from 0.001 to 1 (40 rows).
+  `alpha` of 0 or 1, times 20 `lambda` values from 0.001 to 1, evenly
+  spaced on the log scale (40 rows).
 
 - lasso:
 
-  `alpha = 1`, with 20 `lambda` values from 0.001 to 1.
+  `alpha = 1`, with the same 20 `lambda` values.
 
 - ridge:
 
-  `alpha = 0`, with 20 `lambda` values from 0.001 to 1.
+  `alpha = 0`, with the same 20 `lambda` values.
 
 - rf:
 
-  Up to 3 `mtry` values spanning 20-90 percent of the number of
-  features.
+  Up to 3 `mtry` values spanning 20-90 percent of the number of features
+  (with 1 or 2 features, the values include 0, which randomForest resets
+  to 1).
 
 - svmRadial:
 
-  `sigma` of 0.01, 0.05 or 0.1, times `C` of 0.5, 1 or 2.
+  Up to 3 `sigma` values estimated from the features (the 90, 50 and 10
+  percent quantiles of \\1/\\x - x'\\^2\\ over all pairs of samples, on
+  scaled features, as
+  [`kernlab::sigest()`](https://rdrr.io/pkg/kernlab/man/sigest.html)
+  does on a random subset), times `C` of 0.5, 1 or 2.
 
 - treebag:
 
@@ -82,7 +99,9 @@ the `tuneGrid` argument of
 
 ## Details
 
-The grids are deterministic. An error is raised for unsupported methods.
+The grids are deterministic (no random numbers are used): the same
+`train_data` always gives the same grid. An error is raised for
+unsupported methods.
 
 ## See also
 

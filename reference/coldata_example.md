@@ -13,8 +13,10 @@ coldata_example
 
 ## Format
 
-A data frame with samples as rows and a column `Response` indicating
-treatment outcome.
+A data frame with 73 samples as rows (row names: sample identifiers,
+matching column names of `counts_example`) and 2 columns: `Response`,
+the treatment outcome (`"R"` = responder, `"NR"` = non-responder), and
+`Cohort` (`"Gide"`).
 
 ## Source
 

@@ -83,12 +83,14 @@ proportions within each dataset. Supports multiple repeats.</p>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A named list of fold indices suitable for use in training and evaluation.</p>
+    <p>A named list with the row indices of the training samples of each fold, named
+<code>Fold&lt;i&gt;.Rep&lt;j&gt;</code> (<code>k_folds</code> x <code>n_rep</code> elements).</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Each fold preserves the class distribution within each cohort. Useful for Leave-One-Dataset-Out (LODO)
-strategies or repeated stratified k-fold cross-validation.</p>
+    <p>Each cohort is split into <code>k_folds</code> folds stratified by the target, and the folds of all cohorts are
+merged, so every fold preserves the class distribution within each cohort. Stops with an error if a cohort
+has fewer samples than <code>k_folds</code>.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

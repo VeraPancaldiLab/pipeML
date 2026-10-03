@@ -15,27 +15,36 @@ compute_cv_CINDEX(models, file_name = NULL, plot_results = TRUE)
 
 - models:
 
-  Named list of survival model objects. Each element must contain a
-  `Resample_matrix` data frame with columns:
+  Named list of survival model objects (from
+  [`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md)).
+  Each element contains a `Resample_matrix` data frame with one row per
+  test sample of each resample (for the selected configuration), with
+  columns:
 
   `c_index`
 
-  :   Numeric C-index per fold/resample.
+  :   C-index of the resample, repeated on each of its rows.
 
   `Resample`
 
-  :   Fold or resample identifier (e.g., "Fold1").
+  :   Resample identifier (e.g., "Fold1.Rep1").
+
+  Excluded models are `NULL` and are ignored.
 
 - file_name:
 
   Optional character string to name the output PDF saved under
-  `"Results/CINDEX_CV_methods_<file_name>.pdf"`. If `NULL`, the file
-  uses a default naming convention.
+  `"Results/CINDEX_CV_methods_<file_name>.pdf"`. If `NULL`, the file is
+  `"Results/CINDEX_CV_methods_.pdf"`.
 
 - plot_results:
 
-  Logical (default = TRUE). If `TRUE`, generates a PDF bar plot showing
-  median C-index +/- MAD per model.
+  Logical (default = TRUE). If `TRUE`, saves a bar plot of the median
+  C-index +/- MAD of each model, with the same layout as the
+  classification AUROC/AUPRC plots
+  ([`plot_cv_metric()`](https://verapancaldilab.github.io/pipeML/reference/plot_cv_metric.md)):
+  models sorted from best to worst, selected model in blue, values above
+  the bars and a dashed line at 0.5 (random prediction).
 
 ## Value
 
@@ -43,11 +52,13 @@ A list with:
 
 - `CINDEX_summary`:
 
-  Tibble summarizing median and MAD per model.
+  Tibble with one row per model (`model`, `Median_CINDEX`,
+  `MAD_CINDEX`), sorted from best to worst.
 
 - `All_folds`:
 
-  Tibble of raw C-index values for all models and folds.
+  Tibble with the rows of all models (`model`, `c_index`, `Resample`):
+  one row per test sample of each resample.
 
 - `Top_model`:
 
@@ -55,12 +66,19 @@ A list with:
 
 ## Details
 
-- Median C-index represents typical discrimination performance across
-  folds.
+- The median and MAD are computed over the rows of `Resample_matrix`,
+  i.e. each resample counts in proportion to its number of test samples
+  (the same as per resample when the folds have the same size).
 
-- MAD provides robust variability estimation of C-index values.
+- The MAD is scaled ([`stats::mad()`](https://rdrr.io/r/stats/mad.html)
+  default, comparable to a standard deviation), as for the
+  classification AUROC and AUPRC.
 
-- The optional plot displays model performance with error bars +/- MAD.
+- Models without cross-validation results (excluded because they could
+  not be fitted) are ignored.
+
+- The optional plot displays model performance with error bars +/- MAD
+  (see `plot_results`).
 
 ## See also
 

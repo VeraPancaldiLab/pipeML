@@ -1,11 +1,11 @@
 # Train the Best Survival Model Using Optimized Hyperparameters
 
 Fits a survival model on the full training data using the optimal
-hyperparameters obtained from nested cross-validation. This wrapper
-ensures consistent retraining for different survival model types (Cox,
-penalized Cox, AFT, tree-based, or ensemble models), and supports
-preprocessing pipelines such as CellTFusion through a user-provided fold
-construction function.
+hyperparameters obtained from cross-validation. Used with a custom fold
+construction function. This wrapper ensures consistent retraining for
+different survival model types (Cox, penalized Cox, AFT, tree-based, or
+ensemble models), and supports preprocessing pipelines such as
+CellTFusion through a user-provided fold construction function.
 
 ## Usage
 
@@ -17,7 +17,8 @@ wrapper_train_best_hyperparams_survival(
   fold_construction_fun,
   fold_construction_args_fixed,
   outcome_col = "time",
-  event_col = "event"
+  event_col = "event",
+  preprocess = TRUE
 )
 ```
 
@@ -31,12 +32,13 @@ wrapper_train_best_hyperparams_survival(
 
 - optimized:
 
-  A list output from
-  [`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md)
-  or
-  [`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md),
-  containing the best-tuned parameters (`bestTune`) and model
-  performance summaries.
+  The cross-validation results of one model (one element of the output
+  of
+  [`aggregate_results()`](https://verapancaldilab.github.io/pipeML/reference/aggregate_results.md)):
+  `Results_folds`, `Prediction_folds`, `Resample_matrix` and `bestTune`.
+  With tunable arguments, `bestTune` is a data frame with the selected
+  feature parameters and model hyperparameters; without them, a list
+  with the model hyperparameters and `fold_construction_args_fixed`.
 
 - ml_method:
 
@@ -59,11 +61,17 @@ wrapper_train_best_hyperparams_survival(
 
   - `"boost_tree_mboost"` - Gradient boosting for censored data.
 
+  `"rand_forest_partykit"` and `"boost_tree_mboost"` are supported here
+  but are not run by default (they are commented out of `model_list` in
+  [`compute_k_fold_CV_survival()`](https://verapancaldilab.github.io/pipeML/reference/compute_k_fold_CV_survival.md)).
+
 - fold_construction_fun:
 
   A custom function used to construct folds and preprocessed data (e.g.,
-  `prepare_CellTFusion_folds()`). Must accept arguments `data` and
-  optionally `bestune`.
+  `prepare_CellTFusion_folds()`). Must accept the arguments `data` and
+  `bestune`. Called with `bestune`, it returns a list with the features
+  built on all training samples plus `time` and `event`, its custom
+  output, and the selected parameters.
 
 - fold_construction_args_fixed:
 
@@ -79,23 +87,33 @@ wrapper_train_best_hyperparams_survival(
   Character string naming the event indicator column (default =
   `"event"`).
 
+- preprocess:
+
+  Logical. If `TRUE` (default), the training features are preprocessed
+  with
+  [`preprocess_features()`](https://verapancaldilab.github.io/pipeML/reference/preprocess_features.md).
+
 ## Value
 
-A named list containing:
+`NULL` if the final fit fails. Otherwise a named list containing:
 
 - `Model`:
 
-  A list containing the fitted parsnip model object, resampling results,
-  and tuning information.
+  A list containing the model name (`model`), the fitted workflow
+  (`fitted`), the cross-validation results (`Results_folds`,
+  `Prediction_folds`, `Resample_matrix`) and the selected model
+  hyperparameters (`bestTune`; the feature parameters are in
+  `custom_output$Parameters`).
 
 - `training_set`:
 
-  The final preprocessed training dataset used for fitting.
+  The final training set used for fitting (preprocessed if
+  `preprocess = TRUE`).
 
 - `custom_output`:
 
   Additional data returned by the custom fold construction function
-  (e.g., CellTFusion outputs or parameter tables).
+  (e.g., CellTFusion outputs), plus its third element in `Parameters`.
 
 ## Details
 
@@ -107,9 +125,15 @@ This function performs the following steps:
     `fold_construction_fun()`, including any custom preprocessing or
     feature generation.
 
-3.  Applies the optimal hyperparameters to the model specification.
+3.  Preprocesses the features
+    ([`preprocess_features()`](https://verapancaldilab.github.io/pipeML/reference/preprocess_features.md)),
+    if `preprocess = TRUE`.
 
-4.  Fits the final model using the full training data.
+4.  Applies the optimal model hyperparameters to the model specification
+    (the feature parameters are only used by `fold_construction_fun`).
+
+5.  Fits the final model using the full training data. If the fit fails,
+    a warning is given and `NULL` is returned, so the model is excluded.
 
 If the selected model type has no tunable hyperparameters, the function
 automatically detects this and proceeds with the default model

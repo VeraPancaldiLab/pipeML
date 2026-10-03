@@ -67,7 +67,11 @@ completely unseen data, producing more realistic performance estimates.
 
 Inside each fold, `pipeML` also removes near-constant and highly
 correlated features (\|r\| \> 0.9) from the features built on the
-training part, and keeps the same features in the held-out part.
+training part, and keeps the same features in the held-out part. The
+same is done on the features built on all training samples for the final
+model. Without a fold construction function, the features are the same
+in every fold, so this filter is applied once on all training samples
+before the cross-validation. Set `preprocess = FALSE` to skip it.
 
 ## **Step 1 - Define a base feature function**
 
@@ -407,11 +411,25 @@ res_custom <- compute_features.training.ML(features_train = t(counts_train),
                                            metric         = "AUROC",
                                            k_folds        = 2,
                                            n_rep          = 1,
-                                           ncores         = 2,
                                            return         = FALSE,
                                            fold_construction_fun        = prepare_WGCNA_folds,
                                            fold_construction_args_fixed = list(power = 6))
 ```
+
+Notes on what `pipeML` does with a custom fold function:
+
+- fold files left in `Results/` by a previous interrupted run are
+  removed before your function is called, and the new ones are removed
+  once they have been read;
+- for classification, the models are trained on the folds one after the
+  other: the `ncores` argument of
+  [`compute_features.training.ML()`](https://verapancaldilab.github.io/pipeML/reference/compute_features.training.ML.md)
+  is not used. If building the features is slow, run it in parallel
+  inside your fold function (see [Tunable parameters within custom fold
+  functions](#tunable-parameters-within-custom-fold-functions));
+- the hyperparameter grid of each model is the same in all folds. For
+  random forest, the candidate values of `mtry` are sized from the fold
+  with the fewest features built by your function.
 
 Notice that `res_custom$Custom_output` contains the output of your base
 function on the full training set, in case it is needed (e.g. for
@@ -841,13 +859,13 @@ combinations of the provided parameter values. In this example:
 This results in **2 × 1 × 2 = 4** feature parameter combinations.
 
 For each of these configurations, the machine learning models are
-trained and tuned. For example, if logistic regression with elastic net
-(`glmnet`) is used, the model internally evaluates different values of
-the hyperparameters `alpha` and `lambda`. If the model tests **10 alpha
-values and 20 lambda values**, this results in **200 model
-configurations** for each feature combination, so **4 × 200 = 800**
-model fits, further multiplied by the number of folds and repetitions.
-Larger grids are possible, but the running time grows accordingly.
+trained and tuned. For example, for logistic regression with elastic net
+(`glmnet`), `pipeML` evaluates **2 alpha values (0 and 1) and 20 lambda
+values**, which results in **40 model configurations** for each feature
+combination, so **4 × 40 = 160** model fits, further multiplied by the
+number of folds and repetitions. The same happens for each of the other
+algorithms, so the running time grows quickly with the number of feature
+parameter combinations.
 
 ``` r
 
@@ -858,7 +876,6 @@ res_params <- compute_features.training.ML(features_train = t(counts_train),
                                            metric = "AUROC",
                                            k_folds = 2,
                                            n_rep = 1,
-                                           ncores = 2,
                                            return = FALSE,
                                            fold_construction_fun = prepare_WGCNA_folds_modular,
                                            fold_construction_args_fixed = list(power = 6,

@@ -58,7 +58,8 @@ predictions into a comparable numeric format.</p>
 <span>  <span class="va">model_fit</span>,</span>
 <span>  <span class="va">data</span>,</span>
 <span>  outcome_col <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  event_col <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  event_col <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  ci <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -71,40 +72,56 @@ predictions into a comparable numeric format.</p>
 
 
 <dt id="arg-data">data<a class="anchor" aria-label="anchor" href="#arg-data"></a></dt>
-<dd><p>Data frame containing predictors and survival outcome variables.</p></dd>
+<dd><p>Data frame with the predictors and, to compute the C-index, the survival outcome columns.</p></dd>
 
 
 <dt id="arg-outcome-col">outcome_col<a class="anchor" aria-label="anchor" href="#arg-outcome-col"></a></dt>
-<dd><p>Character string specifying the survival time column (default = <code>"time"</code>).</p></dd>
+<dd><p>Character string specifying the survival time column of <code>data</code>. Default <code>NULL</code>.</p></dd>
 
 
 <dt id="arg-event-col">event_col<a class="anchor" aria-label="anchor" href="#arg-event-col"></a></dt>
-<dd><p>Character string specifying the event indicator column (default = <code>"event"</code>).</p></dd>
+<dd><p>Character string specifying the event indicator column of <code>data</code>. Default <code>NULL</code>. If
+<code>outcome_col</code> or <code>event_col</code> is <code>NULL</code>, the C-index is not computed (<code>NA</code>): only predictions are returned.</p></dd>
+
+
+<dt id="arg-ci">ci<a class="anchor" aria-label="anchor" href="#arg-ci"></a></dt>
+<dd><p>Logical. If <code>TRUE</code> (default), the 95% confidence interval of the C-index is computed with
+<code><a href="compute_cindex_ci.html">compute_cindex_ci()</a></code> (1000 bootstrap resamples). <code>FALSE</code> computes the C-index only, as cross-validation does
+(<code><a href="compute_ml_survival.html">compute_ml_survival()</a></code>), since its confidence interval is not used there.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A list containing:</p><dl><dt><code>preds</code></dt>
-<dd><p>Tibble with standardized numeric predictions <code>.pred</code>.</p></dd>
+<dd><p>Tibble with the risk scores in <code>.pred</code> (higher = higher risk), one row per sample of <code>data</code>.</p></dd>
 
 <dt><code>c_index</code></dt>
-<dd><p>Numeric value of the computed C-index.</p></dd>
+<dd><p>The C-index (<code>NA</code> without outcome columns, <code>NaN</code> if <code>data</code> has no event).</p></dd>
 
 <dt><code>c_index_lower</code></dt>
-<dd><p>Lower bound of 95% CI for the C-index.</p></dd>
+<dd><p>Lower bound of the 95% CI of the C-index (<code>NA</code> without outcome columns or with
+<code>ci = FALSE</code>).</p></dd>
 
 <dt><code>c_index_upper</code></dt>
-<dd><p>Upper bound of 95% CI for the C-index.</p></dd>
+<dd><p>Upper bound of the 95% CI of the C-index (same).</p></dd>
 
 
 </dl></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>The function attempts predictions using multiple types depending on model support:</p><ul><li><p><code>"linear_pred"</code> - Linear predictor/log hazard (higher = higher risk).</p></li>
+    <p>The function attempts predictions using multiple types depending on model support:</p><ul><li><p><code>"linear_pred"</code> - Linear predictor. <code>parsnip</code> returns it so that higher = longer survival (for Cox
+models, the log hazard with the sign changed); reversed internally.</p></li>
 <li><p><code>"time"</code> - Expected survival time (higher = longer survival, reversed internally).</p></li>
-<li><p><code>"survival"</code> - Survival probability at a median evaluation time (higher = better survival, reversed internally).</p></li>
-</ul><p>Standardizes output into a tibble with a single numeric <code>.pred</code> column.
-Computes C-index using <code><a href="compute_cindex_ci.html">compute_cindex_ci()</a></code> if outcome/event columns are provided.</p>
+<li><p><code>"survival"</code> - Survival probability at the median observed time of <code>data</code> (higher = better survival,
+reversed internally). Only tried when <code>outcome_col</code> and <code>event_col</code> are given; none of the default models
+needs it.</p></li>
+</ul><p>The C-index is computed before the predictions are reversed, since it expects higher = longer survival. The
+returned predictions are risk scores: higher = higher risk.</p>
+<p>Standardizes output into a tibble with a single numeric <code>.pred</code> column.
+Computes the C-index if outcome/event columns are provided, with its 95% confidence interval if <code>ci = TRUE</code>
+(<code><a href="compute_cindex_ci.html">compute_cindex_ci()</a></code>: percentile interval over 1000 bootstrap resamples of the samples, stratified by event,
+seed 123, without
+changing the random number state of the session).</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

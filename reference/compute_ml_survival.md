@@ -61,9 +61,9 @@ compute_ml_survival(
 
 - models_hyperparameters:
 
-  Optional list of hyperparameter values to apply. Example:
-  `list(list(trees = 500, min_n = 10))`. Defaults to `NULL` (use engine
-  defaults).
+  List with one element: the hyperparameter values to apply. Example:
+  `list(list(trees = 500, min_n = 10))`. Use `list(NULL)` for the engine
+  defaults.
 
 - return_model:
 
@@ -82,7 +82,9 @@ If `df_test` is provided:
   - `Model` - fitted tidymodels workflow
 
   - `Metrics` - tibble with `predictions` and `c_index`. If `df_test` is
-    `NULL`, the function returns only the fitted model object.
+    `NULL`, the function returns only the fitted model object. If the
+    model cannot be fitted, an object of class `"pipeML_fit_error"` (a
+    list with the model name and the error message) is returned instead.
 
 ## Details
 
@@ -100,7 +102,7 @@ models. Workflow:
 2.  Apply optional hyperparameters via
     [`parsnip::set_args()`](https://parsnip.tidymodels.org/reference/set_args.html).
 
-3.  Construct survival formula: `Surv(time, event) ~ .`.
+3.  Construct survival formula: `survival::Surv(time, event) ~ .`.
 
 4.  Fit model using
     [`parsnip::fit()`](https://generics.r-lib.org/reference/fit.html) on

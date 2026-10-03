@@ -4,7 +4,11 @@ Computes the bootstrap distribution of AUROC (Area Under the ROC Curve)
 and AUPRC (Area Under the Precision-Recall Curve) for a set of
 predictions. This function resamples the data with replacement and
 computes the metrics for each bootstrap iteration, returning the mean,
-95% confidence interval, and all bootstrap values.
+95% confidence interval, and all bootstrap values. The bootstrap is
+stratified: the positive and negative samples are resampled separately,
+keeping their numbers, so every resample contains both classes (as pROC
+does for AUC intervals). The intervals and bands are the 2.5% and 97.5%
+percentiles of the resamples.
 
 ## Usage
 
@@ -16,11 +20,13 @@ bootstrap_auc(predict, target, method, B = 1000, seed = 123, n_grid = 101)
 
 - predict:
 
-  Numeric vector or matrix of predicted values (scores).
+  Data frame of predicted class probabilities, with a column `yes`
+  (probability of the positive class), one row per sample.
 
 - target:
 
-  Numeric or factor vector of observed binary outcomes.
+  Vector of observed outcomes (`"yes"` / `"no"`), in the order of the
+  rows of `predict`.
 
 - method:
 
@@ -32,7 +38,9 @@ bootstrap_auc(predict, target, method, B = 1000, seed = 123, n_grid = 101)
 
 - seed:
 
-  Integer. Random seed for reproducibility (default = 123).
+  Integer. Random seed of the bootstrap resamples (default = 123). It is
+  only used inside the function: the random number state of the session
+  is restored afterwards.
 
 - n_grid:
 

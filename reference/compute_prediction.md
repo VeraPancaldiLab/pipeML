@@ -18,7 +18,8 @@ compute_prediction(
   time_var = NULL,
   event_var = NULL,
   file.name = NULL,
-  return = FALSE
+  return = FALSE,
+  n_groups = 2
 )
 ```
 
@@ -32,11 +33,14 @@ compute_prediction(
 
 - test_data:
 
-  A data frame or matrix of predictor variables for the test set.
+  A data frame of predictor variables for the test set (for
+  classification, a matrix is also accepted). It must contain all the
+  features of the model; other columns are ignored for classification.
 
 - target_var:
 
-  Vector of true labels for the test set (classification only).
+  Vector of true labels for the test set, in the order of the rows of
+  `test_data` (classification only).
 
 - trait.positive:
 
@@ -49,13 +53,13 @@ compute_prediction(
 
 - time_var:
 
-  Column or vector of survival/follow-up times (required for survival
-  tasks).
+  Numeric vector of survival/follow-up times of the test samples, in the
+  order of the rows of `test_data` (required for survival tasks).
 
 - event_var:
 
-  Column or vector of event indicators (1 = event, 0 = censored;
-  required for survival tasks).
+  Numeric vector of event indicators of the test samples (1 = event, 0 =
+  censored; required for survival tasks).
 
 - file.name:
 
@@ -67,6 +71,12 @@ compute_prediction(
   precision-recall curves for classification, Kaplan-Meier curves by
   predicted risk group for survival). Default = FALSE.
 
+- n_groups:
+
+  Integer. Number of risk groups of the Kaplan-Meier plot (survival
+  only, used with `return = TRUE`). Default = 2. See
+  [`plot_survival_performance()`](https://verapancaldilab.github.io/pipeML/reference/plot_survival_performance.md).
+
 ## Value
 
 For classification, a list containing:
@@ -74,7 +84,8 @@ For classification, a list containing:
 - `Metrics`:
 
   Data frame of performance metrics (Accuracy, Sensitivity, Specificity,
-  Precision, Recall, F1 score, MCC) for each threshold.
+  Precision, Recall, F1 score, MCC) for each threshold: one row per test
+  sample, sorted by decreasing predicted probability.
 
 - `AUC`:
 
@@ -84,7 +95,8 @@ For classification, a list containing:
 
 - `Predictions`:
 
-  Data frame of predicted probabilities for each class.
+  Data frame of predicted probabilities for each class (columns `no` and
+  `yes`), in the order of the rows of `test_data`.
 
 - `Curve_bands`:
 
@@ -105,11 +117,18 @@ For survival, a list containing:
 ## Details
 
 Confidence intervals of AUROC and AUPRC come from 1000 bootstrap
-resamples of the test samples.
+resamples of the test samples, stratified by class (positives and
+negatives resampled separately, so every resample has both), and the
+confidence interval of the C-index from 1000 bootstrap resamples
+stratified by event. Both use the fixed seed 123 only inside the
+bootstrap: the state of the random number generator of the session is
+not changed.
 
-Survival models can predict a risk score, a survival time or a survival
-probability. The last two are reversed, so that higher predictions
-always mean higher risk.
+Survival models can predict a linear predictor, a survival time or a
+survival probability. The modelling library returns all three so that
+higher values mean longer survival (also the linear predictor of Cox
+models); they are reversed, so that higher predictions always mean
+higher risk.
 
 ## See also
 

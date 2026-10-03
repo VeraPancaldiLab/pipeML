@@ -60,7 +60,8 @@ MCC at each probability threshold. For survival, it predicts risk scores and com
 <span>  time_var <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  event_var <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  file.name <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  return <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span>  return <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  n_groups <span class="op">=</span> <span class="fl">2</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -74,11 +75,13 @@ MCC at each probability threshold. For survival, it predicts risk scores and com
 
 
 <dt id="arg-test-data">test_data<a class="anchor" aria-label="anchor" href="#arg-test-data"></a></dt>
-<dd><p>A data frame or matrix of predictor variables for the test set.</p></dd>
+<dd><p>A data frame of predictor variables for the test set (for classification, a matrix is also
+accepted). It must contain all the features of the model; other columns are ignored for classification.</p></dd>
 
 
 <dt id="arg-target-var">target_var<a class="anchor" aria-label="anchor" href="#arg-target-var"></a></dt>
-<dd><p>Vector of true labels for the test set (classification only).</p></dd>
+<dd><p>Vector of true labels for the test set, in the order of the rows of <code>test_data</code>
+(classification only).</p></dd>
 
 
 <dt id="arg-trait-positive">trait.positive<a class="anchor" aria-label="anchor" href="#arg-trait-positive"></a></dt>
@@ -90,11 +93,13 @@ MCC at each probability threshold. For survival, it predicts risk scores and com
 
 
 <dt id="arg-time-var">time_var<a class="anchor" aria-label="anchor" href="#arg-time-var"></a></dt>
-<dd><p>Column or vector of survival/follow-up times (required for survival tasks).</p></dd>
+<dd><p>Numeric vector of survival/follow-up times of the test samples, in the order of the rows of
+<code>test_data</code> (required for survival tasks).</p></dd>
 
 
 <dt id="arg-event-var">event_var<a class="anchor" aria-label="anchor" href="#arg-event-var"></a></dt>
-<dd><p>Column or vector of event indicators (1 = event, 0 = censored; required for survival tasks).</p></dd>
+<dd><p>Numeric vector of event indicators of the test samples (1 = event, 0 = censored; required for
+survival tasks).</p></dd>
 
 
 <dt id="arg-file-name">file.name<a class="anchor" aria-label="anchor" href="#arg-file-name"></a></dt>
@@ -105,19 +110,26 @@ MCC at each probability threshold. For survival, it predicts risk scores and com
 <dd><p>Logical. Whether to save the plots in <code>Results/</code> (ROC and precision-recall curves for
 classification, Kaplan-Meier curves by predicted risk group for survival). Default = FALSE.</p></dd>
 
+
+<dt id="arg-n-groups">n_groups<a class="anchor" aria-label="anchor" href="#arg-n-groups"></a></dt>
+<dd><p>Integer. Number of risk groups of the Kaplan-Meier plot (survival only, used with
+<code>return = TRUE</code>). Default = 2. See <code><a href="plot_survival_performance.html">plot_survival_performance()</a></code>.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>For classification, a list containing:</p><dl><dt><code>Metrics</code></dt>
 <dd><p>Data frame of performance metrics (Accuracy, Sensitivity, Specificity,
-Precision, Recall, F1 score, MCC) for each threshold.</p></dd>
+Precision, Recall, F1 score, MCC) for each threshold: one row per test sample,
+sorted by decreasing predicted probability.</p></dd>
 
 <dt><code>AUC</code></dt>
 <dd><p>List with <code>AUROC</code> and <code>AUPRC</code>, each a list with the <code>estimate</code> on the
 test set and the <code>lower</code> and <code>upper</code> bounds of its 95% bootstrap confidence interval.</p></dd>
 
 <dt><code>Predictions</code></dt>
-<dd><p>Data frame of predicted probabilities for each class.</p></dd>
+<dd><p>Data frame of predicted probabilities for each class (columns <code>no</code> and
+<code>yes</code>), in the order of the rows of <code>test_data</code>.</p></dd>
 
 <dt><code>Curve_bands</code></dt>
 <dd><p>List with <code>ROC</code> (columns <code>fpr</code>, <code>lower</code>, <code>upper</code>) and
@@ -136,9 +148,13 @@ confidence interval.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>Confidence intervals of AUROC and AUPRC come from 1000 bootstrap resamples of the test samples.</p>
-<p>Survival models can predict a risk score, a survival time or a survival probability. The last two are
-reversed, so that higher predictions always mean higher risk.</p>
+    <p>Confidence intervals of AUROC and AUPRC come from 1000 bootstrap resamples of the test samples, stratified by
+class (positives and negatives resampled separately, so every resample has both), and the confidence interval
+of the C-index from 1000 bootstrap resamples stratified by event. Both use the fixed seed 123 only inside the
+bootstrap: the state of the random number generator of the session is not changed.</p>
+<p>Survival models can predict a linear predictor, a survival time or a survival probability. The modelling
+library returns all three so that higher values mean longer survival (also the linear predictor of Cox
+models); they are reversed, so that higher predictions always mean higher risk.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

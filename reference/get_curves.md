@@ -17,7 +17,7 @@ get_curves(
   auc_roc,
   auc_prc,
   LODO = FALSE,
-  file.name,
+  file.name = NULL,
   width = 6,
   height = 6,
   roc_band = NULL,
@@ -29,7 +29,9 @@ get_curves(
 
 - data:
 
-  A data frame containing the prediction metrics.
+  A data frame containing the prediction metrics at each threshold, as
+  returned in `compute_prediction()$Metrics` (sorted by decreasing
+  predicted probability within each curve).
 
 - spec:
 
@@ -49,9 +51,12 @@ get_curves(
 
 - color:
 
-  The name of the column containing the cohort names. Each cohort will
-  have a corresponding color in the plot. Multiple cohorts will result
-  in different curves.
+  The name of the column that identifies each curve (e.g. `"model"` for
+  the output of
+  [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md),
+  or the column with the cohort names). Each value will have a
+  corresponding color in the plot. Several curves (several values in
+  this column) are only supported with `LODO = TRUE`.
 
 - auc_roc:
 
@@ -70,11 +75,12 @@ get_curves(
 
   Logical. If TRUE, the function assumes the data contains stacked
   predictions from multiple cohorts and assigns AUROC/AUPRC per cohort
-  (default = FALSE).
+  (default = FALSE). `auc_roc` and `auc_prc` must then hold named
+  vectors, with the names of the cohorts.
 
 - file.name:
 
-  A character string used as the file name prefix for saving the plots.
+  Optional character string added to the names of the saved plots.
 
 - width:
 
@@ -99,8 +105,16 @@ get_curves(
 
 ## Value
 
-Saves two PDF plots: one for the ROC curve and one for the
-Precision-Recall curve in the "Results/" directory.
+No return value. Saves two PDF plots in the "Results/" directory:
+`ROC_curve_<file.name>.pdf` for the ROC curve and
+`PRC_curve_<file.name>.pdf` for the Precision-Recall curve
+(`ROC_curve.pdf` and `PRC_curve.pdf` if `file.name` is `NULL`).
+
+## Details
+
+The ROC curve is drawn from the point (0, 0), and the precision-recall
+curve from recall 0 with the precision of its first point, which are the
+starting points used to calculate AUROC and AUPRC.
 
 ## Examples
 

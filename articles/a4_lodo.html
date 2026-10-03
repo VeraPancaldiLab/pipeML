@@ -92,11 +92,12 @@ on a cohort it has never seen. In a <strong>Leave-One-Dataset-Out
 (LODO)</strong> analysis, each cohort is left out in turn: the models
 are trained on the other cohorts and tested on the left-out one.</p>
 <p>Inside the training cohorts, set <code>LODO = TRUE</code> and give
-the cohort of each sample in <code>batch_var</code>: the
-cross-validation folds are then stratified by cohort and outcome, so
-every fold contains samples of every training cohort in the same
-proportions. The cohort is only used to build the folds; it is not used
-as a predictor.</p>
+the cohort of each sample in <code>batch_var</code> (in the order of the
+rows of the features): the cross-validation folds are then stratified by
+cohort and outcome, so every fold contains samples of every training
+cohort in the same proportions. The cohort is only used to build the
+folds; it is not used as a predictor. For classification, each training
+cohort needs at least <code>k_folds</code> samples.</p>
 </div>
 <div class="section level2">
 <h2 id="classification">

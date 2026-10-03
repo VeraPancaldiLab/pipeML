@@ -1,7 +1,12 @@
 # Compute Concordance Index with Bootstrap Confidence Interval (Internal)
 
 Computes the C-index (concordance index) for survival predictions and
-estimates a 95% confidence interval via bootstrap resampling.
+estimates a 95% confidence interval via bootstrap resampling (percentile
+interval of the C-index over `n_boot` resamples of the rows). The
+bootstrap is stratified by event: samples with an event and censored
+samples are resampled separately, keeping their numbers, so every
+resample contains events. The predictions must be in the direction
+"higher = longer survival".
 
 ## Usage
 
@@ -41,7 +46,9 @@ compute_cindex_ci(
 
 - seed:
 
-  Integer. Random seed for reproducibility (default = 123).
+  Integer. Random seed of the bootstrap resamples (default = 123). It is
+  only used inside the function: the random number state of the session
+  is restored afterwards.
 
 ## Value
 

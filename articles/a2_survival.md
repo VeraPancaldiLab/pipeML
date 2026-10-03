@@ -21,7 +21,8 @@ outcome has two components:
 
 - **time**: follow-up or survival time
 - **event**: whether the event occurred (1) or the observation was
-  censored (0)
+  censored (0). It must be coded with these two values, without missing
+  values.
 
 Survival models are built with `parsnip` and its `censored` extension.
 `censored` must be installed, but you don’t need to load it: `pipeML`
@@ -72,6 +73,11 @@ repeated k-fold cross-validation stratified by event. `time_var` and
 `event_var` are the time and event of each training sample. The best
 model is selected by the concordance index (C-index).
 
+As for classification, near-constant and highly correlated features
+(\|r\| \> 0.9) are removed from the training features before the
+cross-validation (`preprocess = TRUE`, the default); none of the
+features of this example is removed.
+
 Survival models are slower to train than classification models: here we
 use 3 folds and 1 repetition to keep the example fast. Use more folds
 and repetitions (e.g. `k_folds = 5`, `n_rep = 5`) for real analyses.
@@ -95,7 +101,7 @@ All trained models and the name of the selected one:
 ``` r
 
 names(res_survival$ML_Models)
-res_survival$Model$model
+unique(res_survival$Model$Resample_matrix$model)
 ```
 
 The selected model trained on all training samples with the tuned
@@ -153,14 +159,18 @@ Predicted risk scores of the test samples:
 head(pred_survival$preds)
 ```
 
-Depending on the model, survival models predict a risk score, a survival
-time or a survival probability.
+Depending on the model, survival models predict a linear predictor, a
+survival time or a survival probability. The modelling library
+(`parsnip`) returns all of them so that higher values mean longer
+survival.
 [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md)
-converts them into a risk score so that all models are read the same
+reverses them into a risk score so that all models are read the same
 way:
 
-- risk score (**linear_pred**), e.g. Cox models, is used as is;
-- predicted survival time (**time**), e.g. parametric models, is
+- linear predictor (**linear_pred**), e.g. Cox models: `parsnip` returns
+  it with the sign changed (higher = longer survival), so it is reversed
+  back into a risk score;
+- predicted survival time (**time**), e.g. tree-based models, is
   reversed: a longer survival means a lower risk;
 - survival probability (**survival**) is also reversed: a higher
   probability of survival means a lower risk.
@@ -172,20 +182,46 @@ way:
 With `return = TRUE`,
 [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md)
 splits the test samples into two groups at the median predicted risk and
-saves their Kaplan-Meier curves in `Results/`, with the C-index and the
-log-rank test p-value.
+saves their Kaplan-Meier curves in `Results/`
+(`Survival_KM_<file.name>.pdf`), with the C-index and the log-rank test
+p-value. The **High risk** group contains the samples with the highest
+predicted risk scores, so its curve is expected to drop faster than the
+one of the **Low risk** group.
 
 ![Figure 2. Kaplan-Meier curves of the test samples by predicted risk
-group.](figures/KM.png)
+group (two groups).](figures/KM.png)
 
 Figure 2. Kaplan-Meier curves of the test samples by predicted risk
-group.
+group (two groups).
 
-To use another number of groups, call
-[`plot_survival_performance()`](https://verapancaldilab.github.io/pipeML/reference/plot_survival_performance.md)
-with the observed outcome of the test samples and the output of
+The number of groups is set with `n_groups` (default 2). Groups are
+defined by quantiles of the predicted risk and are named Low/High risk
+(2 groups), Low/Medium/High risk (3 groups) or Group 1 (lowest risk) to
+Group n (highest risk):
+
+``` r
+
+pred_survival <- compute_prediction(model = res_survival$Model,
+                                    test_data = X_test,
+                                    task_type = "survival",
+                                    time_var = time_test,
+                                    event_var = event_test,
+                                    file.name = "Example_survival_3groups",
+                                    return = TRUE,
+                                    n_groups = 3)
+```
+
+![Figure 3. Kaplan-Meier curves of the test samples by predicted risk
+group (three groups).](figures/KM_3groups.png)
+
+Figure 3. Kaplan-Meier curves of the test samples by predicted risk
+group (three groups).
+
+The same plot can be drawn from an existing prediction with
+[`plot_survival_performance()`](https://verapancaldilab.github.io/pipeML/reference/plot_survival_performance.md),
+which takes the observed outcome of the test samples and the output of
 [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md).
-Groups are defined by quantiles of the predicted risk:
+It returns the plot object, so it can be customized:
 
 ``` r
 
@@ -193,7 +229,13 @@ km <- plot_survival_performance(df_test = data.frame(time = time_test, event = e
                                 prediction = pred_survival,
                                 n_groups = 3,
                                 file_name = "Example_survival_3groups")
+km$plot + ggplot2::labs(x = "Time (days)")
 ```
+
+Some models (e.g. tree-based ones) predict only a few distinct risk
+scores. Samples with the same predicted risk are always kept in the same
+group, so the groups can have different sizes, and fewer groups than
+`n_groups` may be formed (a message says so).
 
 ## **SHAP values**
 

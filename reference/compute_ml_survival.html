@@ -96,8 +96,8 @@ event indicator, and predictors.</p></dd>
 
 
 <dt id="arg-models-hyperparameters">models_hyperparameters<a class="anchor" aria-label="anchor" href="#arg-models-hyperparameters"></a></dt>
-<dd><p>Optional list of hyperparameter values to apply.
-Example: <code>list(list(trees = 500, min_n = 10))</code>. Defaults to <code>NULL</code> (use engine defaults).</p></dd>
+<dd><p>List with one element: the hyperparameter values to apply.
+Example: <code>list(list(trees = 500, min_n = 10))</code>. Use <code>list(NULL)</code> for the engine defaults.</p></dd>
 
 
 <dt id="arg-return-model">return_model<a class="anchor" aria-label="anchor" href="#arg-return-model"></a></dt>
@@ -110,7 +110,9 @@ Default is <code>FALSE</code>.</p></dd>
     <p>If <code>df_test</code> is provided:</p><ul><li><p>A tibble with columns <code>predictions</code> (predicted risk scores) and <code>c_index</code> (Concordance Index).</p></li>
 <li><p>If <code>return_model = TRUE</code>, a list with elements:</p><ul><li><p><code>Model</code> - fitted tidymodels workflow</p></li>
 <li><p><code>Metrics</code> - tibble with <code>predictions</code> and <code>c_index</code>.
-If <code>df_test</code> is <code>NULL</code>, the function returns only the fitted model object.</p></li>
+If <code>df_test</code> is <code>NULL</code>, the function returns only the fitted model object.
+If the model cannot be fitted, an object of class <code>"pipeML_fit_error"</code> (a list with the model name and the
+error message) is returned instead.</p></li>
 </ul></li>
 </ul></div>
     <div class="section level2">
@@ -121,7 +123,7 @@ higher values indicate higher risk.</p>
 <p>The function uses the <strong>parsnip</strong> interface to define and fit survival models.
 Workflow:</p><ol><li><p>Create model specification (<code><a href="https://parsnip.tidymodels.org/reference/model_spec.html" class="external-link">parsnip::model_spec</a></code>) based on <code>model</code> type.</p></li>
 <li><p>Apply optional hyperparameters via <code><a href="https://parsnip.tidymodels.org/reference/set_args.html" class="external-link">parsnip::set_args()</a></code>.</p></li>
-<li><p>Construct survival formula: <code>Surv(time, event) ~ .</code>.</p></li>
+<li><p>Construct survival formula: <code>survival::Surv(time, event) ~ .</code>.</p></li>
 <li><p>Fit model using <code><a href="https://generics.r-lib.org/reference/fit.html" class="external-link">parsnip::fit()</a></code> on <code>df_train</code>.</p></li>
 <li><p>Evaluate performance using <code><a href="predict_and_evaluate_survival.html">predict_and_evaluate_survival()</a></code> (C-index).</p></li>
 </ol></div>

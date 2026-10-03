@@ -138,7 +138,12 @@ to completely unseen data, producing more realistic performance
 estimates.</p>
 <p>Inside each fold, <code>pipeML</code> also removes near-constant and
 highly correlated features (|r| &gt; 0.9) from the features built on the
-training part, and keeps the same features in the held-out part.</p>
+training part, and keeps the same features in the held-out part. The
+same is done on the features built on all training samples for the final
+model. Without a fold construction function, the features are the same
+in every fold, so this filter is applied once on all training samples
+before the cross-validation. Set <code>preprocess = FALSE</code> to skip
+it.</p>
 </div>
 <div class="section level2">
 <h2 id="step-1---define-a-base-feature-function">
@@ -484,10 +489,24 @@ you can omit this argument.</p>
 <span>                                           metric         <span class="op">=</span> <span class="st">"AUROC"</span>,</span>
 <span>                                           k_folds        <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                           n_rep          <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>                                           ncores         <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                           return         <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>                                           fold_construction_fun        <span class="op">=</span> <span class="va">prepare_WGCNA_folds</span>,</span>
 <span>                                           fold_construction_args_fixed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>power <span class="op">=</span> <span class="fl">6</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<p>Notes on what <code>pipeML</code> does with a custom fold
+function:</p>
+<ul>
+<li>fold files left in <code>Results/</code> by a previous interrupted
+run are removed before your function is called, and the new ones are
+removed once they have been read;</li>
+<li>for classification, the models are trained on the folds one after
+the other: the <code>ncores</code> argument of
+<code><a href="../reference/compute_features.training.ML.html">compute_features.training.ML()</a></code> is not used. If building the
+features is slow, run it in parallel inside your fold function (see <a href="#tunable-parameters-within-custom-fold-functions">Tunable
+parameters within custom fold functions</a>);</li>
+<li>the hyperparameter grid of each model is the same in all folds. For
+random forest, the candidate values of <code>mtry</code> are sized from
+the fold with the fewest features built by your function.</li>
+</ul>
 <p>Notice that <code>res_custom$Custom_output</code> contains the output
 of your base function on the full training set, in case it is needed
 (e.g. for prediction - see next step):</p>
@@ -905,15 +924,14 @@ all combinations of the provided parameter values. In this example:</p>
 <p>This results in <strong>2 × 1 × 2 = 4</strong> feature parameter
 combinations.</p>
 <p>For each of these configurations, the machine learning models are
-trained and tuned. For example, if logistic regression with elastic net
-(<code>glmnet</code>) is used, the model internally evaluates different
-values of the hyperparameters <code>alpha</code> and
-<code>lambda</code>. If the model tests <strong>10 alpha values and 20
-lambda values</strong>, this results in <strong>200 model
-configurations</strong> for each feature combination, so <strong>4 × 200
-= 800</strong> model fits, further multiplied by the number of folds and
-repetitions. Larger grids are possible, but the running time grows
-accordingly.</p>
+trained and tuned. For example, for logistic regression with elastic net
+(<code>glmnet</code>), <code>pipeML</code> evaluates <strong>2 alpha
+values (0 and 1) and 20 lambda values</strong>, which results in
+<strong>40 model configurations</strong> for each feature combination,
+so <strong>4 × 40 = 160</strong> model fits, further multiplied by the
+number of folds and repetitions. The same happens for each of the other
+algorithms, so the running time grows quickly with the number of feature
+parameter combinations.</p>
 <div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">res_params</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/compute_features.training.ML.html">compute_features.training.ML</a></span><span class="op">(</span>features_train <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">counts_train</span><span class="op">)</span>,</span>
 <span>                                           target_var     <span class="op">=</span> <span class="va">coldata_train</span><span class="op">$</span><span class="va">Response</span>,</span>
@@ -922,7 +940,6 @@ accordingly.</p>
 <span>                                           metric <span class="op">=</span> <span class="st">"AUROC"</span>,</span>
 <span>                                           k_folds <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                           n_rep <span class="op">=</span> <span class="fl">1</span>,</span>
-<span>                                           ncores <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>                                           return <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>                                           fold_construction_fun <span class="op">=</span> <span class="va">prepare_WGCNA_folds_modular</span>,</span>
 <span>                                           fold_construction_args_fixed <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>power <span class="op">=</span> <span class="fl">6</span>,</span>

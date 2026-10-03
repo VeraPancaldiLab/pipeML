@@ -1,7 +1,15 @@
 # Evaluate a Precision-Recall Curve on a Fixed Recall Grid (Internal)
 
-For each grid value, returns the precision at the first threshold whose
-recall reaches that value.
+Returns, for each grid value, the precision of the precision-recall
+curve at that recall, with straight lines between consecutive points:
+the curve as
+[`get_curves()`](https://verapancaldilab.github.io/pipeML/reference/get_curves.md)
+draws it (`geom_line()`) and as
+[`calculate_auprc()`](https://verapancaldilab.github.io/pipeML/reference/calculate_auprc.md)
+integrates it, starting at recall 0 with the precision of the first
+point. At a grid value equal to the recall of a point, it is the
+precision at the first threshold reaching that recall (so the final drop
+to the prevalence at recall 1 is not in the band).
 
 ## Usage
 

@@ -56,16 +56,17 @@ It is particularly useful when the class distribution is imbalanced.</p>
 
 
 <dl><dt id="arg-metrics">metrics<a class="anchor" aria-label="anchor" href="#arg-metrics"></a></dt>
-<dd><p>A vector of predicted class labels or probabilities.</p></dd>
+<dd><p>A data frame with metrics obtained using <code><a href="get_sensitivity_specificity.html">get_sensitivity_specificity()</a></code>, containing
+at least two columns: "Sensitivity" and "Specificity" (one row per probability threshold).</p></dd>
 
 
 <dt id="arg-target">target<a class="anchor" aria-label="anchor" href="#arg-target"></a></dt>
-<dd><p>A vector of true class labels.</p></dd>
+<dd><p>A vector of true class labels (<code>"yes"</code> / <code>"no"</code>).</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>The F1 score, a numeric value between 0 and 1.</p>
+    <p>A numeric vector with the F1 score (between 0 and 1) at each probability threshold.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

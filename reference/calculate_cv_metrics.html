@@ -59,7 +59,8 @@ It also handles hyperparameter tuning by selecting the optimal parameter set bas
 
 
 <dl><dt id="arg-ml-model">ml_model<a class="anchor" aria-label="anchor" href="#arg-ml-model"></a></dt>
-<dd><p>A trained machine learning model object containing <code>Prediction_folds</code> and <code>Resample_matrix</code>.</p></dd>
+<dd><p>A trained machine learning model object containing <code>Prediction_folds</code> (out-of-fold predictions),
+<code>Results_folds</code> and <code>Resample_matrix</code>.</p></dd>
 
 
 <dt id="arg-metric">metric<a class="anchor" aria-label="anchor" href="#arg-metric"></a></dt>
@@ -67,19 +68,22 @@ It also handles hyperparameter tuning by selecting the optimal parameter set bas
 
 
 <dt id="arg-hyperparameters">hyperparameters<a class="anchor" aria-label="anchor" href="#arg-hyperparameters"></a></dt>
-<dd><p>Optional character vector of hyperparameter column names to evaluate. If <code>NULL</code>, no hyperparameter tuning is performed.</p></dd>
+<dd><p>Character vector of hyperparameter column names of <code>Prediction_folds</code> to evaluate. For a model
+without hyperparameters (treebag), <code>"parameter"</code> is used: the column that holds <code>"none"</code>. With <code>NULL</code>, no
+hyperparameter tuning is performed and all resamples get the same aggregated value.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>A list containing:</p><dl><dt><code>Prediction_folds</code></dt>
-<dd><p>Data frame of out-of-fold predictions with computed metrics for each resample and hyperparameter combination.</p></dd>
+<dd><p>Data frame of out-of-fold predictions with computed metrics for each resample and hyperparameter combination,
+sorted by resample, hyperparameters and decreasing predicted probability.</p></dd>
 
 <dt><code>Resample_matrix</code></dt>
 <dd><p>Data frame of per-resample performance metrics (AUROC, AUPRC, Accuracy) for the tuned model.</p></dd>
 
 <dt><code>Results_folds</code></dt>
-<dd><p>Aggregated performance metrics across hyperparameter combinations or resamples.</p></dd>
+<dd><p>Median AUROC, AUPRC and Accuracy of each hyperparameter combination.</p></dd>
 
 <dt><code>bestTune</code></dt>
 <dd><p>Optimal hyperparameter configuration based on the selected metric. Set to <code>"none"</code> if no hyperparameters are provided.</p></dd>
