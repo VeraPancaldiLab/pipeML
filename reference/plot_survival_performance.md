@@ -44,8 +44,9 @@ plot_survival_performance(df_test, prediction, n_groups = 2, file_name = NULL)
 
 ## Value
 
-Invisibly returns the `ggsurvplot` object for further customization. The
-plot (curves and number-at-risk table) is saved as a PDF.
+Invisibly returns a `km_plot` object, a list of two ggplot objects that
+can be customized: `plot` (the curves) and `table` (the number at risk).
+Printing it draws both together. The plot is saved as a PDF.
 
 ## Details
 

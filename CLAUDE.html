@@ -48,7 +48,7 @@
 <li>
 <strong>License:</strong> GPL &gt;= 3</li>
 <li>
-<strong>R requirement:</strong> &gt;= 4.3</li>
+<strong>R requirement:</strong> &gt;= 4.3.1</li>
 <li>
 <strong>GitHub:</strong> <a href="https://github.com/VeraPancaldiLab/pipeML" class="external-link uri">https://github.com/VeraPancaldiLab/pipeML</a>
 </li>
@@ -103,7 +103,7 @@ pipeML.Rproj             # RStudio project config</code></pre>
 </tr><tr><td><code><a href="reference/compute_shap_values.html">compute_shap_values()</a></code></td>
 <td>SHAP values of the final model (trained on all training samples) for every training sample; takes only the trained model</td>
 </tr><tr><td><code><a href="reference/plot_survival_performance.html">plot_survival_performance()</a></code></td>
-<td>Kaplan-Meier curves stratified by predicted risk groups</td>
+<td>Kaplan-Meier curves stratified by predicted risk groups (returns a <code>km_plot</code>: <code>$plot</code> and <code>$table</code> ggplots, drawn together by <code>print.km_plot()</code>)</td>
 </tr></tbody></table><hr></div>
 <div class="section level2">
 <h2 id="supported-ml-algorithms">Supported ML Algorithms<a class="anchor" aria-label="anchor" href="#supported-ml-algorithms"></a></h2>
@@ -112,8 +112,9 @@ pipeML.Rproj             # RStudio project config</code></pre>
 <hr></div>
 <div class="section level2">
 <h2 id="key-dependencies">Key Dependencies<a class="anchor" aria-label="anchor" href="#key-dependencies"></a></h2>
-<p><strong>Imports (must be installed):</strong> <code>caret</code>, <code>doParallel</code>, <code>foreach</code>, <code>dplyr</code>, <code>tidyr</code>, <code>tibble</code>, <code>purrr (&gt;= 1.0.2)</code>, <code>ggplot2</code>, <code>reshape2</code>, <code>survival</code>, <code>survminer</code>, <code>fastshap</code>, <code>dials</code>, <code>parsnip</code>, <code>rsample</code>, <code>workflows</code>, <code>tune</code>, <code>yardstick</code>, <code>grDevices</code>, <code>parallel</code>, <code>stats</code></p>
-<p><strong>Suggests (optional, needed for specific algorithms):</strong> <code>testthat (&gt;= 3.0.0)</code>, <code>knitr</code>, <code>rmarkdown</code>, <code>C50</code>, <code>randomForest</code>, <code>glmnet</code>, <code>xgboost</code>, <code>kernlab</code>, <code>recipes</code>, <code>tidyverse</code>, <code>tidymodels</code>, <code>censored</code>, <code>flexsurv</code>, <code>coin</code>, <code>aorsf</code>, <code>WGCNA</code>, <code>cowplot</code>, <code>matlib</code>, <code>shapviz</code></p>
+<p><strong>Imports (must be installed):</strong> <code>caret</code>, <code>doParallel</code>, <code>foreach</code>, <code>dplyr</code>, <code>tidyr</code>, <code>tibble</code>, <code>purrr (&gt;= 1.0.2)</code>, <code>ggplot2</code>, <code>reshape2</code>, <code>survival</code>, <code>fastshap</code>, <code>dials</code>, <code>parsnip</code>, <code>rsample</code>, <code>workflows</code>, <code>tune</code>, <code>withr</code>, <code>yardstick</code>, <code>grDevices</code>, <code>grid</code>, <code>parallel</code>, <code>stats</code></p>
+<p><strong>Suggests (optional, needed for specific algorithms):</strong> <code>testthat (&gt;= 3.0.0)</code>, <code>knitr</code>, <code>rmarkdown</code>, <code>C50</code>, <code>randomForest</code>, <code>glmnet</code>, <code>xgboost</code>, <code>kernlab</code>, <code>recipes</code>, <code>tidyverse</code>, <code>tidymodels</code>, <code>censored</code>, <code>flexsurv</code>, <code>coin</code>, <code>aorsf</code>, <code>WGCNA</code>, <code>cowplot</code>, <code>shapviz</code></p>
+<p><strong>R version (<code>R (&gt;= 4.3.1)</code>, R 4.3.0 not tested):</strong> verified on 2026-10-19 by installing with pak into empty libraries on R 4.3.1 and 4.3.3 and running R CMD check with all tests. Don’t add a dependency that pulls in <code>car</code> (e.g. <code>survminer</code>, <code>ggpubr</code>, <code>rstatix</code>, <code>matlib</code>): <code>car -&gt; pbkrtest -&gt; doBy -&gt; Deriv</code> needs R &gt;= 4.5 (<code>Deriv</code> 4.3.5 declares it; 4.3.0 declares nothing but does not compile on R &lt; 4.5), and <code>car -&gt; quantreg -&gt; MatrixModels</code> needs Matrix &gt;= 1.6-0 (R 4.3.0/4.3.1 ship 1.5-4.1). For this reason <code><a href="reference/plot_survival_performance.html">plot_survival_performance()</a></code> draws the Kaplan-Meier plot with ggplot2 + grid since 2026-10-19 (before: <code>survminer::ggsurvplot()</code>) and <code>matlib</code> (never used) was dropped from Suggests. CI (<code>release</code>, <code>oldrel-1</code>) does not test R 4.3, so re-check the floor locally when adding dependencies.</p>
 <p><strong>Remotes (GitHub):</strong> - <code>VeraPancaldiLab/multideconv</code> — custom deconvolution package (optional) - <code>bgreenwell/fastshap@v0.3.0</code> — <code>fastshap</code> was archived from CRAN on 2026-05-27, so CI (pak) can only install it from GitHub. Pinned to the v0.3.0 release tag; its <code>explain(object, X, pred_wrapper, newdata, nsim, adjust)</code> API and default estimator are unchanged from CRAN 0.1.1.</p>
 <hr></div>
 <div class="section level2">

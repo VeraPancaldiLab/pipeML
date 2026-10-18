@@ -11,7 +11,7 @@ preventing information leakage.
 
 - **Version:** 0.0.1 (active development)
 - **License:** GPL \>= 3
-- **R requirement:** \>= 4.3
+- **R requirement:** \>= 4.3.1
 - **GitHub:** <https://github.com/VeraPancaldiLab/pipeML>
 - **Website:** <https://verapancaldilab.github.io/pipeML>
 - **Authors:** Marcelo Hurtado (aut, cre), Vera Pancaldi (aut)
@@ -59,7 +59,7 @@ All live in `R/machine_learning.R`.
 | [`compute_prediction()`](https://verapancaldilab.github.io/pipeML/reference/compute_prediction.md) | Generate predictions on test data using trained model (returns AUROC/AUPRC with bootstrap CIs and `Curve_bands`) |
 | [`get_curves()`](https://verapancaldilab.github.io/pipeML/reference/get_curves.md) | ROC and Precision-Recall curves with pointwise bootstrap confidence bands |
 | [`compute_shap_values()`](https://verapancaldilab.github.io/pipeML/reference/compute_shap_values.md) | SHAP values of the final model (trained on all training samples) for every training sample; takes only the trained model |
-| [`plot_survival_performance()`](https://verapancaldilab.github.io/pipeML/reference/plot_survival_performance.md) | Kaplan-Meier curves stratified by predicted risk groups |
+| [`plot_survival_performance()`](https://verapancaldilab.github.io/pipeML/reference/plot_survival_performance.md) | Kaplan-Meier curves stratified by predicted risk groups (returns a `km_plot`: `$plot` and `$table` ggplots, drawn together by `print.km_plot()`) |
 
 ------------------------------------------------------------------------
 
@@ -84,14 +84,27 @@ commented out of `model_list`.
 
 **Imports (must be installed):** `caret`, `doParallel`, `foreach`,
 `dplyr`, `tidyr`, `tibble`, `purrr (>= 1.0.2)`, `ggplot2`, `reshape2`,
-`survival`, `survminer`, `fastshap`, `dials`, `parsnip`, `rsample`,
-`workflows`, `tune`, `yardstick`, `grDevices`, `parallel`, `stats`
+`survival`, `fastshap`, `dials`, `parsnip`, `rsample`, `workflows`,
+`tune`, `withr`, `yardstick`, `grDevices`, `grid`, `parallel`, `stats`
 
 **Suggests (optional, needed for specific algorithms):**
 `testthat (>= 3.0.0)`, `knitr`, `rmarkdown`, `C50`, `randomForest`,
 `glmnet`, `xgboost`, `kernlab`, `recipes`, `tidyverse`, `tidymodels`,
-`censored`, `flexsurv`, `coin`, `aorsf`, `WGCNA`, `cowplot`, `matlib`,
-`shapviz`
+`censored`, `flexsurv`, `coin`, `aorsf`, `WGCNA`, `cowplot`, `shapviz`
+
+**R version (`R (>= 4.3.1)`, R 4.3.0 not tested):** verified on
+2026-10-19 by installing with pak into empty libraries on R 4.3.1 and
+4.3.3 and running R CMD check with all tests. Don’t add a dependency
+that pulls in `car` (e.g. `survminer`, `ggpubr`, `rstatix`, `matlib`):
+`car -> pbkrtest -> doBy -> Deriv` needs R \>= 4.5 (`Deriv` 4.3.5
+declares it; 4.3.0 declares nothing but does not compile on R \< 4.5),
+and `car -> quantreg -> MatrixModels` needs Matrix \>= 1.6-0 (R
+4.3.0/4.3.1 ship 1.5-4.1). For this reason
+[`plot_survival_performance()`](https://verapancaldilab.github.io/pipeML/reference/plot_survival_performance.md)
+draws the Kaplan-Meier plot with ggplot2 + grid since 2026-10-19
+(before: `survminer::ggsurvplot()`) and `matlib` (never used) was
+dropped from Suggests. CI (`release`, `oldrel-1`) does not test R 4.3,
+so re-check the floor locally when adding dependencies.
 
 **Remotes (GitHub):** - `VeraPancaldiLab/multideconv` — custom
 deconvolution package (optional) - `bgreenwell/fastshap@v0.3.0` —
