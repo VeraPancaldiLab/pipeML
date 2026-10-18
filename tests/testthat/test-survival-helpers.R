@@ -101,7 +101,9 @@ test_that("plot_survival_performance() forms the risk groups, also with few dist
   pred <- function(v) list(preds = tibble::tibble(.pred = v), c_index = 0.6, c_index_lower = 0.5, c_index_upper = 0.7)
 
   p <- suppressWarnings(suppressMessages(plot_survival_performance(obs, pred(rnorm(n)), n_groups = 3, file_name = "t")))
-  expect_s3_class(p, "ggsurvplot")
+  expect_s3_class(p, "km_plot")
+  expect_s3_class(p$plot, "ggplot")
+  expect_s3_class(p$table, "ggplot")
   expect_true(file.exists(file.path("Results", "Survival_KM_t.pdf")))
 
   # two distinct predictions: the samples with the same prediction stay together, so only 2 groups
@@ -114,7 +116,7 @@ test_that("plot_survival_performance() forms the risk groups, also with few dist
 
   # default: 2 groups, as in compute_prediction()
   p2 <- suppressWarnings(plot_survival_performance(obs, pred(rnorm(n))))
-  expect_equal(levels(p2$data.survplot$risk_group), c("Low risk", "High risk"))
+  expect_equal(levels(droplevels(p2$plot$data$risk_group)), c("Low risk", "High risk"))
 
   # samples without a prediction are left out with a message
   v <- rnorm(n); v[c(3, 9)] <- NA

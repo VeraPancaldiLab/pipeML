@@ -22,8 +22,9 @@ Low/High risk (2 groups), Low/Medium/High risk (3 groups) or Group 1 (lowest ris
 to "Results/Survival_KM_<file_name>.pdf" ("Results/Survival_KM.pdf" if \code{NULL}).}
 }
 \value{
-Invisibly returns the \code{ggsurvplot} object for further customization. The plot (curves and
-number-at-risk table) is saved as a PDF.
+Invisibly returns a \code{km_plot} object, a list of two ggplot objects that can be customized:
+\code{plot} (the curves) and \code{table} (the number at risk). Printing it draws both together. The plot is
+saved as a PDF.
 }
 \description{
 Stratifies individuals into risk groups based on predicted risk scores from

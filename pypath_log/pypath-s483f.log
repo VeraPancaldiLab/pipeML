@@ -1,0 +1,5 @@
+[2026-10-03 01:03:01] Welcome!
+[2026-10-03 01:03:01] Logger started, logging into `/home/marcelo.hurtado/Documents/pipeML/pypath_log/pypath-s483f.log`.
+[2026-10-03 01:03:01] Session `s483f` started.
+[2026-10-03 01:03:01] Config has been read from the following files:
+[2026-10-03 01:03:01]   - /home/marcelo.hurtado/.cache/uv/archive-v0/gnk1NbbwN0xji_c7/lib/python3.10/site-packages/pypath_common/data/settings.yaml

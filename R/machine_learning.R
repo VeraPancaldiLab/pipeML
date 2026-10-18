@@ -5089,8 +5089,9 @@ compute_cv_CINDEX <- function(models, file_name = NULL, plot_results = TRUE){
 #' \code{df_test} must have one row per prediction, in the same order. Samples without a prediction (\code{NA}) are
 #' left out of the plot, with a message.
 #'
-#' @return Invisibly returns the \code{ggsurvplot} object for further customization. The plot (curves and
-#'   number-at-risk table) is saved as a PDF.
+#' @return Invisibly returns a \code{km_plot} object, a list of two ggplot objects that can be customized:
+#'   \code{plot} (the curves) and \code{table} (the number at risk). Printing it draws both together. The plot is
+#'   saved as a PDF.
 #'
 #' @examples
 #' \dontrun{
@@ -5230,31 +5231,92 @@ plot_survival_performance <- function(df_test,
   # Plot KM curves
   # ---------------------------------------------------------------------------
 
-  # Create ggsurvplot without printing
-  plot_obj <- survminer::ggsurvplot(
-    fit_km,
-    data = df_test,
-    risk.table = TRUE,
-    conf.int = TRUE,
-    pval = FALSE,
-    ggtheme = ggplot2::theme_minimal(),
-    palette = if (n_groups <= 3) c("#1B9E77", "#7570B3", "#D95F02")[1:n_groups] else grDevices::hcl.colors(n_groups, "Dark 3"),
-    legend.title = "Risk Group",
-    legend.labs = levels(df_test$risk_group),
-    title = paste0("Test-set Survival Performance", if (!is.null(file_name)) paste0(" - ", file_name)),
-    subtitle = subtitle_text,
-    risk.table.height = 0.25,
-    tables.theme = ggplot2::theme_minimal(),
-    print = FALSE
+  # Drawn with ggplot2 rather than survminer::ggsurvplot(): survminer's dependencies (car, pbkrtest, doBy, Deriv)
+  # need R >= 4.5
+  palette <- if (n_groups <= 3) c("#1B9E77", "#7570B3", "#D95F02")[1:n_groups] else grDevices::hcl.colors(n_groups, "Dark 3")
+  names(palette) <- labels
+
+  # survfit() stores the curves of all groups one after the other; each curve starts at (0, 1)
+  strata <- factor(sub("^risk_group=", "", rep(names(fit_km$strata), fit_km$strata)), levels = labels)
+  km_data <- rbind(
+    data.frame(time = 0, surv = 1, lower = 1, upper = 1, n.censor = 0, risk_group = unique(strata)),
+    data.frame(time = fit_km$time, surv = fit_km$surv, lower = fit_km$lower, upper = fit_km$upper,
+               n.censor = fit_km$n.censor, risk_group = strata)
   )
 
-  # For a single plot, no need to use arrange_ggsurvplots()
+  # Confidence band drawn as steps, like the curve: each value holds until the next time of the same group
+  band <- do.call(rbind, lapply(split(km_data, km_data$risk_group, drop = TRUE), function(d) {
+    next_time <- c(d$time[-1], d$time[nrow(d)])
+    data.frame(time = c(rbind(d$time, next_time)), lower = rep(d$lower, each = 2), upper = rep(d$upper, each = 2),
+               risk_group = d$risk_group[1])
+  }))
+
+  x_breaks <- pretty(c(0, max(df_test$time)))
+
+  km_plot <- ggplot2::ggplot(km_data, ggplot2::aes(x = .data$time, color = .data$risk_group, fill = .data$risk_group)) +
+    ggplot2::geom_ribbon(data = band, ggplot2::aes(ymin = .data$lower, ymax = .data$upper),
+                         alpha = 0.2, color = NA, na.rm = TRUE) +
+    ggplot2::geom_step(ggplot2::aes(y = .data$surv), linewidth = 0.8) +
+    ggplot2::geom_point(data = km_data[km_data$n.censor > 0, ], ggplot2::aes(y = .data$surv), shape = 3, size = 2) +
+    ggplot2::scale_color_manual(values = palette) +
+    ggplot2::scale_fill_manual(values = palette) +
+    ggplot2::scale_x_continuous(breaks = x_breaks, limits = range(x_breaks)) +
+    ggplot2::scale_y_continuous(limits = c(0, 1)) +
+    ggplot2::labs(x = "Time", y = "Survival probability", color = "Risk Group", fill = "Risk Group",
+                  title = paste0("Test-set Survival Performance", if (!is.null(file_name)) paste0(" - ", file_name)),
+                  subtitle = subtitle_text) +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(legend.position = "top")
+
+  # Number at risk at the time axis breaks
+  at_risk <- summary(fit_km, times = x_breaks, extend = TRUE)
+  risk_table <- data.frame(time = at_risk$time, n.risk = at_risk$n.risk,
+                           risk_group = factor(sub("^risk_group=", "", as.character(at_risk$strata)), levels = labels))
+
+  table_plot <- ggplot2::ggplot(risk_table, ggplot2::aes(x = .data$time, y = .data$risk_group, label = .data$n.risk,
+                                                         color = .data$risk_group)) +
+    ggplot2::geom_text(size = 3.5, show.legend = FALSE) +
+    ggplot2::scale_color_manual(values = palette) +
+    ggplot2::scale_x_continuous(breaks = x_breaks, limits = range(x_breaks)) +
+    ggplot2::scale_y_discrete(limits = rev(levels(droplevels(risk_table$risk_group)))) +
+    ggplot2::labs(x = "Time", y = NULL, title = "Number at risk") +
+    ggplot2::theme_minimal() +
+    ggplot2::theme(panel.grid = ggplot2::element_blank(), plot.title = ggplot2::element_text(size = 11))
+
+  plot_obj <- structure(list(plot = km_plot, table = table_plot), class = "km_plot")
+
   grDevices::pdf(paste0("Results/Survival_KM", if (!is.null(file_name)) paste0("_", file_name), ".pdf"), width = 8, height = 6)
-  print(plot_obj, newpage = FALSE)   # prints main plot + risk table together (newpage = FALSE: no blank first page)
+  print(plot_obj, newpage = FALSE)   # main plot + risk table together (newpage = FALSE: no blank first page)
   grDevices::dev.off()
 
   invisible(plot_obj)
 
+}
+
+#' Draw the Kaplan-Meier curves and the number-at-risk table returned by plot_survival_performance()
+#'
+#' @param x A \code{km_plot} object.
+#' @param newpage Logical. Start a new page before drawing (default \code{TRUE}).
+#' @param ... Not used.
+#' @noRd
+#' @export
+print.km_plot <- function(x, newpage = TRUE, ...) {
+  main <- ggplot2::ggplotGrob(x$plot)
+  table <- ggplot2::ggplotGrob(x$table)
+  # Same left and right margins, so that the time axes of the curves and of the table line up
+  widths <- grid::unit.pmax(main$widths, table$widths)
+  main$widths <- widths
+  table$widths <- widths
+
+  if (newpage) grid::grid.newpage()
+  grid::pushViewport(grid::viewport(layout = grid::grid.layout(2, 1, heights = grid::unit(c(3, 1), "null"))))
+  grid::pushViewport(grid::viewport(layout.pos.row = 1))
+  grid::grid.draw(main)
+  grid::popViewport()
+  grid::pushViewport(grid::viewport(layout.pos.row = 2))
+  grid::grid.draw(table)
+  grid::popViewport(2)
+  invisible(x)
 }
 
 #' Predict and Evaluate Survival Model Performance (Internal)

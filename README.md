@@ -15,6 +15,8 @@ construction
 
 ## Installation
 
+`pipeML` requires R 4.3.1 or later.
+
 You can install the development version of `pipeML` from
 [GitHub](https://github.com/) with:
 
