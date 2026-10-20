@@ -6,7 +6,7 @@
 
 - **Version:** 0.0.1 (active development)
 - **License:** GPL >= 3
-- **R requirement:** >= 4.3.1
+- **R requirement:** >= 4.3.1 (README); DESCRIPTION says `R (>= 4.3)`
 - **GitHub:** https://github.com/VeraPancaldiLab/pipeML
 - **Website:** https://verapancaldilab.github.io/pipeML
 - **Authors:** Marcelo Hurtado (aut, cre), Vera Pancaldi (aut)
@@ -78,7 +78,7 @@ All live in `R/machine_learning.R`.
 **Suggests (optional, needed for specific algorithms):**
 `testthat (>= 3.0.0)`, `knitr`, `rmarkdown`, `C50`, `randomForest`, `glmnet`, `xgboost`, `kernlab`, `recipes`, `tidyverse`, `tidymodels`, `censored`, `flexsurv`, `coin`, `aorsf`, `WGCNA`, `cowplot`, `shapviz`
 
-**R version (`R (>= 4.3.1)`, R 4.3.0 not tested):** verified on 2026-10-19 by installing with pak into empty libraries on R 4.3.1 and 4.3.3 and running R CMD check with all tests. Don't add a dependency that pulls in `car` (e.g. `survminer`, `ggpubr`, `rstatix`, `matlib`): `car -> pbkrtest -> doBy -> Deriv` needs R >= 4.5 (`Deriv` 4.3.5 declares it; 4.3.0 declares nothing but does not compile on R < 4.5), and `car -> quantreg -> MatrixModels` needs Matrix >= 1.6-0 (R 4.3.0/4.3.1 ship 1.5-4.1). For this reason `plot_survival_performance()` draws the Kaplan-Meier plot with ggplot2 + grid since 2026-10-19 (before: `survminer::ggsurvplot()`) and `matlib` (never used) was dropped from Suggests. CI (`release`, `oldrel-1`) does not test R 4.3, so re-check the floor locally when adding dependencies.
+**R version (R >= 4.3.1, R 4.3.0 not tested):** DESCRIPTION must keep `R (>= 4.3)`: R CMD check warns "Dependence on R version '4.3.1' not with patchlevel 0" and CI fails on warnings, so 4.3.1 is stated in the README only. verified on 2026-10-19 by installing with pak into empty libraries on R 4.3.1 and 4.3.3 and running R CMD check with all tests. Don't add a dependency that pulls in `car` (e.g. `survminer`, `ggpubr`, `rstatix`, `matlib`): `car -> pbkrtest -> doBy -> Deriv` needs R >= 4.5 (`Deriv` 4.3.5 declares it; 4.3.0 declares nothing but does not compile on R < 4.5), and `car -> quantreg -> MatrixModels` needs Matrix >= 1.6-0 (R 4.3.0/4.3.1 ship 1.5-4.1). For this reason `plot_survival_performance()` draws the Kaplan-Meier plot with ggplot2 + grid since 2026-10-19 (before: `survminer::ggsurvplot()`) and `matlib` (never used) was dropped from Suggests. CI (`release`, `oldrel-1`) does not test R 4.3, so re-check the floor locally when adding dependencies.
 
 **Remotes (GitHub):**
 - `VeraPancaldiLab/multideconv` — custom deconvolution package (optional)
